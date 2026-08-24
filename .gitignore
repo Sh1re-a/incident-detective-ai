@@ -1,0 +1,33 @@
+.DS_Store
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+.envrc
+secrets/
+*.pem
+*.key
+
+# Future frontend artifacts
+node_modules/
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Future Python artifacts
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Local runtime data and logs
+*.log
+*.sqlite
+*.sqlite3
