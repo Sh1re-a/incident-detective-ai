@@ -45,7 +45,7 @@ Minsta innehåll:
 
 - `status` – `diagnosed` eller `insufficient_evidence`,
 - `root_cause_code` – kanonisk kod i formatet `^[A-Z][A-Z0-9_]{1,63}$`; krävs för `diagnosed`, annars `null`,
-- `affected_service` – kanonisk tjänstekod i samma format; krävs för `diagnosed`, annars `null`,
+- `affected_service` – kanonisk kod för den primära tjänst där rotorsaken behöver rättas, inte alla tjänster där symptom syns; krävs för `diagnosed`, annars `null`,
 - kort `business_summary`,
 - kort `technical_summary`,
 - `claims`, där varje påstående har en stabil `claim_code`, en maskinläsbar `claim_value_code`, visningstext och en lista `evidence_ids`,
