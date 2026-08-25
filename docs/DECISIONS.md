@@ -137,12 +137,12 @@ Slutcontainern ska deployas till Cloud Run. Hemligheter finns endast på servers
 
 **Konsekvens:** Ingen deploy görs i grundfasen. Extern deploy och publik åtkomst kräver uttryckligt klartecken.
 
-## DEC-014 – Privat repo och ingen licens före ägarskapsbesked
+## DEC-014 – Publikt portfolio-repo utan licens
 
-**Status:** Proposed
+**Status:** Accepted, 25 augusti 2026
 
-`Sh1re-a/incident-detective-ai` skapas privat. Ingen open-source-licens läggs till och repot görs inte publikt innan Julia/addendumfrågan är bekräftad.
+Projektgrunden publiceras i [Sh1re-a/incident-detective-ai](https://github.com/Sh1re-a/incident-detective-ai). Ingen open-source-licens läggs till och ingen deploy görs som del av publiceringen.
 
-**Varför:** Privat lagring är godkänd, men publik äganderätt och villkor är ännu inte verifierade.
+**Varför:** Projektet är ett icke-kommersiellt portfolio- och utbildningsprojekt som ska kunna visas på GitHub och senare användas som ett sanningsenligt arbetsprov.
 
-**Konsekvens:** En publik release är planerad men får inte antas vara godkänd.
+**Konsekvens:** Projektgrunden och dess Git-historik blir offentligt läsbara. Live-demo, mätresultat och deployment är fortfarande separata, ännu inte genomförda steg.

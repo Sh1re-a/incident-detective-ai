@@ -3,7 +3,7 @@
 - **Period:** tisdag 25 augusti–fredag 18 september 2026
 - **Projekt:** SALT Sprint 3 – The Passion Project
 - **Omfattning:** cirka 95–115 fokuserade timmar
-- **Dokumentstatus:** version 1.0 för granskning, 24 augusti 2026
+- **Dokumentstatus:** version 1.1 för granskning, 25 augusti 2026
 
 ## Problemet jag vill arbeta med
 
@@ -43,7 +43,7 @@ Senast den 18 september vill jag ha en liten men komplett produkt som är deploy
 - en reproducerbar README, en ärlig limitations-del och en 60–90 sekunders demovideo,
 - ett presentationsflöde som ryms inom tio minuter.
 
-Cloud Run är ett tekniskt MUST, men jag gör ingen extern deploy utan ett separat, uttryckligt klartecken. Repot blir inte publikt och får ingen open-source-licens innan Julia/addendumfrågan är bekräftad. Om nödvändigt klartecken saknas i vecka 4 redovisar jag deployment som blockerad; jag kallar inte enbart lokal körning för uppnådd Cloud Run-leverans.
+Cloud Run är ett tekniskt MUST, men jag gör ingen extern deploy utan ett separat, uttryckligt klartecken. Projektgrunden är publik på GitHub som ett icke-kommersiellt portfolio- och utbildningsprojekt och har ingen open-source-licens. Om nödvändigt klartecken för deploy saknas i vecka 4 redovisar jag deployment som blockerad; jag kallar inte enbart lokal körning för uppnådd Cloud Run-leverans.
 
 ## Vad som är simulerat och vad som ska vara verkligt
 
@@ -157,7 +157,7 @@ Vid varje check-in dokumenterar jag:
 | Live-demo eller API blir långsamt eller otillgängligt | Hård timeout, budgetgränser och en sanningsenligt märkt recorded replay. |
 | RAG blir ett eget projekt | Endast 10–15 runbooks indexeras; telemetri ligger kvar bakom domänverktyg. |
 | Syntetisk data uppfattas som verklig | Truth label visas i Story View, Engineering View, README och video. |
-| Ägarskap/publicering är inte klar | Repot förblir privat och utan licens tills Julia/addendum är bekräftat. Extern deploy kräver ett separat klartecken. |
+| Extern deploy är inte klar | GitHub-repot kan vara publikt, men Cloud Run kräver ett separat klartecken och teknisk verifiering. |
 | Jag kan inte försvara lösningen i intervju | Jag dokumenterar beslut, tradeoffs, fel och evalmetod och kan återskapa körningen själv. |
 
 ## Presentation fredag 18 september, högst 10 minuter
@@ -174,4 +174,4 @@ Vid varje check-in dokumenterar jag:
 
 ## Startvillkor
 
-Den här planen, MUST/SHOULD/CUT-scope och [dag‑1‑kontrakten](./docs/DAY-1-CONTRACTS.md) ska granskas innan produktkod börjar. Julia/addendumfrågan är ännu inte bekräftad. Projektgrunden ska lagras i ett privat GitHub-repo; ingen open-source-licens, publik release eller deploy ingår i denna första grundfas.
+Den här planen, MUST/SHOULD/CUT-scope och [dag‑1‑kontrakten](./docs/DAY-1-CONTRACTS.md) ska granskas innan produktkod börjar. Projektgrunden lagras i ett publikt GitHub-repo utan open-source-licens. Ingen produktkod eller deploy ingår i denna första grundfas.

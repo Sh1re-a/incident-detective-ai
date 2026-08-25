@@ -24,20 +24,21 @@ Det här är inte en chatbot och inte ett autonomt driftssystem. Systemet får r
 | **Simulerat** | Alla logs, metrics, traces, runbooks, releasehändelser, incidenter och uppskattningar av affärspåverkan är syntetiska. |
 | **Verkligt i slutprodukten** | Modellens verktygsval, tool calling, structured output, runbook-retrieval, deterministisk verifiering, evals, tracing, uppmätt latens, tokenanvändning, kostnadsestimat och Cloud Run-deploy. |
 | **Verkligt just nu** | Projekt-, scope-, beslut- och kontraktsdokumentationen i detta repo. |
-| **Planerat, inte verifierat** | API-åtkomst och billing, exakt modell, live-AI-flöde, mätvärden, evalutfall, Cloud Run, publik release och användartester. Inga resultat får anges som uppnådda före faktisk mätning. |
+| **Planerat, inte verifierat** | API-åtkomst och billing, exakt modell, live-AI-flöde, mätvärden, evalutfall, Cloud Run och användartester. Inga resultat får anges som uppnådda före faktisk mätning. |
 
 När en sparad körning visas ska den märkas **“Simulated incident — recorded deterministic replay.”** Den får aldrig ha en “Live AI”-badge. Slutmålets live-märkning används först när ett verkligt modellanrop kör utredningen.
 
-## Status 24 augusti 2026
+## Status 25 augusti 2026
 
 - Sprintplan, prioriterad backlog, tekniska beslut och dag‑1‑kontrakt är framtagna för granskning.
 - Ingen frontend, backend, databas, AI-integration, evalharness eller deploy har byggts.
 - Ingen API-åtkomst, billing, modellprestanda, latency, kostnad eller accuracy har verifierats.
-- Repot ska vara privat och sakna open-source-licens tills Julia/addendumfrågan är bekräftad.
+- Projektgrunden är publicerad på GitHub utan open-source-licens. Ingen demo är deployad.
 - Produktkod startar först efter att sprintplan, scope och dag‑1‑kontrakt har granskats.
 
 ## Projektdokument
 
+- [GitHub-repo](https://github.com/Sh1re-a/incident-detective-ai)
 - [Sprintplan](./SPRINTPLAN.md)
 - [Prioriterad backlog](./BACKLOG.md)
 - [Tekniska beslut](./docs/DECISIONS.md)
@@ -73,4 +74,4 @@ Följande ingår inte i sprinten:
 
 ## Ägarskap och publicering
 
-Projektgrunden får sparas i `Sh1re-a/incident-detective-ai` som ett **privat** GitHub-repo. Julia/addendumfrågan är inte bekräftad, så repot görs inte publikt och får ingen open-source-licens. Ingen deploy görs i denna grundfas; en framtida Cloud Run-deploy kräver dessutom ett separat, uttryckligt klartecken från Shirwac.
+Projektgrunden är publicerad i [Sh1re-a/incident-detective-ai](https://github.com/Sh1re-a/incident-detective-ai) som ett icke-kommersiellt portfolio- och utbildningsprojekt. Ingen open-source-licens har lagts till. Att koden är synlig på GitHub betyder inte att en live-demo är deployad; en framtida Cloud Run-deploy är ett separat steg.
