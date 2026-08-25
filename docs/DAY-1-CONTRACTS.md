@@ -122,6 +122,8 @@ UI-regel:
 
 ## 7. Körgränser
 
+Kontraktet nedan är sprintens yttergräns. Den nuvarande liveimplementationen är striktare: högst två collection-rundor och tre modellanrop inklusive synthesis.
+
 - högst tre collection-rundor,
 - högst åtta tool calls totalt,
 - högst två anrop per verktygstyp,

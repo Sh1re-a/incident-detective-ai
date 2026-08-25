@@ -1,13 +1,13 @@
-# Föreslagna tekniska beslut
+# Tekniska beslut
 
-- **Status:** föreslagen riktning inför Shirwacs granskning
+- **Status:** levande beslutslogg; varje beslut har egen status
 - **Senast uppdaterad:** 25 augusti 2026
 
-Förslagen nedan ska hålla Incident Detective litet, förklarbart och mätbart. De blir accepterade först efter Shirwacs granskning. Därefter ändras ett beslut bara när ny evidens eller ett verkligt blockerande problem motiverar det, och ändringen dokumenteras här i stället för att döljas i implementationen.
+Besluten ska hålla Incident Detective litet, förklarbart och mätbart. En föreslagen riktning blir accepterad när den är granskad eller implementerad. Därefter ändras den bara när ny evidens eller ett verkligt blockerande problem motiverar det, och ändringen dokumenteras här i stället för att döljas i implementationen.
 
 ## DEC-001 – Syntetisk incident, verklig utredning
 
-**Status:** Proposed
+**Status:** Accepted, 25 augusti 2026
 
 All incidentdata är syntetisk. Tool calling, modellbeteende, verifiering, evals, mätning och deployment ska däremot vara verkliga i slutprodukten. Live och replay har olika, synliga truth labels.
 
@@ -17,7 +17,7 @@ All incidentdata är syntetisk. Tool calling, modellbeteende, verifiering, evals
 
 ## DEC-002 – Monorepo och en deploybar container
 
-**Status:** Proposed
+**Status:** Accepted, 25 augusti 2026
 
 Frontend, backend, scenariofixtures, verifierare och evalharness ligger i ett monorepo. Slutleveransen ska kunna köras som en container på Cloud Run.
 
@@ -31,13 +31,13 @@ Frontend, backend, scenariofixtures, verifierare och evalharness ligger i ett mo
 
 Story/Engineering View byggs med React, TypeScript och Vite. API, tool contracts och verifiering byggs med Java 21, Spring Boot, Spring MVC, Jakarta Validation och Jackson.
 
-**Varför:** Shirwac kan redan Java och vill använda projektet för att bli bättre på Spring Boot samtidigt som AI-systemet byggs. Java har stöd för den planerade OpenAI-integrationen, så ett extra backend-runtime behövs inte i sprintens kärna.
+**Varför:** Shirwac kan redan Java och vill använda projektet för att bli bättre på Spring Boot samtidigt som AI-systemet byggs. Den officiella Gemini-SDK:n fungerar i Java, så ett extra backend-runtime behövs inte i sprintens kärna.
 
-**Konsekvens:** Delade begrepp måste kontraktstestas mellan TypeScript och Java; de får inte utvecklas som två oberoende sanningar. Spring Boot 4 använder Jackson 3, så den framtida sealed `Evidence`-hierarkin ska round-trip-testas innan scenariofixtures byggs. Python ingår inte i kärnarkitekturen.
+**Konsekvens:** Delade begrepp måste kontraktstestas mellan TypeScript och Java; de får inte utvecklas som två oberoende sanningar. Spring Boot 4 använder Jackson 3 och den sealed `Evidence`-hierarkin round-trip-testas. Python ingår inte i kärnarkitekturen.
 
 ## DEC-004 – Fyra separata domänkontrakt
 
-**Status:** Proposed
+**Status:** Accepted, 25 augusti 2026
 
 `Scenario`, `Evidence`, `Diagnosis` och `GroundTruth` hålls isär. `GroundTruth` är dolt för modellen och alla read-only tools.
 
@@ -47,7 +47,7 @@ Story/Engineering View byggs med React, TypeScript och Vite. API, tool contracts
 
 ## DEC-005 – Typade read-only tools
 
-**Status:** Proposed
+**Status:** Accepted, 25 augusti 2026
 
 Endast `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks` exponeras för modellen. De returnerar strukturerad data med stabila evidence IDs och kan inte skriva eller genomföra remediation.
 
@@ -57,9 +57,9 @@ Endast `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks` exponer
 
 ## DEC-006 – Explicit och begränsad state machine
 
-**Status:** Proposed
+**Status:** Accepted, 25 augusti 2026
 
-Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. Det har högst tre collection-rundor, åtta tool calls totalt, två per verktygstyp, tre parallella read-only-anrop, högst fyra modellanrop och 45 sekunders hard timeout. Slutlig synthesis får inte använda tools och följs endast av deterministisk verifiering.
+Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. Den implementerade gränsen är högst två collection-rundor, åtta tool calls totalt, två per verktygstyp, tre tool calls per runda, högst tre modellanrop och 45 sekunders hard timeout. Första collection kan få upp till 28 sekunder, en andra collection högst 8 sekunder och synthesis får återstående reserverad tid. Slutlig synthesis använder inga tools och följs endast av deterministisk verifiering.
 
 **Varför:** Beteende, latency och kostnad ska vara möjliga att förstå och mäta.
 
@@ -67,17 +67,17 @@ Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. D
 
 ## DEC-007 – En leverantör, function calling och structured output
 
-**Status:** Under review, 25 augusti 2026; access och kontrakt ej verifierade
+**Status:** Accepted for the current slice, 25 augusti 2026
 
-Det ursprungliga förslaget var OpenAI Responses API. Efter en kostnadskontroll är `gemini-3.7-flash` nu förstakandidat för den första lokala live-körningen eftersom Gemini har en gratis utvecklingsnivå i Sverige. Endast en modellleverantör ska användas i sprintens slutlösning. En publik Gemini-klient i Sverige/EES måste använda en billing-aktiverad betaltjänst enligt [Googles aktuella villkor](https://ai.google.dev/gemini-api/terms).
+Det aktuella liveflödet använder Gemini Developer API genom den officiella Java SDK:n, pinnad till `google-genai` 1.67.0. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och kontraktet `gemini-live-v2`. Endast en modellleverantör används i sprintens kärna.
 
 **Varför:** Meritvärdet ligger i arkitektur, evals och omdöme, inte i leverantörens namn. Gratis lokal utveckling minskar startkostnaden utan att låtsas att den publika demon blir kostnadsfri.
 
-**Konsekvens:** Modellanrop isoleras bakom en liten intern gateway, men inget multi-provider-lager eller modellval byggs i gränssnittet. `COLLECT` använder tools, `SYNTHESIZE` görs separat utan tools med strukturerat schema och `VERIFY` är deterministisk Java-kod. Aktuell dokumentation, API-åtkomst, fria kontogränser, billingkrav, SDK-version och modell-ID verifieras före provideradaptern. OpenAI är endast ett alternativ om Gemini inte klarar kontraktet eller evalsen.
+**Konsekvens:** Modellanrop isoleras bakom en liten intern gateway, men inget multi-provider-lager eller modellval byggs i gränssnittet. `COLLECT` använder custom function tools, `SYNTHESIZE` görs separat utan tools med ett strikt schema och `VERIFY` är deterministisk Java-kod. `gemini-3.7-flash` med `LOW` thinking timeoutade i två smoke-försök. Flash-Lite + `MINIMAL` gav en korrekt 5 209 ms-körning men har också timeoutat för det andra scenariot. Profilen är därför ett mätt startval, inte ett bevis på stabilitet eller kvalitet; evalsen får avgöra om den behålls.
 
 ## DEC-008 – RAG endast för runbooks
 
-**Status:** Proposed
+**Status:** Accepted, 25 augusti 2026
 
 PostgreSQL/pgvector används för 10–15 ostrukturerade runbooks. Metrics, logs och traces nås genom sina typade tools och läggs inte i vector store.
 
@@ -87,7 +87,7 @@ PostgreSQL/pgvector används för 10–15 ostrukturerade runbooks. Metrics, logs
 
 ## DEC-009 – Tre olika verifieringsfrågor
 
-**Status:** Proposed
+**Status:** Accepted, 25 augusti 2026
 
 Verifieraren mäter separat:
 
@@ -155,14 +155,24 @@ Recorded replay använder versionshanterad, betrodd demodata. Hela fixturepakete
 
 **Varför:** Replay-läget ska vara en stabil fallback och en reproducerbar referens, inte simulera felbeteenden som bara kan uppstå när en modell genererar ett nytt svar.
 
-**Konsekvens:** Replay-API:t returnerar bara `completed` för ett startbart fixturepaket. En framtida live-AI-runner får ett separat körkontrakt för strukturerade verifieringsfel; replay-API:t annonserar inte en status som dess produktionsrepository inte kan nå.
+**Konsekvens:** Replay-API:t returnerar bara `completed` för ett startbart fixturepaket. Live-runnern har ett separat kontrakt och kan returnera `verification_failed` när ett nytt modellsvar bryter verifieringsreglerna.
 
 ## DEC-016 – Swagger måste matcha det verkliga API:t
 
 **Status:** Accepted, 25 augusti 2026
 
-Det lokala Spring Boot-API:t dokumenteras med springdoc OpenAPI och Swagger UI. OpenAPI-schemat använder samma `snake_case` som verkliga JSON-svar, beskriver evidence-varianterna med explicita wire-värden och visar bara `recorded_replay` så länge ingen live-AI-runner finns.
+Det lokala Spring Boot-API:t dokumenteras med springdoc OpenAPI och Swagger UI. OpenAPI-schemat använder samma `snake_case` som verkliga JSON-svar, beskriver evidence-varianterna med explicita wire-värden och visar nu både `recorded_replay` och den uttryckligen bekräftade `live_ai`-endpointen.
 
 **Varför:** Swagger ska hjälpa mig och en teknisk granskare att förstå och prova det API som faktiskt finns. Ett schema med andra fältnamn, dolt facit eller planerade funktioner skulle ge falsk trygghet.
 
-**Konsekvens:** Kontraktstestet kontrollerar 200/404-svar, schemafält, evidence-discriminator och att interna fixture- och GroundTruth-typer saknas. Swagger är tillgänglig lokalt; om den ska vara publik eller avstängd i Cloud Run beslutas separat före deployment.
+**Konsekvens:** Kontraktstestet kontrollerar live/replay-svar, schemafält, evidence-discriminator och att interna fixturevägar, API-nyckel och GroundTruth-typer saknas. Swagger är tillgänglig lokalt; om den ska vara publik eller avstängd i Cloud Run beslutas separat före deployment.
+
+## DEC-017 – Kostnad visas som uppskattat betalt listpris
+
+**Status:** Accepted, 25 augusti 2026
+
+Tokenanvändningen kommer från leverantörens verkliga responsmetadata. `estimated_cost_usd` beräknas modellberoende från Googles betalda standardlistpris som kontrollerades 25 augusti 2026. Svaret innehåller även `estimated_cost_basis` och säger att faktisk free-tier-debitering kan vara 0 USD.
+
+**Varför:** Applikationen kan inte säkert avgöra kontots billingnivå från ett modellsvar. Ett omärkt listpris skulle därför se ut som en faktisk debitering.
+
+**Konsekvens:** Okända modell-ID:n får `null` som kostnadsestimat i stället för ett påhittat pris. Prislistan måste omverifieras före publicerade kostnadsjämförelser.

@@ -1,6 +1,6 @@
 # Lärspår och verktyg
 
-- **Status:** Replay-API, verifiering och första typade read-only-tool är verifierade; live-AI är inte ansluten
+- **Status:** Replay/live-API, fyra typade read-only tools och första riktiga Gemini-körningen är verifierade
 - **Senast verifierad:** 25 augusti 2026
 
 Målet är inte att läsa allt innan jag bygger. Jag följer samma korta loop:
@@ -23,7 +23,7 @@ Maven används i stället för Gradle i sprinten. Det finns redan på datorn, fu
 | Nu | Maven Wrapper | Reproducerbara bygg- och testkommandon. |
 | Nu | Java records, Jakarta Validation och Jackson | Typade kontrakt, JSON och tydliga valideringsfel. |
 | Nu | JUnit och Spring Boot Test | Deterministiska tester av regler och applikationsstart. |
-| Vecka 2 | Officiell Java-SDK för vald modellleverantör | Verklig function calling och structured output bakom en liten intern gateway. |
+| Nu | Google Gen AI SDK för Java 1.67.0 | Verklig function calling och structured output bakom en liten intern gateway. |
 | Vecka 2 | PostgreSQL och pgvector | Retrieval endast över 10–15 runbooks. |
 | Vecka 2–3 | Strukturerade JSON-loggar och OpenTelemetry | Förklara körningar, fel och latency. |
 | När backendkontraktet är stabilt | React, TypeScript och Vite | Story View och Engineering View. |
@@ -36,11 +36,12 @@ Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i s
 - Java 21.0.10 LTS, `javac` 21.0.10 och Maven 3.9.12 finns.
 - Projektet använder Spring Boot 4.1.1 och Maven Wrapper 3.3.4 med Maven 3.9.16.
 - IntelliJ IDEA 2025.3.3, Docker och Google Cloud CLI finns.
-- Hela Maven-testsuiten med 78 tester är grön på commit `d29a2ee`.
-- Ingen `GEMINI_API_KEY`, `GOOGLE_API_KEY` eller `OPENAI_API_KEY` finns i den aktuella terminalmiljön och ingen lokal `.env` har skapats. API-åtkomst, billing och exakt modell är därför fortfarande **inte verifierade**.
+- Hela den nätverksfria Maven-testsuiten har 131 gröna tester.
+- Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och `gemini-live-v2`.
+- En korrekt live smoke-körning tog 5 209 ms. Flera provider-timeouts har också observerats; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
 - PostgreSQL-klienten finns inte globalt. Det blockerar inte dag 1 och installeras inte innan retrievalsteget behöver den.
 
-En framtida API-nyckel ska bara finnas lokalt eller som en server-side secret. Värdet får aldrig skrivas i repo, dokumentation, frontendkod eller loggar.
+API-nyckeln finns endast i en Git-ignorerad lokal fil och ska senare ligga som server-side secret. Värdet får aldrig skrivas i repo, dokumentation, frontendkod eller loggar.
 
 ## Lärordning och nästa fokus
 
@@ -62,17 +63,15 @@ Läs i denna ordning:
 
 Byggresultat: tester bevisar bland annat att facit inte serialiseras till en publik respons, att okända evidence IDs underkänns och att `insufficient_evidence` inte kan innehålla en påhittad rotorsak.
 
-### Pass 3 – function calling och structured output i Java (nästa)
+### Pass 3 – function calling och structured output i Java (genomfört, förklara nu med egna ord)
 
-Läs bara det spår som väljs efter accesskontrollen. Nuvarande förstakandidat är Gemini:
+Läs den officiella dokumentation som implementationen bygger på:
 
 1. [Gemini API: Function calling](https://ai.google.dev/gemini-api/docs/function-calling)
 2. [Gemini API: Structured outputs](https://ai.google.dev/gemini-api/docs/structured-output)
 3. [Google Gen AI SDK för Java](https://github.com/googleapis/java-genai)
 
-OpenAI-spåret finns kvar som jämförelse tills valet är låst: [Function calling](https://developers.openai.com/api/docs/guides/function-calling), [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) och [Java Responses API](https://developers.openai.com/api/reference/java/resources/responses).
-
-Byggresultat: `get_metrics` är implementerat mot deterministiska fixtures med strikt argumentschema och nätverksfria tester. Nästa tool byggs med samma mönster. Exakt leverantör, SDK-version och modell låses först efter en verifierad access-, kostnads- och kontraktskontroll. Modellsvaret valideras alltid igen på serversidan.
+Byggresultat: alla fyra tools är typade och skrivskyddade. Gemini väljer tools i högst två collection-rundor, synthesis saknar tools och svaret valideras mot schema och Java-regler innan det jämförs med dolt facit. Nästa övning är att kunna följa en request från Swagger genom gateway, tool executor och verifierare.
 
 ### Pass 4 – evals och verifiering
 
@@ -110,7 +109,7 @@ Byggresultat: en lokalt testad container och därefter en separat godkänd deplo
 
 ## Nuvarande kodgrund
 
-Nu finns Spring Boot replay-API, domänkontrakt, separat dold `GroundTruth`, deterministisk verifierare, två fixturepaket, Swagger/OpenAPI, ett typat `get_metrics`-tool och 78 gröna tester. Frontend, modell-SDK/live-runner, databas och deploy saknas fortfarande.
+Nu finns Spring Boot replay/live-API, domänkontrakt, separat dold `GroundTruth`, deterministisk verifierare, två fixturepaket, Swagger/OpenAPI, fyra typade tools, Gemini-gateway, strict structured output, kostnadsestimat och 131 gröna nätverksfria tester. Frontend, PostgreSQL/pgvector, evalharness, observability och deploy saknas fortfarande.
 
 ## Två implementerade startscenarier
 
@@ -129,4 +128,4 @@ Båda ligger i samma syntetiska webbshop och använder tjänstekoderna `STOREFRO
 - [ ] Jag kan förklara varför endast sedd evidens får citeras.
 - [ ] Jag har godkänt preciseringarna i dag‑1‑kontraktet.
 - [ ] Två första scenariofacit och deras kanoniska koder är låsta.
-- [ ] Innan live-AI ansluts kan jag förklara kontrakten och har verifierat leverantörens API-åtkomst utan att exponera en nyckel.
+- [ ] Jag kan förklara varför live kräver både serverflagga och explicit requestbekräftelse och hur nyckeln hålls utanför Git.

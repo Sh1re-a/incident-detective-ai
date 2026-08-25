@@ -21,12 +21,12 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 | ID | Leverans | Acceptanskriterium | Status |
 |---|---|---|---|
 | M-10 | Låst kärnberättelse | “Checkout errors threaten orders” har tydlig kundpåverkan, tidslinje och ett säkert nästa steg | Klar |
-| M-11 | API- och billingcheck | Faktisk modellåtkomst är verifierad utan att token eller hemlighet hamnar i repo/logg | Pågår |
+| M-11 | API- och billingcheck | Faktisk modellåtkomst är verifierad utan att token eller hemlighet hamnar i repo/logg; kontots framtida billingläge dokumenteras separat | Pågår – liveåtkomst verifierad, billingläge ej verifierat |
 | M-12 | Domänkontrakt | `Scenario`, `Evidence`, `Diagnosis` och separat `GroundTruth` är implementerade och validerade | Klar |
 | M-13 | Två scenariopaket | Två seedade, deterministiska paket har minst två evidenstyper, brus och dolt facit; ett integritetstest stoppar `GroundTruth` från publika scenario- och toolpayloads | Klar |
 | M-14 | Backend och verifierare | Riktig frontend–API-kommunikation samt kontroll av schema, citation IDs och facit fungerar; trasiga modellsvar ger valideringsresultat utan HTTP 500 och `seenEvidenceIds` byggs endast från faktiska tool events | Pågår |
 | M-15 | Recorded Story View | Ett helt fall kan följas på högst 90 sekunder och märks “Simulated incident — recorded deterministic replay.” | Ej startad |
-| M-16 | Första liveutredningen | Efter kontraktslås kör ett verkligt modellanrop och läget märks “Simulated incident — real AI investigation.” | Ej startad |
+| M-16 | Första liveutredningen | Efter kontraktslås kör ett verkligt modellanrop och läget märks “Simulated incident — real AI investigation.” | Klar |
 
 **Gate 28 augusti:** ett fall förstås på högst 90 sekunder, minst två evidenstyper visas, resultatet är strukturerat, evidence IDs är klickbara och giltiga och replay/live-märkningen är sann.
 
@@ -34,13 +34,13 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 
 | ID | Leverans | Acceptanskriterium | Status |
 |---|---|---|---|
-| M-20 | Fyra typade read-only tools | `get_metrics` är implementerat och testat; `search_logs`, `get_trace` och `retrieve_runbooks` återstår | Pågår |
-| M-21 | Begränsad state machine | `COLLECT → SYNTHESIZE → VERIFY` följer hela dag‑1‑budgeten: tre collection-rundor, fyra model/åtta tool calls, två per tooltyp, tre parallella reads, tool-free synthesis och 45 s timeout | Ej startad |
+| M-20 | Fyra typade read-only tools | `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks` är scenarioavgränsade, skrivskyddade och testade | Klar |
+| M-21 | Begränsad state machine | `COLLECT → SYNTHESIZE → VERIFY` har högst två collection-rundor, tre model/åtta tool calls, två per tooltyp, högst tre calls per runda, tool-free synthesis och 45 s timeout | Klar |
 | M-22 | Structured diagnosis | Java-typer, Jakarta Validation och deterministiska domänregler validerar `diagnosed` eller `insufficient_evidence`, claims och evidence IDs | Klar |
 | M-23 | Runbook retrieval | PostgreSQL/pgvector söker endast i 10–15 runbooks och returnerar citerbar dokument-/chunkmetadata | Ej startad |
 | M-24 | Sex incidentfamiljer | Sex rotorsaksfamiljer återanvänder samma syntetiska webbshop, tjänstekarta, checkout-berättelse och UI; minst tre är valbara i demon | Ej startad |
 | M-25 | Story + Engineering View | Berättelse och tekniska detaljer kan växlas utan att privat chain-of-thought visas | Ej startad |
-| M-26 | Körmetadata | Run ID, mode, model ID, promptversion, git SHA, latency, tokens, calls och kostnadsestimat sparas | Pågår |
+| M-26 | Körmetadata | Run ID, mode, model ID, promptversion, git SHA, latency, tokens, calls och kostnadsestimat sparas | Pågår – git SHA och beständig lagring återstår |
 | M-27 | Grundobservability | Strukturerade JSON-loggar och OpenTelemetry täcker API, verktyg och verifiering utan hemligheter | Ej startad |
 
 **Gate 4 september:** liveutredningen fungerar och Engineering View visar tools, retrieval, evidens och körmetadata.
@@ -78,16 +78,16 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 
 | Mätetal | Mål | Nuläge |
 |---|---:|---|
-| Diagnosis accuracy | ≥ 15/18 | Ej mätt |
-| Schema pass | 100 % | Ej mätt |
-| Citation ID validity | 100 % | Ej mätt |
+| Diagnosis accuracy | ≥ 15/18 | Ingen eval; 1 lyckad smoke var korrekt |
+| Schema pass | 100 % | Ingen eval; lyckad smoke passerade |
+| Citation ID validity | 100 % | Ingen eval; lyckad smoke passerade |
 | Evidence precision | ≥ 90 % | Ej mätt |
 | Retrieval Hit@4 | ≥ 90 % | Ej mätt |
 | Korrekta abstentions | ≥ 2 | Ej mätt |
-| Warm p95 | < 30 s | Ej mätt |
-| Hard timeout | 45 s | Planerat, ej verifierat |
-| Model/tool calls | ≤ 4 / ≤ 8 | Planerat, ej verifierat |
-| Smoke runs | 20 stabila | Ej körda |
+| Warm p95 | < 30 s | Ej mätt; en lyckad run 5 209 ms, flera timeouts observerade |
+| Hard timeout | 45 s | Implementerad och enhetstestad; provider-timeouts observerade |
+| Model/tool calls | ≤ 4 / ≤ 8 | Lyckad smoke: 3 / 5 |
+| Smoke runs | 20 stabila | 1 lyckad live smoke; flera misslyckade timeoutförsök |
 
 ## SHOULD – endast efter passerad gate
 
