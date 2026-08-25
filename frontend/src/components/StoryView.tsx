@@ -347,17 +347,41 @@ function DiagnosisPanel({
   const rejected = result.status === "verification_failed";
   const abstained = diagnosis.status === "insufficient_evidence";
   const correct = diagnosisResultCorrect(result);
+  const precision = result.verification.evidence_precision;
+  const evidenceProofPassed =
+    result.verification.citation_validity.valid &&
+    (!precision.applicable || precision.score === 1);
+  const unknownEvidenceIds = new Set(
+    result.verification.citation_validity.unknown_evidence_ids,
+  );
+  const supportByCitation = new Map(
+    precision.citation_support.map((support) => [
+      citationKey(
+        support.claim_code,
+        support.claim_value_code,
+        support.evidence_id,
+      ),
+      support.supported,
+    ]),
+  );
+  const verdictTone = rejected
+    ? "rejected"
+    : abstained || (correct && !evidenceProofPassed)
+      ? "safe"
+      : "verified";
 
   return (
     <section className={`diagnosis-panel panel${rejected ? " rejected" : ""}`}>
       <div className="diagnosis-topline">
-        <span className={`verdict-badge ${rejected ? "rejected" : abstained ? "safe" : "verified"}`}>
+        <span className={`verdict-badge ${verdictTone}`}>
           {rejected
             ? "Rejected by verifier"
             : abstained
               ? "Safe abstention"
-              : correct
+              : correct && evidenceProofPassed
                 ? "Verified for this run"
+                : correct
+                  ? "Diagnosis matched · evidence support incomplete"
                 : "Verification finding"}
         </span>
         <span className="mode-label">
@@ -391,16 +415,35 @@ function DiagnosisPanel({
             <span>{humanizeCode(claim.claim_code)}</span>
             <p>{claim.display_text}</p>
             <div className="claim-citations">
-              {claim.evidence_ids.map((evidenceId) => (
-                <button
-                  type="button"
-                  key={evidenceId}
-                  onClick={() => onOpenEvidence(evidenceId)}
-                >
-                  Open evidence
-                  <small>{evidenceId}</small>
-                </button>
-              ))}
+              {claim.evidence_ids.map((evidenceId) => {
+                const unavailable = unknownEvidenceIds.has(evidenceId);
+                const supported = supportByCitation.get(
+                  citationKey(
+                    claim.claim_code,
+                    claim.claim_value_code,
+                    evidenceId,
+                  ),
+                );
+                const supportLabel = unavailable
+                  ? "unavailable"
+                  : supported === true
+                    ? "direct support"
+                    : supported === false
+                      ? "not direct support"
+                      : "not scored";
+
+                return (
+                  <button
+                    type="button"
+                    key={evidenceId}
+                    disabled={unavailable}
+                    onClick={() => onOpenEvidence(evidenceId)}
+                  >
+                    {unavailable ? "Evidence unavailable" : "Open evidence"}
+                    <small>{evidenceId} · {supportLabel}</small>
+                  </button>
+                );
+              })}
             </div>
           </article>
         ))}
@@ -424,9 +467,15 @@ function DiagnosisPanel({
           passed={result.verification.diagnosis_schema_pass}
         />
         <ProofItem
-          label="Evidence IDs"
-          value={result.verification.citation_validity.valid ? "Valid" : "Invalid"}
-          passed={result.verification.citation_validity.valid}
+          label="Evidence proof"
+          value={
+            !result.verification.citation_validity.valid
+              ? "Invalid IDs"
+              : precision.applicable
+                ? `${precision.supported_triples}/${precision.total_triples} direct`
+                : "Not applicable"
+          }
+          passed={evidenceProofPassed}
         />
         <ProofItem
           label="Hidden answer"
@@ -470,4 +519,12 @@ function diagnosisResultCorrect(result: InvestigationResult): boolean {
     result.comparison.root_cause_correct &&
     result.comparison.affected_service_correct
   );
+}
+
+function citationKey(
+  claimCode: string,
+  claimValueCode: string,
+  evidenceId: string,
+): string {
+  return `${claimCode}\u0000${claimValueCode}\u0000${evidenceId}`;
 }

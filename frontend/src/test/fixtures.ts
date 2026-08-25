@@ -109,6 +109,14 @@ export const recordedResult: RecordedReplayResult = {
       supported_triples: 1,
       total_triples: 1,
       score: 1,
+      citation_support: [
+        {
+          claim_code: "root_cause",
+          claim_value_code: "PAYMENT_TIMEOUT_CONFIG",
+          evidence_id: metricEvidence.evidence_id,
+          supported: true,
+        },
+      ],
     },
     diagnosis_correctness: {
       evaluated: true,
@@ -146,7 +154,7 @@ export const liveResult: LiveInvestigationResult = {
     },
   ],
   model_id: "gemini-3.5-flash-lite",
-  prompt_version: "gemini-live-v2",
+  prompt_version: "gemini-live-v3",
   token_usage: {
     input_tokens: 3967,
     output_tokens: 808,

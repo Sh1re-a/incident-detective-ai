@@ -26,6 +26,11 @@ export function EngineeringView({
   const isLive = result.mode === "live_ai";
   const rootCauseCorrect = result.comparison.root_cause_correct;
   const affectedServiceCorrect = result.comparison.affected_service_correct;
+  const seenEvidenceIds = new Set(
+    result.tool_events.flatMap((event) =>
+      event.evidence.map((evidence) => evidence.evidence_id),
+    ),
+  );
 
   return (
     <div className="engineering-view">
@@ -54,7 +59,11 @@ export function EngineeringView({
             <span>01</span>
             <div>
               <strong>Collect</strong>
-              <small>{result.tool_events.length} read-only tool calls returned evidence</small>
+              <small>
+                {isLive
+                  ? `${result.tool_events.length} read-only tool calls returned evidence`
+                  : `${result.tool_events.length} recorded trace ${result.tool_events.length === 1 ? "event" : "events"}; no tool was called now`}
+              </small>
             </div>
           </li>
           <li className="complete">
@@ -86,9 +95,13 @@ export function EngineeringView({
           <div className="section-heading">
             <div>
               <p className="section-kicker">Tool trace</p>
-              <h2 id="tool-calls-title">Read-only calls</h2>
+              <h2 id="tool-calls-title">
+                {isLive ? "Read-only calls" : "Recorded trace events"}
+              </h2>
             </div>
-            <span className="case-count">{result.tool_events.length} calls</span>
+            <span className="case-count">
+              {result.tool_events.length} {isLive ? "calls" : "events"}
+            </span>
           </div>
 
           <div className="engineering-tool-list">
@@ -210,6 +223,47 @@ export function EngineeringView({
             These checks describe one completed synthetic run. They are not an
             eval-set accuracy claim.
           </p>
+
+          {result.verification.evidence_precision.citation_support.length > 0 ? (
+            <details className="technical-detail">
+              <summary>Inspect claim-evidence support</summary>
+              <div className="engineering-tool-list">
+                {result.verification.evidence_precision.citation_support.map(
+                  (support) => (
+                    <article
+                      key={`${support.claim_code}-${support.claim_value_code}-${support.evidence_id}`}
+                    >
+                      <div className="engineering-tool-heading">
+                        <div>
+                          <code>{support.claim_code}</code>
+                          <strong>{humanizeCode(support.claim_value_code)}</strong>
+                        </div>
+                        <span className="round-label">
+                          {support.supported ? "Supported" : "Not supported"}
+                        </span>
+                      </div>
+                      <div className="engineering-evidence-row">
+                        <button
+                          type="button"
+                          disabled={!seenEvidenceIds.has(support.evidence_id)}
+                          onClick={() => onOpenEvidence(support.evidence_id)}
+                        >
+                          <span>
+                            {!seenEvidenceIds.has(support.evidence_id)
+                              ? "Unavailable"
+                              : support.supported
+                                ? "Direct"
+                                : "Weak link"}
+                          </span>
+                          {support.evidence_id}
+                        </button>
+                      </div>
+                    </article>
+                  ),
+                )}
+              </div>
+            </details>
+          ) : null}
         </section>
       </div>
 

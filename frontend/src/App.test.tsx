@@ -81,6 +81,10 @@ describe("Incident Detective experience", () => {
     await user.click(screen.getByRole("tab", { name: "Engineering View" }));
 
     expect(screen.getAllByText("No model called").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByRole("heading", { name: "Recorded trace events" })).toBeVisible();
+    expect(
+      screen.getByText("1 recorded trace event; no tool was called now"),
+    ).toBeVisible();
     expect(screen.getByText("100% this run")).toBeVisible();
     expect(
       screen.getByText(/They are not an eval-set accuracy claim/),
@@ -163,7 +167,14 @@ describe("Incident Detective experience", () => {
       status: "verification_failed",
       diagnosis: {
         ...liveResult.diagnosis,
-        root_cause_code: "WRONG_ROOT_CAUSE",
+        root_cause_code: "INVENTORY_SCHEMA_MISMATCH",
+        claims: [
+          {
+            ...liveResult.diagnosis.claims[0],
+            claim_value_code: "INVENTORY_SCHEMA_MISMATCH",
+            evidence_ids: ["model-invented-evidence-id"],
+          },
+        ],
       },
       comparison: {
         ...liveResult.comparison,
@@ -171,10 +182,29 @@ describe("Incident Detective experience", () => {
       },
       verification: {
         ...liveResult.verification,
+        citation_validity: {
+          valid: false,
+          unknown_evidence_ids: ["model-invented-evidence-id"],
+        },
+        evidence_precision: {
+          applicable: true,
+          supported_triples: 0,
+          total_triples: 1,
+          score: 0,
+          citation_support: [
+            {
+              claim_code: "root_cause",
+              claim_value_code: "INVENTORY_SCHEMA_MISMATCH",
+              evidence_id: "model-invented-evidence-id",
+              supported: false,
+            },
+          ],
+        },
         diagnosis_correctness: {
           ...liveResult.verification.diagnosis_correctness,
           root_cause_correct: false,
         },
+        hard_errors: ["unknown_evidence_id"],
       },
     };
     installApiMock({ liveResponse: rejectedResult });
@@ -190,7 +220,45 @@ describe("Incident Detective experience", () => {
 
     expect(await screen.findByText("Rejected by verifier")).toBeVisible();
     expect(screen.getByText("Did not match")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Evidence unavailable/ })).toBeDisabled();
   });
+
+  it("does not call a weakly supported diagnosis verified", async () => {
+    const weakProofResult: LiveInvestigationResult = {
+      ...liveResult,
+      verification: {
+        ...liveResult.verification,
+        evidence_precision: {
+          applicable: true,
+          supported_triples: 0,
+          total_triples: 1,
+          score: 0,
+          citation_support: [
+            {
+              claim_code: "root_cause",
+              claim_value_code: "PAYMENT_TIMEOUT_CONFIG",
+              evidence_id: metricEvidenceId(),
+              supported: false,
+            },
+          ],
+        },
+      },
+    };
+    installApiMock({ liveResponse: weakProofResult });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Run live AI" }));
+    await user.click(screen.getByRole("button", { name: "Confirm live run" }));
+
+    expect(
+      await screen.findByText("Diagnosis matched · evidence support incomplete"),
+    ).toBeVisible();
+    expect(screen.queryByText("Verified for this run")).not.toBeInTheDocument();
+    expect(screen.getByText("0/1 direct")).toBeVisible();
+    expect(screen.getByText(/not direct support/)).toBeVisible();
+  });
+
 });
 
 interface ApiMockOptions {

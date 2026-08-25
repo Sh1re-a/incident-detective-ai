@@ -129,6 +129,12 @@ export interface Verification {
     supported_triples: number;
     total_triples: number;
     score: number | null;
+    citation_support: Array<{
+      claim_code: Diagnosis["claims"][number]["claim_code"];
+      claim_value_code: string;
+      evidence_id: string;
+      supported: boolean;
+    }>;
   };
   diagnosis_correctness: {
     evaluated: boolean;
