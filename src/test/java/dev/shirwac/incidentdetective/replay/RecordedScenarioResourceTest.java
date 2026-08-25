@@ -2,7 +2,10 @@ package dev.shirwac.incidentdetective.replay;
 
 import dev.shirwac.incidentdetective.domain.diagnosis.Claim;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
+import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
+import dev.shirwac.incidentdetective.domain.evidence.MetricEvidence;
 import dev.shirwac.incidentdetective.domain.evidence.RunbookEvidence;
+import dev.shirwac.incidentdetective.domain.evidence.TraceEvidence;
 import dev.shirwac.incidentdetective.domain.groundtruth.ClaimSupport;
 import dev.shirwac.incidentdetective.domain.groundtruth.GroundTruth;
 import dev.shirwac.incidentdetective.domain.groundtruth.RunbookReference;
@@ -11,6 +14,7 @@ import dev.shirwac.incidentdetective.domain.verification.VerificationReport;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -102,6 +107,116 @@ class RecordedScenarioResourceTest {
         assertFalse(publicScenarioJson.contains("claim_support"));
     }
 
+    @Test
+    void paymentImpactMetricsMatchTheirCompletedMeasurementWindow() throws Exception {
+        RecordedScenarioFixture fixture = readRecordedFixture(
+                "checkout-orders-at-risk-v1"
+        );
+        MetricEvidence ratio = evidence(
+                fixture,
+                "cpt-v1-metric-checkout-failure-rate",
+                MetricEvidence.class
+        );
+        MetricEvidence failures = evidence(
+                fixture,
+                "cpt-v1-metric-failed-checkouts",
+                MetricEvidence.class
+        );
+
+        assertEquals(147.0 / 800.0, ratio.content().value(), 0.0005);
+        assertEquals("800", ratio.content().labels().get("attempts"));
+        assertEquals("10:02-10:12", ratio.content().labels().get("window"));
+        assertEquals(Instant.parse("2026-08-25T10:12:00Z"), ratio.observedAt());
+        assertEquals(147.0, failures.content().value());
+        assertEquals(ratio.observedAt(), failures.observedAt());
+    }
+
+    @Test
+    void inventoryEvidenceExplainsTheMultiItemRollout() throws Exception {
+        RecordedScenarioFixture fixture = readRecordedFixture(
+                "checkout-cart-segment-failures-v1"
+        );
+        MetricEvidence ratio = evidence(
+                fixture,
+                "cic-v1-metric-checkout-failure-rate",
+                MetricEvidence.class
+        );
+        MetricEvidence failures = evidence(
+                fixture,
+                "cic-v1-metric-failed-checkouts",
+                MetricEvidence.class
+        );
+        MetricEvidence contractErrors = evidence(
+                fixture,
+                "cic-v1-metric-contract-errors",
+                MetricEvidence.class
+        );
+        LogEvidence release = evidence(
+                fixture,
+                "cic-v1-log-inventory-release",
+                LogEvidence.class
+        );
+        LogEvidence mismatch = evidence(
+                fixture,
+                "cic-v1-log-schema-mismatch",
+                LogEvidence.class
+        );
+        TraceEvidence trace = evidence(
+                fixture,
+                "cic-v1-trace-contract-failure",
+                TraceEvidence.class
+        );
+
+        assertEquals(61.0 / 670.0, ratio.content().value(), 0.0005);
+        assertEquals("670", ratio.content().labels().get("attempts"));
+        assertEquals("multi_item", ratio.content().labels().get("cart_segment"));
+        assertEquals("11:02-11:12", ratio.content().labels().get("window"));
+        assertEquals(Instant.parse("2026-08-25T11:12:00Z"), ratio.observedAt());
+        assertEquals(61.0, failures.content().value());
+        assertEquals(ratio.observedAt(), failures.observedAt());
+        assertEquals(61.0, contractErrors.content().value());
+        assertEquals(ratio.observedAt(), contractErrors.observedAt());
+        assertEquals(
+                "multi_item_reservation",
+                release.content().attributes().get("rollout_scope")
+        );
+        assertEquals("multi_item", mismatch.content().attributes().get("cart_segment"));
+        assertEquals("3", mismatch.content().attributes().get("item_count"));
+        assertTrue(trace.content().spans().stream().anyMatch(span ->
+                "reserve-multi-item".equals(span.operation())
+        ));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "checkout-orders-at-risk-v1",
+            "checkout-cart-segment-failures-v1"
+    })
+    void generalRunbooksAreNotScoredAsDirectRootCauseProof(String scenarioId)
+            throws Exception {
+        RecordedScenarioFixture fixture = readRecordedFixture(scenarioId);
+        GroundTruth groundTruth = readGroundTruth(scenarioId);
+        Set<String> runbookIds = fixture.evidenceInventory().stream()
+                .filter(RunbookEvidence.class::isInstance)
+                .map(Evidence::evidenceId)
+                .collect(Collectors.toSet());
+
+        Claim rootCause = fixture.recordedDiagnosis().claims().stream()
+                .filter(claim -> "root_cause".equals(claim.claimCode().wireValue()))
+                .findFirst()
+                .orElseThrow();
+        ClaimSupport rootCauseSupport = groundTruth.claimSupport().stream()
+                .filter(support -> "root_cause".equals(
+                        support.claimCode().wireValue()
+                ))
+                .findFirst()
+                .orElseThrow();
+
+        assertTrue(rootCause.evidenceIds().stream().noneMatch(runbookIds::contains));
+        assertTrue(rootCauseSupport.allowedEvidenceIds().stream()
+                .noneMatch(runbookIds::contains));
+    }
+
     private RecordedScenarioFixture readRecordedFixture(String scenarioId) throws IOException {
         return readResource(
                 "/fixtures/recorded/" + scenarioId + ".json",
@@ -121,6 +236,18 @@ class RecordedScenarioResourceTest {
             assertNotNull(input, "Missing test resource " + path);
             return jsonMapper.readValue(input, type);
         }
+    }
+
+    private <T extends Evidence> T evidence(
+            RecordedScenarioFixture fixture,
+            String evidenceId,
+            Class<T> type
+    ) {
+        Evidence evidence = fixture.evidenceInventory().stream()
+                .filter(candidate -> evidenceId.equals(candidate.evidenceId()))
+                .findFirst()
+                .orElseThrow();
+        return type.cast(evidence);
     }
 
     private Map<String, Evidence> uniqueEvidenceIndex(RecordedScenarioFixture fixture) {
