@@ -16,8 +16,7 @@
       "claim_value_code": "INVENTORY_SCHEMA_MISMATCH",
       "allowed_evidence_ids": [
         "cic-v1-log-schema-mismatch",
-        "cic-v1-trace-contract-failure",
-        "cic-v1-runbook-contract-compatibility"
+        "cic-v1-trace-contract-failure"
       ]
     },
     {

@@ -17,8 +17,7 @@
       "allowed_evidence_ids": [
         "cpt-v1-log-timeout-config",
         "cpt-v1-log-timeout-error",
-        "cpt-v1-trace-failed-checkout",
-        "cpt-v1-runbook-timeout-precedence"
+        "cpt-v1-trace-failed-checkout"
       ]
     },
     {

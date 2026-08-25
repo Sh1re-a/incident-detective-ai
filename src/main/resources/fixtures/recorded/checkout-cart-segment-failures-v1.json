@@ -256,8 +256,7 @@
         "display_text": "Checkout and inventory use incompatible response schemas.",
         "evidence_ids": [
           "cic-v1-log-schema-mismatch",
-          "cic-v1-trace-contract-failure",
-          "cic-v1-runbook-contract-compatibility"
+          "cic-v1-trace-contract-failure"
         ]
       },
       {
