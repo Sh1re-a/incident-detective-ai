@@ -124,6 +124,7 @@
         "level": "ERROR",
         "message": "SocketTimeoutException while awaiting synthetic payment provider.",
         "attributes": {
+          "trace_id": "cpt-trace-4821",
           "configured_timeout_ms": "2000",
           "elapsed_ms": "2004",
           "provider": "SYNTHETIC_PAY"

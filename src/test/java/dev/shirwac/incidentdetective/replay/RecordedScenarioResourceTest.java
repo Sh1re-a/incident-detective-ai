@@ -192,6 +192,29 @@ class RecordedScenarioResourceTest {
             "checkout-orders-at-risk-v1",
             "checkout-cart-segment-failures-v1"
     })
+    void errorLogsExposeAnExactTraceIdForTheReadOnlyTraceTool(
+            String scenarioId
+    ) throws Exception {
+        RecordedScenarioFixture fixture = readRecordedFixture(scenarioId);
+        Set<String> traceIds = fixture.evidenceInventory().stream()
+                .filter(TraceEvidence.class::isInstance)
+                .map(TraceEvidence.class::cast)
+                .map(trace -> trace.content().traceId())
+                .collect(Collectors.toSet());
+
+        assertTrue(fixture.evidenceInventory().stream()
+                .filter(LogEvidence.class::isInstance)
+                .map(LogEvidence.class::cast)
+                .map(log -> log.content().attributes().get("trace_id"))
+                .filter(Objects::nonNull)
+                .anyMatch(traceIds::contains));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "checkout-orders-at-risk-v1",
+            "checkout-cart-segment-failures-v1"
+    })
     void generalRunbooksAreNotScoredAsDirectRootCauseProof(String scenarioId)
             throws Exception {
         RecordedScenarioFixture fixture = readRecordedFixture(scenarioId);
