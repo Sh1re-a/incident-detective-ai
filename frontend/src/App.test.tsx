@@ -259,6 +259,28 @@ describe("Incident Detective experience", () => {
     expect(screen.getByText(/not direct support/)).toBeVisible();
   });
 
+  it("explains the learning project and supports keyboard view navigation", async () => {
+    installApiMock();
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(
+      await screen.findByText(/A four-week learning project by Shirwac Abib/),
+    ).toBeVisible();
+    expect(screen.getByText(/Evals and deployment are still in progress/)).toBeVisible();
+
+    const storyTab = screen.getByRole("tab", { name: "Story View" });
+    storyTab.focus();
+    await user.keyboard("{ArrowRight}");
+
+    const engineeringTab = screen.getByRole("tab", { name: "Engineering View" });
+    expect(engineeringTab).toHaveFocus();
+    expect(engineeringTab).toHaveAttribute("aria-selected", "true");
+    expect(
+      screen.getByRole("heading", { name: "Run a case before inspecting its trace" }),
+    ).toBeVisible();
+  });
+
 });
 
 interface ApiMockOptions {

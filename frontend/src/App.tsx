@@ -1,4 +1,5 @@
 import {
+  type KeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -237,6 +238,26 @@ export function App() {
     setPhase("success");
   }, [result]);
 
+  const selectViewAndFocus = useCallback((nextView: AppView) => {
+    setView(nextView);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`${nextView}-view-tab`)?.focus();
+    });
+  }, []);
+
+  const handleViewKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key === "ArrowRight" || event.key === "End") {
+        event.preventDefault();
+        selectViewAndFocus("engineering");
+      } else if (event.key === "ArrowLeft" || event.key === "Home") {
+        event.preventDefault();
+        selectViewAndFocus("story");
+      }
+    },
+    [selectViewAndFocus],
+  );
+
   return (
     <div className="site-shell" id="top">
       <header className="site-header">
@@ -252,20 +273,28 @@ export function App() {
 
         <nav className="view-tabs" aria-label="Demo view" role="tablist">
           <button
+            id="story-view-tab"
             type="button"
             role="tab"
             aria-selected={view === "story"}
+            aria-controls="demo-view-panel"
+            tabIndex={view === "story" ? 0 : -1}
             className={view === "story" ? "active" : ""}
             onClick={() => setView("story")}
+            onKeyDown={handleViewKeyDown}
           >
             Story View
           </button>
           <button
+            id="engineering-view-tab"
             type="button"
             role="tab"
             aria-selected={view === "engineering"}
+            aria-controls="demo-view-panel"
+            tabIndex={view === "engineering" ? 0 : -1}
             className={view === "engineering" ? "active" : ""}
             onClick={() => setView("engineering")}
+            onKeyDown={handleViewKeyDown}
           >
             Engineering View
           </button>
@@ -290,8 +319,13 @@ export function App() {
               <span> follow the evidence.</span>
             </h1>
             <p className="hero-intro">
-              An AI investigator uses bounded read-only tools, cites what it saw
-              and submits its diagnosis to a deterministic verifier.
+              The AI investigates a broken checkout, shows the evidence behind
+              its answer and submits the result to a deterministic verifier.
+            </p>
+            <p className="hero-intro">
+              A four-week learning project by Shirwac Abib: building and testing
+              an applied AI system with Java, Spring and React. Evals and
+              deployment are still in progress.
             </p>
           </div>
           <div className="hero-proof" aria-label="Project principles">
@@ -329,9 +363,10 @@ export function App() {
             />
 
             <div
+              id="demo-view-panel"
               className="view-content"
               role="tabpanel"
-              aria-label={view === "story" ? "Story View" : "Engineering View"}
+              aria-labelledby={`${view}-view-tab`}
             >
               {view === "story" ? (
                 <StoryView
