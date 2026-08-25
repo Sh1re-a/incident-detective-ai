@@ -22,9 +22,9 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 |---|---|---|---|
 | M-10 | Låst kärnberättelse | “Checkout errors threaten orders” har tydlig kundpåverkan, tidslinje och ett säkert nästa steg | Ej startad |
 | M-11 | API- och billingcheck | Faktisk modellåtkomst är verifierad utan att token eller hemlighet hamnar i repo/logg | Ej startad |
-| M-12 | Domänkontrakt | `Scenario`, `Evidence`, `Diagnosis` och separat `GroundTruth` är implementerade och validerade | Ej startad |
-| M-13 | Två scenariopaket | Två seedade, deterministiska paket har minst två evidenstyper, brus och dolt facit | Ej startad |
-| M-14 | Backend och verifierare | Riktig frontend–API-kommunikation samt kontroll av schema, citation IDs och facit fungerar | Ej startad |
+| M-12 | Domänkontrakt | `Scenario`, `Evidence`, `Diagnosis` och separat `GroundTruth` är implementerade och validerade | Klar |
+| M-13 | Två scenariopaket | Två seedade, deterministiska paket har minst två evidenstyper, brus och dolt facit; ett integritetstest stoppar `GroundTruth` från publika scenario- och toolpayloads | Ej startad |
+| M-14 | Backend och verifierare | Riktig frontend–API-kommunikation samt kontroll av schema, citation IDs och facit fungerar; trasiga modellsvar ger valideringsresultat utan HTTP 500 och `seenEvidenceIds` byggs endast från faktiska tool events | Pågår |
 | M-15 | Recorded Story View | Ett helt fall kan följas på högst 90 sekunder och märks “Simulated incident — recorded deterministic replay.” | Ej startad |
 | M-16 | Första liveutredningen | Efter kontraktslås kör ett verkligt modellanrop och läget märks “Simulated incident — real AI investigation.” | Ej startad |
 
@@ -36,7 +36,7 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 |---|---|---|---|
 | M-20 | Fyra typade read-only tools | `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks` har validerade in-/utdata och kan inte skriva | Ej startad |
 | M-21 | Begränsad state machine | `COLLECT → SYNTHESIZE → VERIFY` följer hela dag‑1‑budgeten: tre collection-rundor, fyra model/åtta tool calls, två per tooltyp, tre parallella reads, tool-free synthesis och 45 s timeout | Ej startad |
-| M-22 | Structured diagnosis | Java-typer, Jakarta Validation och deterministiska domänregler validerar `diagnosed` eller `insufficient_evidence`, claims och evidence IDs | Ej startad |
+| M-22 | Structured diagnosis | Java-typer, Jakarta Validation och deterministiska domänregler validerar `diagnosed` eller `insufficient_evidence`, claims och evidence IDs | Klar |
 | M-23 | Runbook retrieval | PostgreSQL/pgvector söker endast i 10–15 runbooks och returnerar citerbar dokument-/chunkmetadata | Ej startad |
 | M-24 | Sex incidentfamiljer | Sex rotorsaksfamiljer återanvänder samma syntetiska webbshop, tjänstekarta, checkout-berättelse och UI; minst tre är valbara i demon | Ej startad |
 | M-25 | Story + Engineering View | Berättelse och tekniska detaljer kan växlas utan att privat chain-of-thought visas | Ej startad |
