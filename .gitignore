@@ -16,16 +16,14 @@ coverage/
 .vite/
 *.tsbuildinfo
 
-# Future Python artifacts
-.venv/
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-*.egg-info/
+# Java, Maven and IntelliJ
+target/
+*.class
+.idea/
+*.iml
+*.iws
+*.ipr
+.mvn/wrapper/maven-wrapper.jar
 
 # Local runtime data and logs
 *.log
