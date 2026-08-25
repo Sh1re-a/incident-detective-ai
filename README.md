@@ -4,7 +4,7 @@ Incident Detective är mitt individuella Passion Project under SALT Sprint 3, 25
 
 > **Slutmål:** “Simulated incident — real AI investigation.”
 >
-> **Nuvarande läge:** Två deterministiska syntetiska incidenter kan köras genom ett lokalt Java/Spring Boot-API som recorded replay. Verifiering, evidence IDs och dolt facit fungerar. Frontend och live-AI är ännu inte byggda.
+> **Nuvarande läge:** Två deterministiska syntetiska incidenter kan köras genom ett lokalt Java/Spring Boot-API som recorded replay. Verifiering, evidence IDs, dolt facit och lokal Swagger-dokumentation fungerar. Frontend och live-AI är ännu inte byggda.
 
 ## Idén i korthet
 
@@ -34,7 +34,7 @@ När en sparad körning visas ska den märkas **“Simulated incident — record
 - `Scenario`, `Evidence`, `Diagnosis`, separat `GroundTruth` och tre oberoende verifieringsresultat är implementerade i Java.
 - Två seedade scenarier finns: ett payment-timeoutfall och ett inventory-kontraktsfall. Båda innehåller metrics, logs, trace, runbook och avsiktligt brus.
 - Ett lokalt recorded-replay-API returnerar ordnade tool events, endast faktiskt sedd evidens, diagnos, verifieringsrapport och en begränsad facitjämförelse efter avslutad körning.
-- Maven-paketet och 66 tester är gröna. Den paketerade JAR-filen har startats lokalt; ingen frontend, databas, AI-integration, evalharness eller deploy är byggd.
+- Maven-paketet och 68 tester är gröna. Den paketerade JAR-filen har startats lokalt; ingen frontend, databas, AI-integration, evalharness eller deploy är byggd.
 - Ingen API-åtkomst, billing, modellprestanda, latency, kostnad eller accuracy har verifierats.
 - Projektgrunden är publicerad på GitHub utan open-source-licens. Ingen demo är deployad.
 
@@ -46,6 +46,15 @@ Starta backend med `./mvnw spring-boot:run`. De två nuvarande körningarna star
 - `/api/v1/scenarios/checkout-cart-segment-failures-v1/runs/recorded-replay`
 
 Svaret märks alltid **“Simulated incident — recorded deterministic replay.”** Modell-ID, promptversion, tokenanvändning och kostnad är `null`, eftersom ingen modell körs i replay-läget.
+
+### Swagger och OpenAPI lokalt
+
+När backend kör på port 8080 kan API:t läsas och provas här:
+
+- [Swagger UI](http://localhost:8080/swagger-ui.html)
+- [OpenAPI JSON](http://localhost:8080/v3/api-docs)
+
+Dokumentationen gäller bara det nuvarande recorded-replay-API:t. Den visar därför endast `recorded_replay`, syntetisk incidentdata och manuellt godkända nästa steg. Det finns ingen live-AI-endpoint och ingen automatisk remediation. Inför en framtida Cloud Run-deploy ska det beslutas uttryckligen om Swagger ska vara publik eller avstängd.
 
 ## Projektdokument
 
@@ -61,7 +70,7 @@ Svaret märks alltid **“Simulated incident — recorded deterministic replay.�
 Den planerade lösningen är ett monorepo med en deploybar container:
 
 - React, TypeScript och Vite för gränssnittet.
-- Java 21, Spring Boot 4.1.1, Spring MVC, Jakarta Validation och Jackson för API och validering.
+- Java 21, Spring Boot 4.1.1, Spring MVC, Jakarta Validation, Jackson och springdoc OpenAPI för API, validering och lokal Swagger-dokumentation.
 - OpenAI Responses API med custom function tools och strict structured output. Aktuell officiell dokumentation ska kontrolleras före implementation; exakta modell- och SDK-versioner är ännu inte valda.
 - En explicit och begränsad `COLLECT → SYNTHESIZE → VERIFY`-process.
 - PostgreSQL och pgvector endast för ostrukturerade runbooks. Metrics, logs och traces nås genom typade domänverktyg.

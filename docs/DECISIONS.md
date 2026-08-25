@@ -156,3 +156,13 @@ Recorded replay använder versionshanterad, betrodd demodata. Hela fixturepakete
 **Varför:** Replay-läget ska vara en stabil fallback och en reproducerbar referens, inte simulera felbeteenden som bara kan uppstå när en modell genererar ett nytt svar.
 
 **Konsekvens:** Replay-API:t returnerar bara `completed` för ett startbart fixturepaket. En framtida live-AI-runner får ett separat körkontrakt för strukturerade verifieringsfel; replay-API:t annonserar inte en status som dess produktionsrepository inte kan nå.
+
+## DEC-016 – Swagger måste matcha det verkliga API:t
+
+**Status:** Accepted, 25 augusti 2026
+
+Det lokala Spring Boot-API:t dokumenteras med springdoc OpenAPI och Swagger UI. OpenAPI-schemat använder samma `snake_case` som verkliga JSON-svar, beskriver evidence-varianterna med explicita wire-värden och visar bara `recorded_replay` så länge ingen live-AI-runner finns.
+
+**Varför:** Swagger ska hjälpa mig och en teknisk granskare att förstå och prova det API som faktiskt finns. Ett schema med andra fältnamn, dolt facit eller planerade funktioner skulle ge falsk trygghet.
+
+**Konsekvens:** Kontraktstestet kontrollerar 200/404-svar, schemafält, evidence-discriminator och att interna fixture- och GroundTruth-typer saknas. Swagger är tillgänglig lokalt; om den ska vara publik eller avstängd i Cloud Run beslutas separat före deployment.
