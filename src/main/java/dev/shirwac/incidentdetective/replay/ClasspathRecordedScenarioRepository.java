@@ -80,7 +80,7 @@ final class ClasspathRecordedScenarioRepository implements RecordedScenarioRepos
         return Map.copyOf(loaded);
     }
 
-    private RecordedScenarioPackage assemble(
+    RecordedScenarioPackage assemble(
             ScenarioFixtureIndexEntry entry,
             RecordedScenarioFixture fixture,
             GroundTruth groundTruth
