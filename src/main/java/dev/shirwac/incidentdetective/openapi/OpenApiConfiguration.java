@@ -6,11 +6,24 @@ import io.swagger.v3.core.jackson.ModelResolver;
 import io.swagger.v3.core.util.Json31;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.media.ComposedSchema;
+import io.swagger.v3.oas.models.media.Schema;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.List;
+import java.util.Map;
+
 @Configuration(proxyBeanMethods = false)
 public class OpenApiConfiguration {
+
+    private static final List<String> EVIDENCE_IMPLEMENTATIONS = List.of(
+            "MetricEvidence",
+            "LogEvidence",
+            "TraceEvidence",
+            "RunbookEvidence"
+    );
 
     @Bean
     OpenAPI incidentDetectiveOpenApi() {
@@ -28,5 +41,32 @@ public class OpenApiConfiguration {
         ObjectMapper mapper = Json31.mapper().copy();
         mapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
         return new ModelResolver(mapper).openapi31(true);
+    }
+
+    @Bean
+    OpenApiCustomizer flattenEvidenceImplementationSchemas() {
+        return openApi -> {
+            if (openApi.getComponents() == null
+                    || openApi.getComponents().getSchemas() == null) {
+                return;
+            }
+
+            Map<String, Schema> schemas = openApi.getComponents().getSchemas();
+            EVIDENCE_IMPLEMENTATIONS.forEach(name -> {
+                Schema<?> schema = schemas.get(name);
+                if (!(schema instanceof ComposedSchema composed)
+                        || composed.getAllOf() == null) {
+                    return;
+                }
+
+                composed.getAllOf().stream()
+                        .filter(part -> part.get$ref() == null)
+                        .findFirst()
+                        .ifPresent(objectSchema -> {
+                            objectSchema.setRequired(composed.getRequired());
+                            schemas.put(name, objectSchema);
+                        });
+            });
+        };
     }
 }

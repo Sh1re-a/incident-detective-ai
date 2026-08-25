@@ -102,6 +102,28 @@ class OpenApiDocumentationTest {
                         "#/components/schemas/TraceEvidence",
                         "#/components/schemas/RunbookEvidence"
                 )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.MetricEvidence.type"
+                ).value("object"))
+                .andExpect(jsonPath(
+                        "$.components.schemas.MetricEvidence.allOf"
+                ).doesNotExist())
+                .andExpect(jsonPath(
+                        "$.components.schemas.LogEvidence.allOf"
+                ).doesNotExist())
+                .andExpect(jsonPath(
+                        "$.components.schemas.TraceEvidence.allOf"
+                ).doesNotExist())
+                .andExpect(jsonPath(
+                        "$.components.schemas.RunbookEvidence.allOf"
+                ).doesNotExist())
+                .andExpect(jsonPath(
+                        "$.components.schemas.MetricEvidence.properties.evidence_id"
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.MetricEvidence.properties.content"
+                                + "['$ref']"
+                ).value("#/components/schemas/MetricContent"))
                 .andExpect(jsonPath("$.components.schemas.GroundTruth").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.ClaimSupport").doesNotExist())
                 .andExpect(jsonPath(
