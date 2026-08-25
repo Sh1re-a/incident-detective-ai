@@ -2,7 +2,9 @@ import type { InvestigationResult } from "../api/types";
 import {
   formatCost,
   formatDuration,
+  formatSequence,
   humanizeCode,
+  trimSentenceEnd,
   toolPresentation,
 } from "../lib/presentation";
 
@@ -90,12 +92,12 @@ export function EngineeringView({
           </div>
 
           <div className="engineering-tool-list">
-            {result.tool_events.map((event) => {
+            {result.tool_events.map((event, index) => {
               const tool = toolPresentation[event.tool_name];
               return (
                 <article key={event.event_id}>
                   <div className="engineering-tool-heading">
-                    <span className="tool-index-small">{tool.index}</span>
+                    <span className="tool-index-small">{formatSequence(index)}</span>
                     <div>
                       <code>{event.tool_name}</code>
                       <strong>{tool.label}</strong>
@@ -248,7 +250,7 @@ export function EngineeringView({
         {isLive ? (
           <>
             <p className="cost-basis">
-              Cost basis: {result.estimated_cost_basis}. This is an estimate, not
+              Cost basis: {trimSentenceEnd(result.estimated_cost_basis)}. This is an estimate, not
               a provider invoice; a free-tier run may be billed at $0.
             </p>
             <div className="model-call-list">

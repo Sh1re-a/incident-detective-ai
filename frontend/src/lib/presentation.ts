@@ -2,29 +2,35 @@ import type { Evidence, ToolName } from "../api/types";
 
 export const toolPresentation: Record<
   ToolName,
-  { label: string; shortLabel: string; index: string }
+  { label: string; shortLabel: string }
 > = {
   get_metrics: {
     label: "Checked service health",
     shortLabel: "Metrics",
-    index: "01",
   },
   search_logs: {
     label: "Searched releases and errors",
     shortLabel: "Logs",
-    index: "02",
   },
   get_trace: {
     label: "Followed a failed checkout",
     shortLabel: "Trace",
-    index: "03",
   },
   retrieve_runbooks: {
     label: "Consulted operational guidance",
     shortLabel: "Runbook",
-    index: "04",
   },
 };
+
+const TRAILING_FULL_STOPS = /\.+$/;
+
+export function formatSequence(index: number): string {
+  return String(index + 1).padStart(2, "0");
+}
+
+export function trimSentenceEnd(value: string): string {
+  return value.trim().replace(TRAILING_FULL_STOPS, "");
+}
 
 export function humanizeCode(value: string | null): string {
   if (!value) {

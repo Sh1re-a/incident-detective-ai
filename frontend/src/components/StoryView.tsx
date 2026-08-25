@@ -4,6 +4,7 @@ import type {
   Scenario,
 } from "../api/types";
 import {
+  formatSequence,
   formatTimestamp,
   humanizeCode,
   toolPresentation,
@@ -159,7 +160,7 @@ export function StoryView({
                 return (
                   <li className="tool-step" key={event.event_id}>
                     <div className="tool-index" aria-hidden="true">
-                      {tool.index}
+                      {formatSequence(index)}
                     </div>
                     <div className="tool-step-content">
                       <div className="tool-step-heading">
@@ -256,7 +257,11 @@ function RunStatus({
       <div className="run-status failed" role="alert">
         <span aria-hidden="true">!</span>
         <div>
-          <strong>Live investigation did not complete</strong>
+          <strong>
+            {pendingMode === "live_ai"
+              ? "Live investigation did not complete"
+              : "Recorded investigation did not load"}
+          </strong>
           <p>{errorMessage}</p>
           {pendingMode === "live_ai" ? (
             <button className="text-button" type="button" onClick={onRunReplay}>
