@@ -107,6 +107,8 @@ När backend kör på port 8080 kan API:t läsas och provas här:
 
 Dokumentationen visar både `recorded_replay` och `live_ai`, deras olika truth labels, explicita livebekräftelse och manuellt godkända nästa steg. Inför en framtida Cloud Run-deploy ska det beslutas uttryckligen om Swagger ska vara publik eller avstängd.
 
+För en enkel genomgång av vad endpointsen returnerar, varför de finns och hur flödet kan presenteras, se [API- och presentationsguiden](./docs/API-WALKTHROUGH.md).
+
 ### Lokal Gemini-nyckel
 
 Kopiera `local-secrets.properties.example` till `local-secrets.properties`, lägg nyckeln efter `GEMINI_API_KEY=` och sätt `INCIDENT_DETECTIVE_LIVE_AI_ENABLED=true` när du medvetet vill tillåta liveanrop. Den lokala filen ignoreras av Git, ligger utanför `src` och paketeras inte i JAR-filen. Starta om backend efter en ändring. Recorded replay fungerar utan nyckel.
@@ -123,6 +125,7 @@ Ett live-smoketest körs aldrig av den vanliga testsuiten. Det måste aktiveras 
 - [Sprintplan](./SPRINTPLAN.md)
 - [Prioriterad backlog](./BACKLOG.md)
 - [Tekniska beslut](./docs/DECISIONS.md)
+- [API- och presentationsguide](./docs/API-WALKTHROUGH.md)
 - [Första live-smoke och observerade failure cases](./docs/LIVE-SMOKE-2026-08-25.md)
 - [Dag‑1‑kontrakt för granskning](./docs/DAY-1-CONTRACTS.md)
 - [Lärspår och verktyg](./docs/LEARNING-PATH.md)
