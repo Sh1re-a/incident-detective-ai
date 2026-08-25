@@ -9,7 +9,7 @@
       "end": "2026-08-25T10:15:00Z"
     },
     "affected_services": ["STOREFRONT", "CHECKOUT_API", "PAYMENT_ADAPTER"],
-    "business_impact_summary": "Synthetic estimate: 147 of 800 checkout attempts failed during the incident window.",
+    "business_impact_summary": "Synthetic estimate for 10:02–10:12 UTC: 147 of 800 checkout attempts failed.",
     "initial_symptoms": [
       {
         "symptom_code": "CHECKOUT_ERROR_RATE_HIGH",
@@ -29,7 +29,7 @@
       "evidence_type": "metric",
       "evidence_id": "cpt-v1-metric-checkout-failure-rate",
       "scenario_id": "checkout-orders-at-risk-v1",
-      "observed_at": "2026-08-25T10:04:00Z",
+      "observed_at": "2026-08-25T10:12:00Z",
       "display_summary": "Checkout failure ratio reached 18.4 percent.",
       "source_ref": "metrics/checkout/failure-ratio/10-02-10-12",
       "content": {
@@ -275,7 +275,7 @@
       {
         "claim_code": "customer_impact",
         "claim_value_code": "CHECKOUT_PAYMENT_FAILURES",
-        "display_text": "147 of 800 synthetic checkout attempts failed in the measured window.",
+        "display_text": "147 of 800 synthetic checkout attempts failed from 10:02 to 10:12 UTC.",
         "evidence_ids": [
           "cpt-v1-metric-checkout-failure-rate",
           "cpt-v1-metric-failed-checkouts"
