@@ -42,7 +42,7 @@ När en sparad körning visas ska den märkas **“Simulated incident — record
 - Backend tillåter högst en pågående liveutredning och fem starter per rullande tio minuter per applikationsinstans. Över gränsen returneras ett sanerat `429`-svar med `Retry-After`; recorded replay påverkas inte. En framtida Cloud Run-konfiguration måste begränsa antalet instanser för att göra detta till en meningsfull global kostnadsgräns.
 - Två aktuella live-körningar gjordes genom det riktiga UI:t med prompt v4. Payment-fallet gav 5/5 direkt stödda claim-evidence-länkar på 5,50 sekunder med 5 653 tokens och cirka 0,0039 USD i betalt listprisestimat. Inventory-fallet gav 5/5 på 4,55 sekunder med 5 363 tokens och cirka 0,0037 USD. Båda använde 3 modellanrop och 5 tool calls; faktisk free-tier-debitering kan vara 0 USD.
 - Detta är **inte** ett accuracy- eller p95-resultat. Äldre körningar innehåller både 40–60 procents evidence precision och provider-timeouts. De observerade felen behålls i smoke-loggen och ska ingå i kommande evals och fallbackarbete.
-- Backendens vanliga testsuite har 148 gröna tester. Frontend har 10 gröna beteendetester och en verifierad produktionsbuild. Det explicita nätverksbaserade smoke-testet ingår inte i den vanliga testsuiten.
+- Backendens vanliga testsuite har 153 gröna tester. Frontend har 10 gröna beteendetester och en verifierad produktionsbuild. Det explicita nätverksbaserade smoke-testet ingår inte i den vanliga testsuiten.
 - Projektgrunden är publicerad på GitHub utan open-source-licens. Ingen demo är deployad.
 
 ## Kör den interaktiva demon lokalt
