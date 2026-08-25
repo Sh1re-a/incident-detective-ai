@@ -69,11 +69,11 @@ Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. D
 
 **Status:** Accepted for the current slice, 25 augusti 2026
 
-Det aktuella liveflödet använder Gemini Developer API genom den officiella Java SDK:n, pinnad till `google-genai` 1.67.0. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och kontraktet `gemini-live-v2`. Endast en modellleverantör används i sprintens kärna.
+Det aktuella liveflödet använder Gemini Developer API genom den officiella Java SDK:n, pinnad till `google-genai` 1.67.0. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och kontraktet `gemini-live-v4`. Endast en modellleverantör används i sprintens kärna.
 
 **Varför:** Meritvärdet ligger i arkitektur, evals och omdöme, inte i leverantörens namn. Gratis lokal utveckling minskar startkostnaden utan att låtsas att den publika demon blir kostnadsfri.
 
-**Konsekvens:** Modellanrop isoleras bakom en liten intern gateway, men inget multi-provider-lager eller modellval byggs i gränssnittet. `COLLECT` använder custom function tools, `SYNTHESIZE` görs separat utan tools med ett strikt schema och `VERIFY` är deterministisk Java-kod. `gemini-3.7-flash` med `LOW` thinking timeoutade i två smoke-försök. Flash-Lite + `MINIMAL` gav en korrekt 5 209 ms-körning men har också timeoutat för det andra scenariot. Profilen är därför ett mätt startval, inte ett bevis på stabilitet eller kvalitet; evalsen får avgöra om den behålls.
+**Konsekvens:** Modellanrop isoleras bakom en liten intern gateway, men inget multi-provider-lager eller modellval byggs i gränssnittet. `COLLECT` använder custom function tools, `SYNTHESIZE` görs separat utan tools med ett strikt schema och `VERIFY` är deterministisk Java-kod. v4 delar en kanonisk claim-taxonomi mellan schema, Java-validering och synthesis samt ber den första loggsökningen att inte filtrera bort INFO-händelser. Två opt-in UI-smokes, ett per scenario, gav rätt rotorsak och 5/5 direkt stödda claim-evidence-länkar på 4,55–5,50 sekunder. Historiska provider-timeouts och sämre evidensprecision finns kvar i smoke-loggen. Profilen är därför ett mätt startval, inte ett bevis på stabilitet eller kvalitet; evalsen får avgöra om den behålls.
 
 ## DEC-008 – RAG endast för runbooks
 
