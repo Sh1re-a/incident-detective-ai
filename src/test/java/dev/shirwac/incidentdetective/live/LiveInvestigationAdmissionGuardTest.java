@@ -3,7 +3,9 @@ package dev.shirwac.incidentdetective.live;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -78,9 +80,62 @@ class LiveInvestigationAdmissionGuardTest {
         assertTrue(guard.admit(() -> true));
     }
 
+    @Test
+    void reopensTheOldestSlotAtTheRollingWindowBoundary() {
+        MutableClock clock = new MutableClock(NOW);
+        LiveInvestigationAdmissionGuard guard = new LiveInvestigationAdmissionGuard(clock);
+        for (int run = 0;
+             run < LiveInvestigationAdmissionGuard.MAX_STARTS_PER_WINDOW;
+             run++) {
+            guard.admit(() -> null);
+        }
+
+        clock.advance(LiveInvestigationAdmissionGuard.ROLLING_WINDOW
+                .minusSeconds(1));
+        LiveAdmissionRejectedException rejection = assertThrows(
+                LiveAdmissionRejectedException.class,
+                () -> guard.admit(() -> null)
+        );
+        assertEquals(Duration.ofSeconds(1), rejection.retryAfter());
+
+        clock.advance(Duration.ofSeconds(1));
+        assertEquals("reopened", guard.admit(() -> "reopened"));
+    }
+
     private LiveInvestigationAdmissionGuard guard() {
         return new LiveInvestigationAdmissionGuard(
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
+    }
+
+    private static final class MutableClock extends Clock {
+
+        private Instant instant;
+
+        private MutableClock(Instant instant) {
+            this.instant = instant;
+        }
+
+        void advance(Duration duration) {
+            instant = instant.plus(duration);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            if (!ZoneOffset.UTC.equals(zone)) {
+                throw new IllegalArgumentException("test clock only supports UTC");
+            }
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
     }
 }
