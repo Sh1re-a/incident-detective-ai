@@ -1,7 +1,7 @@
 # Föreslagna tekniska beslut
 
 - **Status:** föreslagen riktning inför Shirwacs granskning
-- **Senast uppdaterad:** 24 augusti 2026
+- **Senast uppdaterad:** 25 augusti 2026
 
 Förslagen nedan ska hålla Incident Detective litet, förklarbart och mätbart. De blir accepterade först efter Shirwacs granskning. Därefter ändras ett beslut bara när ny evidens eller ett verkligt blockerande problem motiverar det, och ändringen dokumenteras här i stället för att döljas i implementationen.
 
@@ -146,3 +146,13 @@ Projektgrunden publiceras i [Sh1re-a/incident-detective-ai](https://github.com/S
 **Varför:** Projektet är ett icke-kommersiellt portfolio- och utbildningsprojekt som ska kunna visas på GitHub och senare användas som ett sanningsenligt arbetsprov.
 
 **Konsekvens:** Projektgrunden och dess Git-historik blir offentligt läsbara. Live-demo, mätresultat och deployment är fortfarande separata, ännu inte genomförda steg.
+
+## DEC-015 – Recorded replay stoppar trasiga fixtures
+
+**Status:** Accepted, 25 augusti 2026
+
+Recorded replay använder versionshanterad, betrodd demodata. Hela fixturepaketet valideras därför när applikationen startar. Ett schemafel, ett saknat evidence ID eller ett citat till evidens som inte returnerats ska stoppa uppstarten i stället för att bli en normal replay-körning.
+
+**Varför:** Replay-läget ska vara en stabil fallback och en reproducerbar referens, inte simulera felbeteenden som bara kan uppstå när en modell genererar ett nytt svar.
+
+**Konsekvens:** Replay-API:t returnerar bara `completed` för ett startbart fixturepaket. En framtida live-AI-runner får ett separat körkontrakt för strukturerade verifieringsfel; replay-API:t annonserar inte en status som dess produktionsrepository inte kan nå.

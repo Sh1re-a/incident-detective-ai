@@ -6,8 +6,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Arrays;
 
 public enum ReplayRunStatus {
-    COMPLETED("completed"),
-    VERIFICATION_FAILED("verification_failed");
+    COMPLETED("completed");
 
     private final String wireValue;
 

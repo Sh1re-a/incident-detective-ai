@@ -63,6 +63,12 @@ public final class RecordedReplayService {
                 Set.copyOf(seenEvidenceIds),
                 scenarioPackage.groundTruth()
         );
+        if (!verification.hardErrors().isEmpty()) {
+            throw new IllegalStateException(
+                    "Trusted recorded fixture failed deterministic verification: "
+                            + verification.hardErrors()
+            );
+        }
         DiagnosisCorrectness correctness = verification.diagnosisCorrectness();
         ReplayComparison comparison = new ReplayComparison(
                 scenarioPackage.groundTruth().expectedStatus(),
@@ -74,16 +80,13 @@ public final class RecordedReplayService {
         );
 
         Instant completedAt = clock.instant();
-        ReplayRunStatus status = verification.hardErrors().isEmpty()
-                ? ReplayRunStatus.COMPLETED
-                : ReplayRunStatus.VERIFICATION_FAILED;
 
         return new RecordedReplayResult(
                 UUID.randomUUID().toString(),
                 scenarioId,
                 RunMode.RECORDED_REPLAY,
                 TRUTH_LABEL,
-                status,
+                ReplayRunStatus.COMPLETED,
                 startedAt,
                 completedAt,
                 Math.max(0, Duration.between(startedAt, completedAt).toMillis()),
