@@ -1,22 +1,14 @@
 package dev.shirwac.incidentdetective.live;
 
 import dev.shirwac.incidentdetective.ai.CollectionModelResult;
-import dev.shirwac.incidentdetective.ai.CollectionToolCall;
 import dev.shirwac.incidentdetective.ai.InvestigationModelGateway;
-import dev.shirwac.incidentdetective.ai.ModelCallMetadata;
 import dev.shirwac.incidentdetective.ai.ModelPhase;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
 import dev.shirwac.incidentdetective.ai.SynthesisModelResult;
-import dev.shirwac.incidentdetective.domain.diagnosis.Claim;
-import dev.shirwac.incidentdetective.domain.diagnosis.ClaimCode;
-import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
-import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
-import dev.shirwac.incidentdetective.domain.diagnosis.SafeNextStep;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
 import dev.shirwac.incidentdetective.domain.verification.VerificationErrorCode;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
-import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -28,6 +20,11 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.call;
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.correctDiagnosis;
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.diagnosisWithUnknownCitation;
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.metadata;
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.stubCheckoutCollections;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -64,7 +61,7 @@ class LiveInvestigationServiceTest {
 
     @Test
     void completesABoundedRunUsingOnlyToolReturnedEvidence() {
-        stubCollections();
+        stubCheckoutCollections(model);
         when(model.synthesize(any(), anyList(), any())).thenReturn(
                 new SynthesisModelResult(correctDiagnosis(), metadata(
                         ModelPhase.SYNTHESIZE,
@@ -107,35 +104,10 @@ class LiveInvestigationServiceTest {
 
     @Test
     void returnsAnInspectableVerificationFailureForAnUnknownCitation() {
-        stubCollections();
-        Diagnosis diagnosis = new Diagnosis(
-                DiagnosisStatus.DIAGNOSED,
-                "PAYMENT_TIMEOUT_CONFIG",
-                "PAYMENT_ADAPTER",
-                "Checkout failures threaten synthetic orders.",
-                "Payment authorization reaches the configured timeout.",
-                List.of(
-                        new Claim(
-                                ClaimCode.ROOT_CAUSE,
-                                "PAYMENT_TIMEOUT_CONFIG",
-                                "The timeout is too short.",
-                                List.of("model-invented-evidence-id")
-                        ),
-                        new Claim(
-                                ClaimCode.AFFECTED_SERVICE,
-                                "PAYMENT_ADAPTER",
-                                "The failure occurs in payment authorization.",
-                                List.of("cpt-v1-log-timeout-error")
-                        )
-                ),
-                new SafeNextStep(
-                        "Review the timeout configuration with a human.",
-                        true
-                )
-        );
+        stubCheckoutCollections(model);
         when(model.synthesize(any(), anyList(), any())).thenReturn(
                 new SynthesisModelResult(
-                        diagnosis,
+                        diagnosisWithUnknownCitation(),
                         metadata(ModelPhase.SYNTHESIZE, 1, 500, 200)
                 )
         );
@@ -199,122 +171,6 @@ class LiveInvestigationServiceTest {
 
         assertEquals(ModelProviderFailure.MALFORMED_RESPONSE, exception.failure());
         verify(model, never()).synthesize(any(), anyList(), any());
-    }
-
-    private void stubCollections() {
-        when(model.collect(any(), anyList(), anyList(), eq(1), any())).thenReturn(
-                new CollectionModelResult(
-                        List.of(
-                                call("call-metrics", ToolName.GET_METRICS, Map.of(
-                                        "metric_names", List.of(
-                                                "checkout_failure_ratio",
-                                                "failed_checkout_attempts",
-                                                "payment_authorization_duration_p95"
-                                        ),
-                                        "start", "2026-08-25T09:55:00Z",
-                                        "end", "2026-08-25T10:15:00Z"
-                                )),
-                                call("call-logs", ToolName.SEARCH_LOGS, Map.of(
-                                        "services", List.of("PAYMENT_ADAPTER"),
-                                        "levels", List.of(),
-                                        "query", "timeout",
-                                        "start", "2026-08-25T09:55:00Z",
-                                        "end", "2026-08-25T10:15:00Z"
-                                )),
-                                call("call-runbook", ToolName.RETRIEVE_RUNBOOKS, Map.of(
-                                        "query", "payment timeout trace",
-                                        "max_results", 4
-                                ))
-                        ),
-                        metadata(ModelPhase.COLLECT, 1, 600, 100)
-                )
-        );
-        when(model.collect(any(), anyList(), anyList(), eq(2), any())).thenReturn(
-                new CollectionModelResult(
-                        List.of(call("call-trace", ToolName.GET_TRACE, Map.of(
-                                "trace_id", "cpt-trace-4821"
-                        ))),
-                        metadata(ModelPhase.COLLECT, 2, 500, 100)
-                )
-        );
-    }
-
-    private CollectionToolCall call(
-            String callId,
-            ToolName toolName,
-            Map<String, Object> arguments
-    ) {
-        return new CollectionToolCall(callId, toolName, arguments);
-    }
-
-    private ModelCallMetadata metadata(
-            ModelPhase phase,
-            int round,
-            int input,
-            int output
-    ) {
-        return new ModelCallMetadata(
-                phase,
-                round,
-                "response-" + phase.wireValue() + "-" + round,
-                "gemini-test-version",
-                new ModelTokenUsage(input, output, input + output),
-                25
-        );
-    }
-
-    private Diagnosis correctDiagnosis() {
-        return new Diagnosis(
-                DiagnosisStatus.DIAGNOSED,
-                "PAYMENT_TIMEOUT_CONFIG",
-                "PAYMENT_ADAPTER",
-                "Synthetic checkout attempts fail during payment authorization.",
-                "The configured timeout is below the observed authorization duration.",
-                List.of(
-                        new Claim(
-                                ClaimCode.ROOT_CAUSE,
-                                "PAYMENT_TIMEOUT_CONFIG",
-                                "The payment timeout is shorter than observed duration.",
-                                List.of(
-                                        "cpt-v1-log-timeout-config",
-                                        "cpt-v1-log-timeout-error",
-                                        "cpt-v1-trace-failed-checkout"
-                                )
-                        ),
-                        new Claim(
-                                ClaimCode.AFFECTED_SERVICE,
-                                "PAYMENT_ADAPTER",
-                                "The failure occurs inside payment authorization.",
-                                List.of(
-                                        "cpt-v1-log-timeout-error",
-                                        "cpt-v1-trace-failed-checkout"
-                                )
-                        ),
-                        new Claim(
-                                ClaimCode.CUSTOMER_IMPACT,
-                                "CHECKOUT_PAYMENT_FAILURES",
-                                "Synthetic checkout attempts are failing.",
-                                List.of(
-                                        "cpt-v1-metric-checkout-failure-rate",
-                                        "cpt-v1-metric-failed-checkouts"
-                                )
-                        ),
-                        new Claim(
-                                ClaimCode.OBSERVED_SYMPTOM,
-                                "PAYMENT_LATENCY_SPIKE",
-                                "Payment latency reaches the timeout boundary.",
-                                List.of(
-                                        "cpt-v1-metric-payment-p95",
-                                        "cpt-v1-log-timeout-error",
-                                        "cpt-v1-trace-failed-checkout"
-                                )
-                        )
-                ),
-                new SafeNextStep(
-                        "Review and approve restoring the previous timeout.",
-                        true
-                )
-        );
     }
 
     @Test

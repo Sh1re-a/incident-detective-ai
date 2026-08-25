@@ -22,7 +22,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.List;
+import java.util.function.Supplier;
 
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.correctDiagnosis;
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.diagnosisWithUnknownCitation;
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.stubCheckoutCollections;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -55,9 +59,16 @@ class LiveInvestigationApiTest {
     @MockitoBean
     private InvestigationModelGateway model;
 
+    @MockitoBean
+    private LiveInvestigationAdmissionGuard admissionGuard;
+
     @BeforeEach
     void resetModel() {
-        reset(model);
+        reset(model, admissionGuard);
+        when(admissionGuard.admit(any())).thenAnswer(invocation -> {
+            Supplier<?> action = invocation.getArgument(0);
+            return action.get();
+        });
     }
 
     @Test
@@ -101,6 +112,99 @@ class LiveInvestigationApiTest {
         assertFalse(json.contains("claim_support"));
         assertFalse(json.contains("allowed_evidence_ids"));
         assertFalse(json.contains("cpt-v1-log-inventory-noise"));
+    }
+
+    @Test
+    void returnsACompleteDiagnosedResponseWithToolsEvidenceAndVerification()
+            throws Exception {
+        stubCheckoutCollections(model);
+        when(model.synthesize(any(), anyList(), any())).thenReturn(
+                new SynthesisModelResult(
+                        correctDiagnosis(),
+                        metadata(ModelPhase.SYNTHESIZE, 1)
+                )
+        );
+
+        MvcResult result = mockMvc.perform(post(PATH, SCENARIO_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirm_live_ai\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("completed"))
+                .andExpect(jsonPath("$.tool_events.length()").value(4))
+                .andExpect(jsonPath("$.tool_events[0].collection_round").value(1))
+                .andExpect(jsonPath("$.tool_events[0].tool_name")
+                        .value("get_metrics"))
+                .andExpect(jsonPath("$.tool_events[1].tool_name")
+                        .value("search_logs"))
+                .andExpect(jsonPath("$.tool_events[2].tool_name")
+                        .value("retrieve_runbooks"))
+                .andExpect(jsonPath("$.tool_events[3].collection_round").value(2))
+                .andExpect(jsonPath("$.tool_events[3].tool_name")
+                        .value("get_trace"))
+                .andExpect(jsonPath("$.tool_events[3].evidence[0].evidence_id")
+                        .value("cpt-v1-trace-failed-checkout"))
+                .andExpect(jsonPath("$.diagnosis.status").value("diagnosed"))
+                .andExpect(jsonPath("$.diagnosis.root_cause_code")
+                        .value("PAYMENT_TIMEOUT_CONFIG"))
+                .andExpect(jsonPath("$.diagnosis.affected_service")
+                        .value("PAYMENT_ADAPTER"))
+                .andExpect(jsonPath(
+                        "$.diagnosis.safe_next_step.requires_human_approval"
+                ).value(true))
+                .andExpect(jsonPath("$.verification.citation_validity.valid")
+                        .value(true))
+                .andExpect(jsonPath("$.verification.evidence_precision.score")
+                        .value(1.0))
+                .andExpect(jsonPath("$.verification.hard_errors.length()")
+                        .value(0))
+                .andExpect(jsonPath("$.comparison.root_cause_correct")
+                        .value(true))
+                .andExpect(jsonPath("$.comparison.affected_service_correct")
+                        .value(true))
+                .andExpect(jsonPath("$.model_calls.length()").value(3))
+                .andExpect(jsonPath("$.model_calls[0].phase").value("collect"))
+                .andExpect(jsonPath("$.model_calls[2].phase")
+                        .value("synthesize"))
+                .andExpect(jsonPath("$.token_usage.total_tokens").value(1_315))
+                .andExpect(jsonPath("$.tool_call_count").value(4))
+                .andExpect(jsonPath("$.model_call_count").value(3))
+                .andExpect(jsonPath("$.limitations.length()").value(3))
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString();
+        assertFalse(json.contains("test-only-key"));
+        assertFalse(json.contains("\"ground_truth\":"));
+        assertFalse(json.contains("allowed_evidence_ids"));
+        assertFalse(json.contains("cpt-v1-log-inventory-noise"));
+    }
+
+    @Test
+    void returnsInspectableVerificationFailureForAnInventedEvidenceId()
+            throws Exception {
+        stubCheckoutCollections(model);
+        when(model.synthesize(any(), anyList(), any())).thenReturn(
+                new SynthesisModelResult(
+                        diagnosisWithUnknownCitation(),
+                        metadata(ModelPhase.SYNTHESIZE, 1)
+                )
+        );
+
+        mockMvc.perform(post(PATH, SCENARIO_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirm_live_ai\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("verification_failed"))
+                .andExpect(jsonPath("$.verification.citation_validity.valid")
+                        .value(false))
+                .andExpect(jsonPath(
+                        "$.verification.citation_validity.unknown_evidence_ids[0]"
+                ).value("model-invented-evidence-id"))
+                .andExpect(jsonPath("$.verification.hard_errors[0]")
+                        .value("unknown_evidence_id"))
+                .andExpect(jsonPath("$.comparison.root_cause_correct")
+                        .value(true))
+                .andExpect(jsonPath("$.comparison.affected_service_correct")
+                        .value(true));
     }
 
     @Test
