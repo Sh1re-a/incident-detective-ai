@@ -65,15 +65,15 @@ Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. D
 
 **Konsekvens:** Systemet måste kunna avstå med `insufficient_evidence` i stället för att fortsätta leta utan gräns.
 
-## DEC-007 – Responses API, strict output och en leverantör
+## DEC-007 – En leverantör, function calling och structured output
 
-**Status:** Proposed; exact SDK/model pending verification
+**Status:** Under review, 25 augusti 2026; access och kontrakt ej verifierade
 
-AI-integrationen byggs med aktuell OpenAI Responses API, custom function tools och strict structured output. Endast en modellleverantör används under sprinten.
+Det ursprungliga förslaget var OpenAI Responses API. Efter en kostnadskontroll är `gemini-3.7-flash` nu förstakandidat för den första lokala live-körningen eftersom Gemini har en gratis utvecklingsnivå i Sverige. Endast en modellleverantör ska användas i sprintens slutlösning. En publik Gemini-klient i Sverige/EES måste använda en billing-aktiverad betaltjänst enligt [Googles aktuella villkor](https://ai.google.dev/gemini-api/terms).
 
-**Varför:** Meritvärdet ligger i arkitektur, evals och omdöme, inte i ett stort providerlager.
+**Varför:** Meritvärdet ligger i arkitektur, evals och omdöme, inte i leverantörens namn. Gratis lokal utveckling minskar startkostnaden utan att låtsas att den publika demon blir kostnadsfri.
 
-**Konsekvens:** Aktuell officiell dokumentation, API-åtkomst, billing, SDK-version och modell-ID måste verifieras innan implementation. Assistants API, Threads/Runs och avvecklade evalflöden används inte.
+**Konsekvens:** Modellanrop isoleras bakom en liten intern gateway, men inget multi-provider-lager eller modellval byggs i gränssnittet. `COLLECT` använder tools, `SYNTHESIZE` görs separat utan tools med strukturerat schema och `VERIFY` är deterministisk Java-kod. Aktuell dokumentation, API-åtkomst, fria kontogränser, billingkrav, SDK-version och modell-ID verifieras före provideradaptern. OpenAI är endast ett alternativ om Gemini inte klarar kontraktet eller evalsen.
 
 ## DEC-008 – RAG endast för runbooks
 

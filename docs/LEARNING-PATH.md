@@ -1,6 +1,6 @@
 # Lärspår och verktyg
 
-- **Status:** Java/Spring Boot-grunden är verifierad; dag‑1‑granskning pågår
+- **Status:** Replay-API, verifiering och första typade read-only-tool är verifierade; live-AI är inte ansluten
 - **Senast verifierad:** 25 augusti 2026
 
 Målet är inte att läsa allt innan jag bygger. Jag följer samma korta loop:
@@ -23,7 +23,7 @@ Maven används i stället för Gradle i sprinten. Det finns redan på datorn, fu
 | Nu | Maven Wrapper | Reproducerbara bygg- och testkommandon. |
 | Nu | Java records, Jakarta Validation och Jackson | Typade kontrakt, JSON och tydliga valideringsfel. |
 | Nu | JUnit och Spring Boot Test | Deterministiska tester av regler och applikationsstart. |
-| Vecka 2 | Officiella OpenAI Java SDK och Responses API | Verklig function calling och structured output. |
+| Vecka 2 | Officiell Java-SDK för vald modellleverantör | Verklig function calling och structured output bakom en liten intern gateway. |
 | Vecka 2 | PostgreSQL och pgvector | Retrieval endast över 10–15 runbooks. |
 | Vecka 2–3 | Strukturerade JSON-loggar och OpenTelemetry | Förklara körningar, fel och latency. |
 | När backendkontraktet är stabilt | React, TypeScript och Vite | Story View och Engineering View. |
@@ -36,15 +36,15 @@ Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i s
 - Java 21.0.10 LTS, `javac` 21.0.10 och Maven 3.9.12 finns.
 - Projektet använder Spring Boot 4.1.1 och Maven Wrapper 3.3.4 med Maven 3.9.16.
 - IntelliJ IDEA 2025.3.3, Docker och Google Cloud CLI finns.
-- Det första Spring Boot-starttestet är grönt.
-- Ingen `OPENAI_API_KEY` finns i den aktuella terminalmiljön och ingen lokal `.env` har skapats. API-åtkomst, billing och exakt modell är därför fortfarande **inte verifierade**.
+- Hela Maven-testsuiten med 78 tester är grön på commit `d29a2ee`.
+- Ingen `GEMINI_API_KEY`, `GOOGLE_API_KEY` eller `OPENAI_API_KEY` finns i den aktuella terminalmiljön och ingen lokal `.env` har skapats. API-åtkomst, billing och exakt modell är därför fortfarande **inte verifierade**.
 - PostgreSQL-klienten finns inte globalt. Det blockerar inte dag 1 och installeras inte innan retrievalsteget behöver den.
 
 En framtida API-nyckel ska bara finnas lokalt eller som en server-side secret. Värdet får aldrig skrivas i repo, dokumentation, frontendkod eller loggar.
 
-## Det jag läser först
+## Lärordning och nästa fokus
 
-### Pass 1 – förstå Spring Boot-grunden
+### Pass 1 – förstå Spring Boot-grunden (genomfört, använd som referens)
 
 Läs i denna ordning:
 
@@ -56,22 +56,23 @@ Läs i denna ordning:
 
 Övning: öppna startklassen, `pom.xml` och starttestet i IntelliJ. Kör testet därifrån och förklara vad `@SpringBootApplication` och `@SpringBootTest` gör. Ingen incidentfunktion behöver byggas i detta pass.
 
-### Pass 2 – modellera kontrakten
+### Pass 2 – modellera kontrakten (genomfört)
 
-Efter att dag‑1‑kontraktet är godkänt bygger vi `Scenario`, `Evidence`, `Diagnosis` och `GroundTruth` som små Java-typer. Vi använder records där datan är oföränderlig, enums för kanoniska koder och vanliga domänmetoder för regler som beror på flera fält. Jakarta Validation används vid API-gränsen, men ersätter inte domänreglerna.
+`Scenario`, `Evidence`, `Diagnosis` och `GroundTruth` är implementerade som små Java-typer med validering och tester. Records används där datan är oföränderlig, enums för kanoniska koder och domänmetoder för regler som beror på flera fält. Nästa övning är att kunna förklara gränserna och följa dem i live-runnern.
 
 Byggresultat: tester bevisar bland annat att facit inte serialiseras till en publik respons, att okända evidence IDs underkänns och att `insufficient_evidence` inte kan innehålla en påhittad rotorsak.
 
-### Pass 3 – Responses API och function calling i Java
+### Pass 3 – function calling och structured output i Java (nästa)
 
-Läs:
+Läs bara det spår som väljs efter accesskontrollen. Nuvarande förstakandidat är Gemini:
 
-1. [OpenAI Java: Responses API reference](https://developers.openai.com/api/reference/java/resources/responses)
-2. [OpenAI: Function calling](https://developers.openai.com/api/docs/guides/function-calling)
-3. [OpenAI: Migrate to the Responses API](https://developers.openai.com/api/docs/guides/migrate-to-responses)
-4. [OpenAI: Structured model outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
+1. [Gemini API: Function calling](https://ai.google.dev/gemini-api/docs/function-calling)
+2. [Gemini API: Structured outputs](https://ai.google.dev/gemini-api/docs/structured-output)
+3. [Google Gen AI SDK för Java](https://github.com/googleapis/java-genai)
 
-Byggresultat: ett read-only tool i taget, först mot deterministiska fixtures. Exakt SDK-version och modell väljs först när API-åtkomst och billing är verifierade. Modellsvaret valideras alltid igen på serversidan.
+OpenAI-spåret finns kvar som jämförelse tills valet är låst: [Function calling](https://developers.openai.com/api/docs/guides/function-calling), [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) och [Java Responses API](https://developers.openai.com/api/reference/java/resources/responses).
+
+Byggresultat: `get_metrics` är implementerat mot deterministiska fixtures med strikt argumentschema och nätverksfria tester. Nästa tool byggs med samma mönster. Exakt leverantör, SDK-version och modell låses först efter en verifierad access-, kostnads- och kontraktskontroll. Modellsvaret valideras alltid igen på serversidan.
 
 ### Pass 4 – evals och verifiering
 
@@ -107,31 +108,18 @@ Läs:
 
 Byggresultat: en lokalt testad container och därefter en separat godkänd deploy. Ett publikt GitHub-repo betyder inte att Cloud Run redan är klar.
 
-## Nuvarande minsta kodgrund
+## Nuvarande kodgrund
 
-```text
-pom.xml
-mvnw
-mvnw.cmd
-.mvn/wrapper/maven-wrapper.properties
-src/main/java/dev/shirwac/incidentdetective/
-  IncidentDetectiveApplication.java
-src/main/resources/
-  application.properties
-src/test/java/dev/shirwac/incidentdetective/
-  IncidentDetectiveApplicationTests.java
-```
+Nu finns Spring Boot replay-API, domänkontrakt, separat dold `GroundTruth`, deterministisk verifierare, två fixturepaket, Swagger/OpenAPI, ett typat `get_metrics`-tool och 78 gröna tester. Frontend, modell-SDK/live-runner, databas och deploy saknas fortfarande.
 
-Detta är bara en verifierad verktygsgrund. Ingen controller, domänmodell, databas, React-app eller modellintegration finns ännu. Efter kontraktsgodkännande är första produktslicen Java-typer och deterministiska verifierartester, följt av en liten recorded-replay-endpoint.
-
-## Två föreslagna startscenarier
+## Två implementerade startscenarier
 
 Båda ligger i samma syntetiska webbshop och använder tjänstekoderna `STOREFRONT`, `CHECKOUT_API`, `PAYMENT_ADAPTER`, `INVENTORY_SERVICE` och `ORDER_SERVICE`.
 
 | Scenario | Det besökaren ser först | Dolt facit | Evidensmix |
 |---|---|---|---|
-| A: `checkout-payment-timeout-v1` | Checkoutfel ökar direkt efter en release och betalningssteget blir långsamt. | `root_cause_code = PAYMENT_TIMEOUT_CONFIG`, `affected_service = PAYMENT_ADAPTER` | Metric, log, trace och runbook om timeoutkonfiguration. |
-| B: `checkout-inventory-contract-v1` | En del varukorgar börjar nekas efter en release av lagertjänsten. | `root_cause_code = INVENTORY_SCHEMA_MISMATCH`, `affected_service = INVENTORY_SERVICE` | Metric, valideringslogg, trace och runbook om API-kontrakt. |
+| A: `checkout-orders-at-risk-v1` | Checkoutfel ökar direkt efter en release och betalningssteget blir långsamt. | `root_cause_code = PAYMENT_TIMEOUT_CONFIG`, `affected_service = PAYMENT_ADAPTER` | Metric, log, trace och runbook om timeoutkonfiguration. |
+| B: `checkout-cart-segment-failures-v1` | En del varukorgar börjar nekas efter en release av lagertjänsten. | `root_cause_code = INVENTORY_SCHEMA_MISMATCH`, `affected_service = INVENTORY_SERVICE` | Metric, valideringslogg, trace och runbook om API-kontrakt. |
 
 `affected_service` betyder den primära tjänst där rotorsaken behöver rättas, inte alla tjänster där symptom syns. Systemet får rekommendera att jämföra eller återställa en ändring, men åtgärden kräver alltid mänskligt godkännande.
 
@@ -141,4 +129,4 @@ Båda ligger i samma syntetiska webbshop och använder tjänstekoderna `STOREFRO
 - [ ] Jag kan förklara varför endast sedd evidens får citeras.
 - [ ] Jag har godkänt preciseringarna i dag‑1‑kontraktet.
 - [ ] Två första scenariofacit och deras kanoniska koder är låsta.
-- [ ] Först därefter skapas incident- och AI-kod.
+- [ ] Innan live-AI ansluts kan jag förklara kontrakten och har verifierat leverantörens API-åtkomst utan att exponera en nyckel.

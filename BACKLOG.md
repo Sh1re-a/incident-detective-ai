@@ -21,7 +21,7 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 | ID | Leverans | Acceptanskriterium | Status |
 |---|---|---|---|
 | M-10 | Låst kärnberättelse | “Checkout errors threaten orders” har tydlig kundpåverkan, tidslinje och ett säkert nästa steg | Klar |
-| M-11 | API- och billingcheck | Faktisk modellåtkomst är verifierad utan att token eller hemlighet hamnar i repo/logg | Ej startad |
+| M-11 | API- och billingcheck | Faktisk modellåtkomst är verifierad utan att token eller hemlighet hamnar i repo/logg | Pågår |
 | M-12 | Domänkontrakt | `Scenario`, `Evidence`, `Diagnosis` och separat `GroundTruth` är implementerade och validerade | Klar |
 | M-13 | Två scenariopaket | Två seedade, deterministiska paket har minst två evidenstyper, brus och dolt facit; ett integritetstest stoppar `GroundTruth` från publika scenario- och toolpayloads | Klar |
 | M-14 | Backend och verifierare | Riktig frontend–API-kommunikation samt kontroll av schema, citation IDs och facit fungerar; trasiga modellsvar ger valideringsresultat utan HTTP 500 och `seenEvidenceIds` byggs endast från faktiska tool events | Pågår |
@@ -34,7 +34,7 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 
 | ID | Leverans | Acceptanskriterium | Status |
 |---|---|---|---|
-| M-20 | Fyra typade read-only tools | `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks` har validerade in-/utdata och kan inte skriva | Ej startad |
+| M-20 | Fyra typade read-only tools | `get_metrics` är implementerat och testat; `search_logs`, `get_trace` och `retrieve_runbooks` återstår | Pågår |
 | M-21 | Begränsad state machine | `COLLECT → SYNTHESIZE → VERIFY` följer hela dag‑1‑budgeten: tre collection-rundor, fyra model/åtta tool calls, två per tooltyp, tre parallella reads, tool-free synthesis och 45 s timeout | Ej startad |
 | M-22 | Structured diagnosis | Java-typer, Jakarta Validation och deterministiska domänregler validerar `diagnosed` eller `insufficient_evidence`, claims och evidence IDs | Klar |
 | M-23 | Runbook retrieval | PostgreSQL/pgvector söker endast i 10–15 runbooks och returnerar citerbar dokument-/chunkmetadata | Ej startad |
@@ -51,7 +51,7 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 |---|---|---|---|
 | M-30 | 18 evalfall | Sex familjer × tre variationer, med separata development- och held-out-fall | Ej startad |
 | M-31 | Baseline | Symptom-only baseline och full utredning körs mot samma relevanta fall | Ej startad |
-| M-32 | Tre separata verifieringar | Citation validity, evidence support/precision och diagnosis correctness mäts var för sig | Pågår |
+| M-32 | Tre separata verifieringar | Citation validity, evidence support/precision och diagnosis correctness mäts var för sig | Klar |
 | M-33 | Retrievalmått | Hit@4 mäts mot förväntad runbookkälla/chunk för relevanta fall | Ej startad |
 | M-34 | Säkerhets-/abstentionfall | Minst två fall kräver korrekt abstention och ett runbookfall innehåller prompt-injection-liknande text | Ej startad |
 | M-35 | Portabel evalrapport | Samma kommando fungerar lokalt/CI och redovisar accuracy, citations, retrieval, latency, calls och kostnad | Ej startad |
