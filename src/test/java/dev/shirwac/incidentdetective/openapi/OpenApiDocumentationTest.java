@@ -21,6 +21,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class OpenApiDocumentationTest {
 
+    private static final String SCENARIOS_PATH = "/api/v1/scenarios";
+    private static final String SCENARIOS_GET =
+            "$.paths['" + SCENARIOS_PATH + "'].get";
     private static final String REPLAY_PATH =
             "/api/v1/scenarios/{scenarioId}/runs/recorded-replay";
     private static final String REPLAY_POST =
@@ -32,6 +35,23 @@ class OpenApiDocumentationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Test
+    void documentsTheSafeScenarioCatalog() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(SCENARIOS_GET + ".summary")
+                        .value("List synthetic incident scenarios"))
+                .andExpect(jsonPath(
+                        SCENARIOS_GET
+                                + ".responses['200'].content['application/json']"
+                                + ".schema['$ref']"
+                ).value("#/components/schemas/ScenarioCatalogResponse"))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ScenarioCatalogResponse"
+                                + ".properties.scenarios.items['$ref']"
+                ).value("#/components/schemas/Scenario"));
+    }
 
     @Test
     void documentsTheRecordedReplayContractWithoutGroundTruthSchemas()

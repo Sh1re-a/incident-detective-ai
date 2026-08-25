@@ -2,6 +2,7 @@ package dev.shirwac.incidentdetective.investigation;
 
 import dev.shirwac.incidentdetective.domain.scenario.Scenario;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -11,4 +12,6 @@ import java.util.Optional;
 public interface InvestigationScenarioCatalog {
 
     Optional<Scenario> findById(String scenarioId);
+
+    List<Scenario> findAll();
 }

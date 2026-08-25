@@ -28,14 +28,22 @@ final class ClasspathRecordedScenarioRepository implements RecordedScenarioRepos
     private static final String INDEX_RESOURCE = "fixtures/index.json";
 
     private final Map<String, RecordedScenarioPackage> scenariosById;
+    private final List<RecordedScenarioPackage> scenarios;
 
     ClasspathRecordedScenarioRepository(JsonMapper jsonMapper, Validator validator) {
-        scenariosById = loadAll(jsonMapper, validator);
+        Map<String, RecordedScenarioPackage> loaded = loadAll(jsonMapper, validator);
+        scenariosById = Map.copyOf(loaded);
+        scenarios = List.copyOf(loaded.values());
     }
 
     @Override
     public Optional<RecordedScenarioPackage> findById(String scenarioId) {
         return Optional.ofNullable(scenariosById.get(scenarioId));
+    }
+
+    @Override
+    public List<RecordedScenarioPackage> findAll() {
+        return scenarios;
     }
 
     private Map<String, RecordedScenarioPackage> loadAll(
@@ -77,7 +85,7 @@ final class ClasspathRecordedScenarioRepository implements RecordedScenarioRepos
             }
             loaded.put(entry.scenarioId(), scenarioPackage);
         }
-        return Map.copyOf(loaded);
+        return loaded;
     }
 
     RecordedScenarioPackage assemble(
