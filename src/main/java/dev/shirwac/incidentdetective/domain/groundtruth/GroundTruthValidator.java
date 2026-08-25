@@ -1,6 +1,7 @@
 package dev.shirwac.incidentdetective.domain.groundtruth;
 
 import dev.shirwac.incidentdetective.domain.diagnosis.ClaimCode;
+import dev.shirwac.incidentdetective.domain.diagnosis.ClaimValueTaxonomy;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
@@ -30,6 +31,7 @@ public final class GroundTruthValidator
 
         if (!hasUniqueExpectedClaimKeys(expectedClaims)
                 || !hasUniqueSupportKeys(claimSupport)
+                || !hasCanonicalClaimValues(expectedClaims, claimSupport)
                 || !hasMatchingClaimAndSupportKeys(expectedClaims, claimSupport)
                 || !hasUniqueEvidenceIdsPerSupport(claimSupport)
                 || !hasUniqueRunbookReferences(relevantRunbooks)) {
@@ -120,6 +122,19 @@ public final class GroundTruthValidator
                 claimSupport.stream().map(this::claimKey).toList()
         );
         return expectedKeys.equals(supportKeys);
+    }
+
+    private boolean hasCanonicalClaimValues(
+            List<ExpectedClaim> expectedClaims,
+            List<ClaimSupport> claimSupport
+    ) {
+        return expectedClaims.stream().allMatch(claim -> ClaimValueTaxonomy.contains(
+                claim.claimCode(),
+                claim.claimValueCode()
+        )) && claimSupport.stream().allMatch(support -> ClaimValueTaxonomy.contains(
+                support.claimCode(),
+                support.claimValueCode()
+        ));
     }
 
     private boolean hasUniqueEvidenceIdsPerSupport(List<ClaimSupport> claimSupport) {

@@ -1,0 +1,94 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["diagnosed", "insufficient_evidence"]
+    },
+    "root_cause_code": {
+      "type": ["string", "null"],
+      "enum": [
+        "PAYMENT_TIMEOUT_CONFIG",
+        "INVENTORY_SCHEMA_MISMATCH",
+        null
+      ],
+      "description": "One exact code from the shared incident taxonomy, or null when evidence is insufficient."
+    },
+    "affected_service": {
+      "type": ["string", "null"],
+      "description": "Upper snake-case service code, or null when evidence is insufficient."
+    },
+    "business_summary": {"type": "string"},
+    "technical_summary": {"type": "string"},
+    "claims": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "claim_code": {
+            "type": "string",
+            "enum": [
+              "root_cause",
+              "affected_service",
+              "trigger",
+              "customer_impact",
+              "observed_symptom",
+              "missing_evidence"
+            ]
+          },
+          "claim_value_code": {
+            "type": "string",
+            "enum": [
+              "PAYMENT_TIMEOUT_CONFIG",
+              "INVENTORY_SCHEMA_MISMATCH",
+              "PAYMENT_ADAPTER",
+              "INVENTORY_SERVICE",
+              "PAYMENT_ADAPTER_RELEASE",
+              "INVENTORY_SERVICE_RELEASE",
+              "CHECKOUT_PAYMENT_FAILURES",
+              "MULTI_ITEM_CHECKOUT_FAILURES",
+              "PAYMENT_LATENCY_SPIKE",
+              "INVENTORY_CONTRACT_VALIDATION_ERRORS",
+              "PAYMENT_PROVIDER_RESPONSE"
+            ],
+            "description": "An exact value from shared_claim_value_taxonomy for the selected claim_code."
+          },
+          "display_text": {"type": "string"},
+          "evidence_ids": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {"type": "string"},
+            "description": "One or two evidence IDs that directly support this exact claim."
+          }
+        },
+        "required": [
+          "claim_code",
+          "claim_value_code",
+          "display_text",
+          "evidence_ids"
+        ]
+      }
+    },
+    "safe_next_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "summary": {"type": "string"},
+        "requires_human_approval": {"type": "boolean"}
+      },
+      "required": ["summary", "requires_human_approval"]
+    }
+  },
+  "required": [
+    "status",
+    "root_cause_code",
+    "affected_service",
+    "business_summary",
+    "technical_summary",
+    "claims",
+    "safe_next_step"
+  ]
+}

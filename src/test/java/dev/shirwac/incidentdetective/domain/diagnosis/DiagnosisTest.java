@@ -72,6 +72,60 @@ class DiagnosisTest {
     }
 
     @Test
+    void rejectsANonCanonicalClaimValue() {
+        Diagnosis diagnosis = diagnosed(
+                "PAYMENT_TIMEOUT_CONFIG",
+                "PAYMENT_ADAPTER",
+                List.of(
+                        claim(
+                                ClaimCode.ROOT_CAUSE,
+                                "PAYMENT_TIMEOUT_CONFIG",
+                                "ev-log-001"
+                        ),
+                        claim(
+                                ClaimCode.AFFECTED_SERVICE,
+                                "PAYMENT_ADAPTER",
+                                "ev-trace-001"
+                        ),
+                        claim(
+                                ClaimCode.CUSTOMER_IMPACT,
+                                "CHECKOUT_FAILURES",
+                                "ev-metric-001"
+                        )
+                )
+        );
+
+        assertFalse(validator.validate(diagnosis).isEmpty());
+    }
+
+    @Test
+    void rejectsAClaimValueFromTheWrongCategory() {
+        Diagnosis diagnosis = diagnosed(
+                "PAYMENT_TIMEOUT_CONFIG",
+                "PAYMENT_ADAPTER",
+                List.of(
+                        claim(
+                                ClaimCode.ROOT_CAUSE,
+                                "PAYMENT_TIMEOUT_CONFIG",
+                                "ev-log-001"
+                        ),
+                        claim(
+                                ClaimCode.AFFECTED_SERVICE,
+                                "PAYMENT_ADAPTER",
+                                "ev-trace-001"
+                        ),
+                        claim(
+                                ClaimCode.CUSTOMER_IMPACT,
+                                "PAYMENT_TIMEOUT_CONFIG",
+                                "ev-metric-001"
+                        )
+                )
+        );
+
+        assertFalse(validator.validate(diagnosis).isEmpty());
+    }
+
+    @Test
     void rejectsDuplicateClaimKeys() {
         Diagnosis diagnosis = diagnosed(
                 "PAYMENT_TIMEOUT_CONFIG",
@@ -173,7 +227,7 @@ class DiagnosisTest {
                 "The available evidence does not isolate a root cause.",
                 List.of(claim(
                         ClaimCode.CUSTOMER_IMPACT,
-                        "CHECKOUT_FAILURES",
+                        "CHECKOUT_PAYMENT_FAILURES",
                         "ev-metric-001"
                 )),
                 safeNextStep()
@@ -215,7 +269,7 @@ class DiagnosisTest {
                         ),
                         claim(
                                 ClaimCode.CUSTOMER_IMPACT,
-                                "CHECKOUT_FAILURES",
+                                "CHECKOUT_PAYMENT_FAILURES",
                                 "ev-metric-001"
                         )
                 )

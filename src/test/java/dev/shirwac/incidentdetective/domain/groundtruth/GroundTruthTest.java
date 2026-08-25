@@ -114,6 +114,38 @@ class GroundTruthTest {
     }
 
     @Test
+    void rejectsANonCanonicalExpectedClaim() {
+        GroundTruth groundTruth = new GroundTruth(
+                "checkout-timeout-v1",
+                DiagnosisStatus.DIAGNOSED,
+                "PAYMENT_TIMEOUT_CONFIG",
+                "PAYMENT_ADAPTER",
+                List.of(
+                        new ExpectedClaim(
+                                ClaimCode.ROOT_CAUSE,
+                                "PAYMENT_TIMEOUT_CONFIG"
+                        ),
+                        new ExpectedClaim(
+                                ClaimCode.AFFECTED_SERVICE,
+                                "PAYMENT_ADAPTER"
+                        ),
+                        new ExpectedClaim(
+                                ClaimCode.CUSTOMER_IMPACT,
+                                "CHECKOUT_FAILURES"
+                        )
+                ),
+                List.of(
+                        support(ClaimCode.ROOT_CAUSE, "PAYMENT_TIMEOUT_CONFIG", "ev-log-001"),
+                        support(ClaimCode.AFFECTED_SERVICE, "PAYMENT_ADAPTER", "ev-trace-001"),
+                        support(ClaimCode.CUSTOMER_IMPACT, "CHECKOUT_FAILURES", "ev-metric-001")
+                ),
+                List.of()
+        );
+
+        assertFalse(validator.validate(groundTruth).isEmpty());
+    }
+
+    @Test
     void rejectsSupportWithoutAnExpectedClaim() {
         GroundTruth groundTruth = new GroundTruth(
                 "checkout-timeout-v1",

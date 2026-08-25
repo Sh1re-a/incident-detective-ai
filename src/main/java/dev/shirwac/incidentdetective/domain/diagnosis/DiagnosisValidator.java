@@ -41,6 +41,7 @@ public final class DiagnosisValidator implements ConstraintValidator<ValidDiagno
                 ClaimCode.AFFECTED_SERVICE,
                 diagnosis.affectedService()
         ) && claims.stream().allMatch(this::hasEvidence)
+                && claims.stream().allMatch(this::hasCanonicalClaimValue)
                 && hasUniqueClaimKeys(claims);
     }
 
@@ -59,7 +60,8 @@ public final class DiagnosisValidator implements ConstraintValidator<ValidDiagno
         );
 
         return diagnosis.claims().stream()
-                .allMatch(claim -> allowedClaims.contains(claim.claimCode()));
+                .allMatch(claim -> allowedClaims.contains(claim.claimCode())
+                        && hasCanonicalClaimValue(claim));
     }
 
     private boolean hasExactlyOneMatchingClaim(
@@ -77,6 +79,13 @@ public final class DiagnosisValidator implements ConstraintValidator<ValidDiagno
 
     private boolean hasEvidence(Claim claim) {
         return claim.evidenceIds() != null && !claim.evidenceIds().isEmpty();
+    }
+
+    private boolean hasCanonicalClaimValue(Claim claim) {
+        return ClaimValueTaxonomy.contains(
+                claim.claimCode(),
+                claim.claimValueCode()
+        );
     }
 
     private boolean hasUniqueClaimKeys(List<Claim> claims) {

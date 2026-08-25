@@ -1,11 +1,13 @@
 package dev.shirwac.incidentdetective.ai;
 
+import dev.shirwac.incidentdetective.domain.diagnosis.ClaimValueTaxonomy;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.InputStream;
+import java.util.HashSet;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,6 +23,7 @@ class GeminiSchemaResourceTest {
         List<String> resources = List.of(
                 "ai/diagnosis-schema-v1.json",
                 "ai/diagnosis-schema-v2.json",
+                "ai/diagnosis-schema-v3.json",
                 "ai/tool-schemas/get_metrics-v1.json",
                 "ai/tool-schemas/search_logs-v1.json",
                 "ai/tool-schemas/get_trace-v1.json",
@@ -44,7 +47,9 @@ class GeminiSchemaResourceTest {
     void versionedPromptsDoNotMentionGroundTruth() throws Exception {
         for (String resourcePath : List.of(
                 "ai/prompts/collect-gemini-live-v2.txt",
-                "ai/prompts/synthesize-gemini-live-v2.txt"
+                "ai/prompts/synthesize-gemini-live-v2.txt",
+                "ai/prompts/collect-gemini-live-v3.txt",
+                "ai/prompts/synthesize-gemini-live-v3.txt"
         )) {
             String prompt = new ClassPathResource(resourcePath)
                     .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
@@ -72,5 +77,33 @@ class GeminiSchemaResourceTest {
         assertTrue(values.toString().contains("INVENTORY_SCHEMA_MISMATCH"));
         assertTrue(values.get(2).isNull());
         assertFalse(schema.toString().contains("scenario_id"));
+    }
+
+    @Test
+    void diagnosisSchemaV3UsesTheSharedClaimValueTaxonomy() throws Exception {
+        JsonNode schema;
+        try (InputStream input = new ClassPathResource(
+                "ai/diagnosis-schema-v3.json"
+        ).getInputStream()) {
+            schema = jsonMapper.readTree(input);
+        }
+
+        JsonNode values = schema.get("properties")
+                .get("claims")
+                .get("items")
+                .get("properties")
+                .get("claim_value_code")
+                .get("enum");
+        HashSet<String> schemaValues = new HashSet<>();
+        values.forEach(value -> schemaValues.add(value.asText()));
+
+        assertEquals(ClaimValueTaxonomy.allValues(), schemaValues);
+        assertEquals(2, schema.get("properties")
+                .get("claims")
+                .get("items")
+                .get("properties")
+                .get("evidence_ids")
+                .get("maxItems")
+                .asInt());
     }
 }
