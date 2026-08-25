@@ -57,6 +57,38 @@ public final class DeterministicVerifier {
         return EvidencePrecision.scored(supportedTriples, citationTriples.size());
     }
 
+    public DiagnosisCorrectness verifyDiagnosis(
+            Diagnosis diagnosis,
+            GroundTruth groundTruth
+    ) {
+        Objects.requireNonNull(diagnosis, "diagnosis must not be null");
+        Objects.requireNonNull(groundTruth, "groundTruth must not be null");
+
+        if (groundTruth.expectedStatus() == DiagnosisStatus.DIAGNOSED) {
+            boolean diagnosed = diagnosis.status() == DiagnosisStatus.DIAGNOSED;
+            return DiagnosisCorrectness.diagnosis(
+                    diagnosed && Objects.equals(
+                            diagnosis.rootCauseCode(),
+                            groundTruth.rootCauseCode()
+                    ),
+                    diagnosed && Objects.equals(
+                            diagnosis.affectedService(),
+                            groundTruth.affectedService()
+                    )
+            );
+        }
+
+        if (groundTruth.expectedStatus() == DiagnosisStatus.INSUFFICIENT_EVIDENCE) {
+            boolean correctAbstention = diagnosis.status()
+                    == DiagnosisStatus.INSUFFICIENT_EVIDENCE
+                    && diagnosis.rootCauseCode() == null
+                    && diagnosis.affectedService() == null;
+            return DiagnosisCorrectness.abstention(correctAbstention);
+        }
+
+        return DiagnosisCorrectness.notEvaluated();
+    }
+
     private Set<String> citedEvidenceIds(Diagnosis diagnosis) {
         if (diagnosis.claims() == null) {
             return Set.of();
