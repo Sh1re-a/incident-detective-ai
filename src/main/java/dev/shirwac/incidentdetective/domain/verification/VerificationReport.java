@@ -5,7 +5,8 @@ import java.util.List;
 import java.util.Objects;
 
 public record VerificationReport(
-        boolean schemaPass,
+        boolean diagnosisSchemaPass,
+        boolean groundTruthSchemaPass,
         CitationValidity citationValidity,
         EvidencePrecision evidencePrecision,
         DiagnosisCorrectness diagnosisCorrectness,
@@ -22,12 +23,21 @@ public record VerificationReport(
             throw new IllegalArgumentException("hardErrors must not contain duplicates");
         }
 
-        boolean hasSchemaError = hardErrors.contains(
+        boolean hasDiagnosisSchemaError = hardErrors.contains(
                 VerificationErrorCode.DIAGNOSIS_SCHEMA_INVALID
-        ) || hardErrors.contains(VerificationErrorCode.GROUND_TRUTH_SCHEMA_INVALID);
-        if (schemaPass == hasSchemaError) {
+        );
+        if (diagnosisSchemaPass == hasDiagnosisSchemaError) {
             throw new IllegalArgumentException(
-                    "schemaPass must be false exactly when a schema error exists"
+                    "diagnosisSchemaPass must match the diagnosis schema error"
+            );
+        }
+
+        boolean hasGroundTruthSchemaError = hardErrors.contains(
+                VerificationErrorCode.GROUND_TRUTH_SCHEMA_INVALID
+        );
+        if (groundTruthSchemaPass == hasGroundTruthSchemaError) {
+            throw new IllegalArgumentException(
+                    "groundTruthSchemaPass must match the ground truth schema error"
             );
         }
 

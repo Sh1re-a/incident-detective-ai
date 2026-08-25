@@ -39,8 +39,6 @@ public final class DeterministicVerifier {
 
         boolean diagnosisSchemaValid = validator.validate(diagnosis).isEmpty();
         boolean groundTruthSchemaValid = validator.validate(groundTruth).isEmpty();
-        boolean schemaPass = diagnosisSchemaValid && groundTruthSchemaValid;
-
         CitationValidity citationValidity = verifyCitations(diagnosis, seenEvidenceIds);
         List<VerificationErrorCode> hardErrors = new ArrayList<>();
         if (!diagnosisSchemaValid) {
@@ -69,7 +67,8 @@ public final class DeterministicVerifier {
         }
 
         return new VerificationReport(
-                schemaPass,
+                diagnosisSchemaValid,
+                groundTruthSchemaValid,
                 citationValidity,
                 evidencePrecision,
                 diagnosisCorrectness,
@@ -77,7 +76,7 @@ public final class DeterministicVerifier {
         );
     }
 
-    public CitationValidity verifyCitations(
+    CitationValidity verifyCitations(
             Diagnosis diagnosis,
             Set<String> seenEvidenceIds
     ) {
@@ -92,7 +91,7 @@ public final class DeterministicVerifier {
         return new CitationValidity(unknownEvidenceIds.isEmpty(), unknownEvidenceIds);
     }
 
-    public EvidencePrecision scoreEvidencePrecision(
+    EvidencePrecision scoreEvidencePrecision(
             Diagnosis diagnosis,
             GroundTruth groundTruth
     ) {
@@ -119,7 +118,7 @@ public final class DeterministicVerifier {
         return EvidencePrecision.scored(supportedTriples, citationTriples.size());
     }
 
-    public DiagnosisCorrectness verifyDiagnosis(
+    DiagnosisCorrectness verifyDiagnosis(
             Diagnosis diagnosis,
             GroundTruth groundTruth
     ) {

@@ -31,7 +31,8 @@ class DeterministicVerifierReportTest {
                 validGroundTruth()
         );
 
-        assertTrue(report.schemaPass());
+        assertTrue(report.diagnosisSchemaPass());
+        assertTrue(report.groundTruthSchemaPass());
         assertTrue(report.citationValidity().valid());
         assertEquals(2, report.evidencePrecision().supportedTriples());
         assertEquals(2, report.evidencePrecision().totalTriples());
@@ -49,7 +50,8 @@ class DeterministicVerifierReportTest {
                 validGroundTruth()
         );
 
-        assertTrue(report.schemaPass());
+        assertTrue(report.diagnosisSchemaPass());
+        assertTrue(report.groundTruthSchemaPass());
         assertFalse(report.citationValidity().valid());
         assertEquals(
                 List.of("ev-runbook-001"),
@@ -81,12 +83,41 @@ class DeterministicVerifierReportTest {
                 validGroundTruth()
         );
 
-        assertFalse(report.schemaPass());
+        assertFalse(report.diagnosisSchemaPass());
+        assertTrue(report.groundTruthSchemaPass());
         assertTrue(report.citationValidity().valid());
         assertEquals(0.0, report.evidencePrecision().score(), TOLERANCE);
         assertFalse(report.diagnosisCorrectness().evaluated());
         assertEquals(
                 List.of(VerificationErrorCode.DIAGNOSIS_SCHEMA_INVALID),
+                report.hardErrors()
+        );
+    }
+
+    @Test
+    void separatesInvalidGroundTruthFromTheModelSchemaMetric() {
+        GroundTruth invalidGroundTruth = new GroundTruth(
+                "checkout-timeout-v1",
+                DiagnosisStatus.DIAGNOSED,
+                null,
+                null,
+                List.of(),
+                List.of(),
+                List.of()
+        );
+
+        VerificationReport report = verifier.verify(
+                validDiagnosis("ev-log-001"),
+                Set.of("ev-log-001", "ev-trace-001"),
+                invalidGroundTruth
+        );
+
+        assertTrue(report.diagnosisSchemaPass());
+        assertFalse(report.groundTruthSchemaPass());
+        assertFalse(report.evidencePrecision().applicable());
+        assertFalse(report.diagnosisCorrectness().evaluated());
+        assertEquals(
+                List.of(VerificationErrorCode.GROUND_TRUTH_SCHEMA_INVALID),
                 report.hardErrors()
         );
     }
