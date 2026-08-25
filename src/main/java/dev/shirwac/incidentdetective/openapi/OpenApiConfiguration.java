@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Configuration(proxyBeanMethods = false)
 public class OpenApiConfiguration {
@@ -45,7 +46,7 @@ public class OpenApiConfiguration {
     }
 
     @Bean
-    OpenApiCustomizer flattenEvidenceImplementationSchemas() {
+    OpenApiCustomizer customizeComponentSchemas() {
         return openApi -> {
             if (openApi.getComponents() == null
                     || openApi.getComponents().getSchemas() == null) {
@@ -68,6 +69,16 @@ public class OpenApiConfiguration {
                             schemas.put(name, objectSchema);
                         });
             });
+
+            Schema<?> recordedResult = schemas.get("RecordedReplayResult");
+            if (recordedResult != null && recordedResult.getProperties() != null) {
+                Schema<?> nullSchema = new Schema<>().types(Set.of("null"));
+                Schema<?> tokenUsageSchema = new Schema<>().oneOf(List.of(
+                        nullSchema,
+                        new Schema<>().$ref("#/components/schemas/ModelTokenUsage")
+                )).description("Always null because replay uses no model tokens.");
+                recordedResult.getProperties().put("token_usage", tokenUsageSchema);
+            }
         };
     }
 }

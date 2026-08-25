@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.live;
 
+import dev.shirwac.incidentdetective.api.ApiProblemResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -8,7 +9,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.MediaType;
-import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -51,10 +51,10 @@ public final class LiveInvestigationController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Live model call was not explicitly confirmed",
+                    description = "Invalid request body or live model call not confirmed",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class)
                     )
             ),
             @ApiResponse(
@@ -62,7 +62,15 @@ public final class LiveInvestigationController {
                     description = "Synthetic scenario not found",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "415",
+                    description = "Request body is not application/json",
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ApiProblemResponse.class)
                     )
             ),
             @ApiResponse(
@@ -70,7 +78,7 @@ public final class LiveInvestigationController {
                     description = "Live AI concurrency or rolling start limit reached",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class)
                     )
             ),
             @ApiResponse(
@@ -78,7 +86,7 @@ public final class LiveInvestigationController {
                     description = "Provider response or model tool arguments were invalid",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class)
                     )
             ),
             @ApiResponse(
@@ -86,7 +94,7 @@ public final class LiveInvestigationController {
                     description = "Live AI is disabled or not configured",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class)
                     )
             ),
             @ApiResponse(
@@ -94,7 +102,7 @@ public final class LiveInvestigationController {
                     description = "Provider or investigation deadline exceeded",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class)
                     )
             )
     })

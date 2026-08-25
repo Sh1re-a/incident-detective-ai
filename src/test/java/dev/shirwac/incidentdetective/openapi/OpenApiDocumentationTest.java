@@ -82,7 +82,7 @@ class OpenApiDocumentationTest {
                         REPLAY_POST
                                 + ".responses['404'].content['application/problem+json']"
                                 + ".schema['$ref']"
-                ).value("#/components/schemas/ProblemDetail"))
+                ).value("#/components/schemas/ApiProblemResponse"))
                 .andExpect(jsonPath("$.components.schemas.RecordedReplayResult").exists())
                 .andExpect(jsonPath(
                         "$.components.schemas.RecordedReplayResult.properties.scenario_id"
@@ -98,7 +98,7 @@ class OpenApiDocumentationTest {
                 ).doesNotExist())
                 .andExpect(jsonPath(
                         "$.components.schemas.RecordedReplayResult.properties.mode.enum"
-                ).value(containsInAnyOrder("recorded_replay", "live_ai")))
+                ).value(contains("recorded_replay")))
                 .andExpect(jsonPath(LIVE_POST + ".summary")
                         .value("Run a live Gemini incident investigation"))
                 .andExpect(jsonPath(
@@ -115,6 +115,43 @@ class OpenApiDocumentationTest {
                         "$.components.schemas.LiveInvestigationRequest"
                                 + ".properties.confirm_live_ai"
                 ).exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.LiveInvestigationRequest.required"
+                ).value(contains("confirm_live_ai")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.LiveInvestigationResult.properties.mode.enum"
+                ).value(contains("live_ai")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.RecordedReplayResult.required"
+                ).value(containsInAnyOrder(
+                        "run_id", "scenario_id", "mode", "truth_label", "status",
+                        "started_at", "completed_at", "latency_ms", "scenario",
+                        "tool_events", "diagnosis", "verification", "comparison",
+                        "model_id", "prompt_version", "token_usage",
+                        "estimated_cost_usd"
+                )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.LiveInvestigationResult.required.length()"
+                ).value(22))
+                .andExpect(jsonPath(
+                        "$.components.schemas.RecordedReplayResult.properties"
+                                + ".token_usage.oneOf[0].type"
+                ).value("null"))
+                .andExpect(jsonPath(
+                        "$.components.schemas.RecordedReplayResult.properties"
+                                + ".token_usage.oneOf[1]['$ref']"
+                ).value("#/components/schemas/ModelTokenUsage"))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ApiProblemResponse.properties.code"
+                ).exists())
+                .andExpect(jsonPath("$.paths.length()").value(3))
+                .andExpect(jsonPath(LIVE_POST + ".responses['400']").exists())
+                .andExpect(jsonPath(LIVE_POST + ".responses['404']").exists())
+                .andExpect(jsonPath(LIVE_POST + ".responses['415']").exists())
+                .andExpect(jsonPath(LIVE_POST + ".responses['429']").exists())
+                .andExpect(jsonPath(LIVE_POST + ".responses['502']").exists())
+                .andExpect(jsonPath(LIVE_POST + ".responses['503']").exists())
+                .andExpect(jsonPath(LIVE_POST + ".responses['504']").exists())
                 .andExpect(jsonPath(
                         "$.components.schemas.LiveInvestigationResult.properties.model_calls"
                 ).exists())
