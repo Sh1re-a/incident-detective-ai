@@ -1,4 +1,4 @@
-package dev.shirwac.incidentdetective.replay;
+package dev.shirwac.incidentdetective.investigation.tools;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;

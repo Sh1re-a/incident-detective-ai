@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.replay;
 
+import dev.shirwac.incidentdetective.investigation.tools.ToolName;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
