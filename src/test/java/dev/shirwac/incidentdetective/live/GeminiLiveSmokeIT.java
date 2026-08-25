@@ -52,13 +52,23 @@ class GeminiLiveSmokeIT {
 
         System.out.printf(
                 Locale.ROOT,
-                "LIVE_SMOKE_OK scenario=%s run_status=%s diagnosis=%s "
+                "LIVE_SMOKE_OK scenario=%s model=%s thinking=%s "
+                        + "run_status=%s diagnosis=%s root_cause=%s "
+                        + "affected_service=%s tools=%s "
                         + "model_calls=%d tool_calls=%d input_tokens=%d "
                         + "output_tokens=%d latency_ms=%d estimated_cost_usd=%s "
-                        + "diagnosis_correct=%s citations_valid=%s%n",
+                        + "root_cause_correct=%s affected_service_correct=%s "
+                        + "citations_valid=%s%n",
                 result.scenarioId(),
+                result.modelId(),
+                properties.thinkingLevel(),
                 result.status(),
                 result.diagnosis().status(),
+                result.diagnosis().rootCauseCode(),
+                result.diagnosis().affectedService(),
+                result.toolEvents().stream()
+                        .map(event -> event.toolName().wireValue())
+                        .toList(),
                 result.modelCallCount(),
                 result.toolCallCount(),
                 result.tokenUsage().inputTokens(),
@@ -66,6 +76,8 @@ class GeminiLiveSmokeIT {
                 result.latencyMs(),
                 result.estimatedCostUsd(),
                 result.verification().diagnosisCorrectness().rootCauseCorrect(),
+                result.verification().diagnosisCorrectness()
+                        .affectedServiceCorrect(),
                 result.verification().citationValidity().valid()
         );
     }
