@@ -4,12 +4,36 @@ import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.investigation.InvestigationScenarioNotFoundException;
 import dev.shirwac.incidentdetective.investigation.tools.InvalidToolArgumentsException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public final class LiveInvestigationExceptionHandler {
+
+    @ExceptionHandler(LiveAdmissionRejectedException.class)
+    ResponseEntity<ProblemDetail> handleAdmissionRejection(
+            LiveAdmissionRejectedException exception
+    ) {
+        String detail = exception.rejection() == LiveAdmissionRejection.CONCURRENT_RUN
+                ? "Another live investigation is already running."
+                : "The public live investigation limit has been reached.";
+        ProblemDetail problem = problem(
+                HttpStatus.TOO_MANY_REQUESTS,
+                "Live AI is busy",
+                detail,
+                "LIVE_AI_RATE_LIMITED"
+        );
+        long retryAfterSeconds = Math.max(
+                1,
+                (exception.retryAfter().toMillis() + 999) / 1_000
+        );
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds))
+                .body(problem);
+    }
 
     @ExceptionHandler(LiveInvestigationException.class)
     ProblemDetail handleLiveFailure(LiveInvestigationException exception) {

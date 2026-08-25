@@ -64,6 +64,7 @@ public final class LiveInvestigationService {
     private final InvestigationModelGateway model;
     private final CompletedInvestigationVerifier verifier;
     private final GeminiCostEstimator costEstimator;
+    private final LiveInvestigationAdmissionGuard admissionGuard;
     private final Clock clock;
 
     public LiveInvestigationService(
@@ -73,6 +74,7 @@ public final class LiveInvestigationService {
             InvestigationModelGateway model,
             CompletedInvestigationVerifier verifier,
             GeminiCostEstimator costEstimator,
+            LiveInvestigationAdmissionGuard admissionGuard,
             Clock clock
     ) {
         this.properties = properties;
@@ -81,6 +83,7 @@ public final class LiveInvestigationService {
         this.model = model;
         this.verifier = verifier;
         this.costEstimator = costEstimator;
+        this.admissionGuard = admissionGuard;
         this.clock = clock;
     }
 
@@ -89,9 +92,16 @@ public final class LiveInvestigationService {
             LiveInvestigationRequest request
     ) {
         requireLiveAccess(request);
-        Instant startedAt = clock.instant();
         Scenario scenario = scenarios.findById(scenarioId)
                 .orElseThrow(() -> new InvestigationScenarioNotFoundException(scenarioId));
+        return admissionGuard.admit(() -> investigateAdmitted(scenarioId, scenario));
+    }
+
+    private LiveInvestigationResult investigateAdmitted(
+            String scenarioId,
+            Scenario scenario
+    ) {
+        Instant startedAt = clock.instant();
         List<String> availableMetricNames = tools.availableMetricNames(scenarioId);
         Map<String, Evidence> evidenceById = new LinkedHashMap<>();
         List<LiveToolEvent> toolEvents = new ArrayList<>();

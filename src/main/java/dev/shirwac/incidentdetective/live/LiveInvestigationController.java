@@ -66,6 +66,14 @@ public final class LiveInvestigationController {
                     )
             ),
             @ApiResponse(
+                    responseCode = "429",
+                    description = "Live AI concurrency or rolling start limit reached",
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)
+                    )
+            ),
+            @ApiResponse(
                     responseCode = "502",
                     description = "Provider response or model tool arguments were invalid",
                     content = @Content(
