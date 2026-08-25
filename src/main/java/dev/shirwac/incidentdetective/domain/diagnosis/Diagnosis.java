@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Pattern;
 
 import java.util.List;
 
+@ValidDiagnosis
 public record Diagnosis(
         @NotNull DiagnosisStatus status,
         @Pattern(regexp = "^[A-Z][A-Z0-9_]{1,63}$")
