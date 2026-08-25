@@ -1,0 +1,297 @@
+{
+  "scenario": {
+    "scenario_id": "checkout-cart-segment-failures-v1",
+    "title": "Some carts fail before payment",
+    "description": "Multi-item checkouts began failing shortly after a synthetic webshop release.",
+    "incident_started_at": "2026-08-25T11:02:00Z",
+    "time_window": {
+      "start": "2026-08-25T10:55:00Z",
+      "end": "2026-08-25T11:15:00Z"
+    },
+    "affected_services": ["STOREFRONT", "CHECKOUT_API", "INVENTORY_SERVICE"],
+    "business_impact_summary": "Synthetic estimate: 61 of 670 multi-item checkout attempts failed during the incident window.",
+    "initial_symptoms": [
+      {
+        "symptom_code": "CHECKOUT_FAILURES_CART_SEGMENT",
+        "summary": "Failures are concentrated in synthetic multi-item carts.",
+        "observed_at": "2026-08-25T11:04:00Z"
+      },
+      {
+        "symptom_code": "INVENTORY_RESERVATION_ERRORS",
+        "summary": "Checkout reports errors after inventory reservation responses.",
+        "observed_at": "2026-08-25T11:05:00Z"
+      }
+    ],
+    "version": 1
+  },
+  "evidence_inventory": [
+    {
+      "evidence_type": "metric",
+      "evidence_id": "cic-v1-metric-checkout-failure-rate",
+      "scenario_id": "checkout-cart-segment-failures-v1",
+      "observed_at": "2026-08-25T11:04:00Z",
+      "display_summary": "Multi-item checkout failure ratio reached 9.1 percent.",
+      "source_ref": "metrics/checkout/multi-item-failure-ratio/11-02-11-12",
+      "content": {
+        "metric_name": "checkout_failure_ratio",
+        "value": 0.091,
+        "unit": "ratio",
+        "labels": {
+          "service": "CHECKOUT_API",
+          "cart_segment": "multi_item",
+          "attempts": "670"
+        }
+      }
+    },
+    {
+      "evidence_type": "metric",
+      "evidence_id": "cic-v1-metric-failed-checkouts",
+      "scenario_id": "checkout-cart-segment-failures-v1",
+      "observed_at": "2026-08-25T11:12:00Z",
+      "display_summary": "61 synthetic multi-item checkout attempts failed.",
+      "source_ref": "metrics/checkout/multi-item-failed-attempts/11-02-11-12",
+      "content": {
+        "metric_name": "failed_checkout_attempts",
+        "value": 61,
+        "unit": "count",
+        "labels": {
+          "service": "CHECKOUT_API",
+          "cart_segment": "multi_item"
+        }
+      }
+    },
+    {
+      "evidence_type": "metric",
+      "evidence_id": "cic-v1-metric-contract-errors",
+      "scenario_id": "checkout-cart-segment-failures-v1",
+      "observed_at": "2026-08-25T11:05:00Z",
+      "display_summary": "Checkout recorded 61 inventory response validation errors.",
+      "source_ref": "metrics/checkout/inventory-contract-errors",
+      "content": {
+        "metric_name": "inventory_contract_validation_errors",
+        "value": 61,
+        "unit": "count",
+        "labels": {
+          "service": "CHECKOUT_API",
+          "upstream": "INVENTORY_SERVICE"
+        }
+      }
+    },
+    {
+      "evidence_type": "metric",
+      "evidence_id": "cic-v1-metric-payment-latency-normal",
+      "scenario_id": "checkout-cart-segment-failures-v1",
+      "observed_at": "2026-08-25T11:06:00Z",
+      "display_summary": "Payment latency remained normal for checkout attempts that reached payment.",
+      "source_ref": "metrics/payment-adapter/authorization-p95",
+      "content": {
+        "metric_name": "payment_authorization_duration_p95",
+        "value": 0.42,
+        "unit": "seconds",
+        "labels": {
+          "service": "PAYMENT_ADAPTER",
+          "result": "normal"
+        }
+      }
+    },
+    {
+      "evidence_type": "log",
+      "evidence_id": "cic-v1-log-inventory-release",
+      "scenario_id": "checkout-cart-segment-failures-v1",
+      "observed_at": "2026-08-25T11:00:18Z",
+      "display_summary": "Inventory service released response schema version 2 before failures began.",
+      "source_ref": "logs/inventory-service/deploy/2026.08.25.2",
+      "content": {
+        "service": "INVENTORY_SERVICE",
+        "level": "INFO",
+        "message": "Release inventory-service-2026.08.25.2 completed.",
+        "attributes": {
+          "release": "inventory-service-2026.08.25.2",
+          "response_schema_version": "2"
+        }
+      }
+    },
+    {
+      "evidence_type": "log",
+      "evidence_id": "cic-v1-log-schema-mismatch",
+      "scenario_id": "checkout-cart-segment-failures-v1",
+      "observed_at": "2026-08-25T11:04:31Z",
+      "display_summary": "Checkout expected inventory schema 1 but received schema 2 without reservation_token.",
+      "source_ref": "logs/checkout-api/inventory-response/cic-7712",
+      "content": {
+        "service": "CHECKOUT_API",
+        "level": "ERROR",
+        "message": "InventoryReservationContractException: missing reservation_token.",
+        "attributes": {
+          "expected_schema": "1",
+          "received_schema": "2",
+          "upstream_http_status": "200",
+          "received_field": "reservation.token"
+        }
+      }
+    },
+    {
+      "evidence_type": "trace",
+      "evidence_id": "cic-v1-trace-contract-failure",
+      "scenario_id": "checkout-cart-segment-failures-v1",
+      "observed_at": "2026-08-25T11:04:31Z",
+      "display_summary": "Checkout failed while decoding a successful inventory response, before payment was called.",
+      "source_ref": "traces/cic-trace-7712",
+      "content": {
+        "trace_id": "cic-trace-7712",
+        "spans": [
+          {
+            "span_id": "cic-span-storefront",
+            "service": "STOREFRONT",
+            "operation": "submit-checkout",
+            "duration_ms": 71,
+            "status": "ERROR"
+          },
+          {
+            "span_id": "cic-span-checkout",
+            "service": "CHECKOUT_API",
+            "operation": "confirm-checkout",
+            "duration_ms": 63,
+            "status": "ERROR"
+          },
+          {
+            "span_id": "cic-span-inventory",
+            "service": "INVENTORY_SERVICE",
+            "operation": "reserve-items",
+            "duration_ms": 36,
+            "status": "OK"
+          },
+          {
+            "span_id": "cic-span-decode",
+            "service": "CHECKOUT_API",
+            "operation": "decode-inventory-reservation",
+            "duration_ms": 4,
+            "status": "ERROR"
+          }
+        ]
+      }
+    },
+    {
+      "evidence_type": "runbook",
+      "evidence_id": "cic-v1-runbook-contract-compatibility",
+      "scenario_id": "checkout-cart-segment-failures-v1",
+      "display_summary": "The runbook explains provider and consumer response compatibility checks.",
+      "source_ref": "runbooks/rb-service-contract-compatibility#provider-response-breaking-change",
+      "content": {
+        "document_id": "rb-service-contract-compatibility",
+        "chunk_id": "provider-response-breaking-change",
+        "document_version": "1.1",
+        "text": "Compare provider and consumer schema versions and inspect the failing decode span. HTTP 200 does not prove contract compatibility. A human must approve rollback or a compatibility patch."
+      }
+    },
+    {
+      "evidence_type": "log",
+      "evidence_id": "cic-v1-log-catalog-noise",
+      "scenario_id": "checkout-cart-segment-failures-v1",
+      "observed_at": "2026-08-25T11:03:12Z",
+      "display_summary": "A catalog reindex completed successfully and is unrelated.",
+      "source_ref": "logs/catalog-service/reindex/991",
+      "content": {
+        "service": "CATALOG_SERVICE",
+        "level": "INFO",
+        "message": "Incremental product reindex completed.",
+        "attributes": {
+          "duration_ms": "312",
+          "result": "success"
+        }
+      }
+    }
+  ],
+  "tool_events": [
+    {
+      "event_id": "cic-v1-tool-metrics",
+      "tool_name": "get_metrics",
+      "safe_summary": "Read segmented checkout errors, inventory contract errors, and payment latency.",
+      "evidence_ids": [
+        "cic-v1-metric-checkout-failure-rate",
+        "cic-v1-metric-failed-checkouts",
+        "cic-v1-metric-contract-errors",
+        "cic-v1-metric-payment-latency-normal"
+      ]
+    },
+    {
+      "event_id": "cic-v1-tool-logs",
+      "tool_name": "search_logs",
+      "safe_summary": "Searched inventory release and checkout contract validation logs.",
+      "evidence_ids": [
+        "cic-v1-log-inventory-release",
+        "cic-v1-log-schema-mismatch"
+      ]
+    },
+    {
+      "event_id": "cic-v1-tool-trace",
+      "tool_name": "get_trace",
+      "safe_summary": "Opened one representative failed multi-item checkout trace.",
+      "evidence_ids": ["cic-v1-trace-contract-failure"]
+    },
+    {
+      "event_id": "cic-v1-tool-runbook",
+      "tool_name": "retrieve_runbooks",
+      "safe_summary": "Retrieved general service contract compatibility guidance.",
+      "evidence_ids": ["cic-v1-runbook-contract-compatibility"]
+    }
+  ],
+  "recorded_diagnosis": {
+    "status": "diagnosed",
+    "root_cause_code": "INVENTORY_SCHEMA_MISMATCH",
+    "affected_service": "INVENTORY_SERVICE",
+    "business_summary": "Synthetic multi-item checkouts fail before payment because checkout cannot read the new inventory response shape.",
+    "technical_summary": "Inventory response schema 2 moved reservation_token to reservation.token. Checkout still expects schema 1 and rejects the HTTP 200 response during decoding.",
+    "claims": [
+      {
+        "claim_code": "root_cause",
+        "claim_value_code": "INVENTORY_SCHEMA_MISMATCH",
+        "display_text": "Checkout and inventory use incompatible response schemas.",
+        "evidence_ids": [
+          "cic-v1-log-schema-mismatch",
+          "cic-v1-trace-contract-failure",
+          "cic-v1-runbook-contract-compatibility"
+        ]
+      },
+      {
+        "claim_code": "affected_service",
+        "claim_value_code": "INVENTORY_SERVICE",
+        "display_text": "The incompatible response is produced by inventory service.",
+        "evidence_ids": [
+          "cic-v1-log-inventory-release",
+          "cic-v1-log-schema-mismatch",
+          "cic-v1-trace-contract-failure"
+        ]
+      },
+      {
+        "claim_code": "trigger",
+        "claim_value_code": "INVENTORY_SERVICE_RELEASE",
+        "display_text": "The response shape changed with the inventory service release.",
+        "evidence_ids": ["cic-v1-log-inventory-release"]
+      },
+      {
+        "claim_code": "customer_impact",
+        "claim_value_code": "MULTI_ITEM_CHECKOUT_FAILURES",
+        "display_text": "61 of 670 synthetic multi-item checkout attempts failed.",
+        "evidence_ids": [
+          "cic-v1-metric-checkout-failure-rate",
+          "cic-v1-metric-failed-checkouts"
+        ]
+      },
+      {
+        "claim_code": "observed_symptom",
+        "claim_value_code": "INVENTORY_CONTRACT_VALIDATION_ERRORS",
+        "display_text": "Checkout records contract validation errors immediately after inventory responds.",
+        "evidence_ids": [
+          "cic-v1-metric-contract-errors",
+          "cic-v1-log-schema-mismatch",
+          "cic-v1-trace-contract-failure"
+        ]
+      }
+    ],
+    "safe_next_step": {
+      "summary": "Review and approve rolling back the inventory response change or deploying a backward-compatible checkout decoder. No remediation is automatic.",
+      "requires_human_approval": true
+    }
+  }
+}

@@ -11,7 +11,8 @@ import dev.shirwac.incidentdetective.domain.verification.VerificationReport;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import tools.jackson.databind.json.JsonMapper;
@@ -34,8 +35,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @JsonTest
 class RecordedScenarioResourceTest {
 
-    private static final String SCENARIO_ID = "checkout-orders-at-risk-v1";
-
     private static Validator validator;
 
     @Autowired
@@ -46,19 +45,23 @@ class RecordedScenarioResourceTest {
         validator = Validation.buildDefaultValidatorFactory().getValidator();
     }
 
-    @Test
-    void loadsAConsistentPaymentTimeoutScenario() throws Exception {
-        RecordedScenarioFixture fixture = readRecordedFixture(SCENARIO_ID);
-        GroundTruth groundTruth = readGroundTruth(SCENARIO_ID);
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "checkout-orders-at-risk-v1",
+            "checkout-cart-segment-failures-v1"
+    })
+    void loadsAConsistentRecordedScenario(String scenarioId) throws Exception {
+        RecordedScenarioFixture fixture = readRecordedFixture(scenarioId);
+        GroundTruth groundTruth = readGroundTruth(scenarioId);
 
         assertTrue(validator.validate(fixture).isEmpty());
         assertTrue(validator.validate(groundTruth).isEmpty());
-        assertEquals(SCENARIO_ID, fixture.scenario().scenarioId());
-        assertEquals(SCENARIO_ID, groundTruth.scenarioId());
+        assertEquals(scenarioId, fixture.scenario().scenarioId());
+        assertEquals(scenarioId, groundTruth.scenarioId());
 
         Map<String, Evidence> evidenceById = uniqueEvidenceIndex(fixture);
         assertTrue(fixture.evidenceInventory().stream()
-                .allMatch(evidence -> SCENARIO_ID.equals(evidence.scenarioId())));
+                .allMatch(evidence -> scenarioId.equals(evidence.scenarioId())));
 
         Set<String> seenEvidenceIds = seenEvidenceIds(fixture, evidenceById);
         assertTrue(seenEvidenceIds.containsAll(citedEvidenceIds(fixture)));
@@ -82,9 +85,14 @@ class RecordedScenarioResourceTest {
         assertTrue(report.hardErrors().isEmpty());
     }
 
-    @Test
-    void publicScenarioJsonDoesNotRevealEvidenceOrGroundTruth() throws Exception {
-        RecordedScenarioFixture fixture = readRecordedFixture(SCENARIO_ID);
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "checkout-orders-at-risk-v1",
+            "checkout-cart-segment-failures-v1"
+    })
+    void publicScenarioJsonDoesNotRevealEvidenceOrGroundTruth(String scenarioId)
+            throws Exception {
+        RecordedScenarioFixture fixture = readRecordedFixture(scenarioId);
 
         String publicScenarioJson = jsonMapper.writeValueAsString(fixture.scenario());
 

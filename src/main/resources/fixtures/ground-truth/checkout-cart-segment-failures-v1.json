@@ -1,0 +1,62 @@
+{
+  "scenario_id": "checkout-cart-segment-failures-v1",
+  "expected_status": "diagnosed",
+  "root_cause_code": "INVENTORY_SCHEMA_MISMATCH",
+  "affected_service": "INVENTORY_SERVICE",
+  "expected_claims": [
+    {"claim_code": "root_cause", "claim_value_code": "INVENTORY_SCHEMA_MISMATCH"},
+    {"claim_code": "affected_service", "claim_value_code": "INVENTORY_SERVICE"},
+    {"claim_code": "trigger", "claim_value_code": "INVENTORY_SERVICE_RELEASE"},
+    {"claim_code": "customer_impact", "claim_value_code": "MULTI_ITEM_CHECKOUT_FAILURES"},
+    {"claim_code": "observed_symptom", "claim_value_code": "INVENTORY_CONTRACT_VALIDATION_ERRORS"}
+  ],
+  "claim_support": [
+    {
+      "claim_code": "root_cause",
+      "claim_value_code": "INVENTORY_SCHEMA_MISMATCH",
+      "allowed_evidence_ids": [
+        "cic-v1-log-schema-mismatch",
+        "cic-v1-trace-contract-failure",
+        "cic-v1-runbook-contract-compatibility"
+      ]
+    },
+    {
+      "claim_code": "affected_service",
+      "claim_value_code": "INVENTORY_SERVICE",
+      "allowed_evidence_ids": [
+        "cic-v1-log-inventory-release",
+        "cic-v1-log-schema-mismatch",
+        "cic-v1-trace-contract-failure"
+      ]
+    },
+    {
+      "claim_code": "trigger",
+      "claim_value_code": "INVENTORY_SERVICE_RELEASE",
+      "allowed_evidence_ids": ["cic-v1-log-inventory-release"]
+    },
+    {
+      "claim_code": "customer_impact",
+      "claim_value_code": "MULTI_ITEM_CHECKOUT_FAILURES",
+      "allowed_evidence_ids": [
+        "cic-v1-metric-checkout-failure-rate",
+        "cic-v1-metric-failed-checkouts"
+      ]
+    },
+    {
+      "claim_code": "observed_symptom",
+      "claim_value_code": "INVENTORY_CONTRACT_VALIDATION_ERRORS",
+      "allowed_evidence_ids": [
+        "cic-v1-metric-contract-errors",
+        "cic-v1-log-schema-mismatch",
+        "cic-v1-trace-contract-failure"
+      ]
+    }
+  ],
+  "relevant_runbooks": [
+    {
+      "document_id": "rb-service-contract-compatibility",
+      "chunk_id": "provider-response-breaking-change",
+      "document_version": "1.1"
+    }
+  ]
+}
