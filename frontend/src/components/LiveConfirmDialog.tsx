@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+
+import { useDialogFocusTrap } from "../lib/useDialogFocusTrap";
 
 interface LiveConfirmDialogProps {
   open: boolean;
@@ -12,21 +14,9 @@ export function LiveConfirmDialog({
   onConfirm,
 }: LiveConfirmDialogProps) {
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    cancelButtonRef.current?.focus();
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onCancel();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, onCancel]);
+  useDialogFocusTrap(open, dialogRef, cancelButtonRef, onCancel);
 
   if (!open) {
     return null;
@@ -35,6 +25,7 @@ export function LiveConfirmDialog({
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onCancel}>
       <section
+        ref={dialogRef}
         className="modal-panel live-confirm"
         role="dialog"
         aria-modal="true"

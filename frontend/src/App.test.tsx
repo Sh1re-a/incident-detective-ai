@@ -125,6 +125,31 @@ describe("Incident Detective experience", () => {
     expect(screen.getByText(/estimate, not a provider invoice/)).toBeVisible();
   });
 
+  it("keeps keyboard focus inside the live confirmation dialog", async () => {
+    installApiMock();
+    const user = userEvent.setup();
+    render(<App />);
+
+    const liveButton = await screen.findByRole("button", { name: "Run live AI" });
+    await user.click(liveButton);
+    const dialog = screen.getByRole("dialog", {
+      name: "Run a live AI investigation?",
+    });
+    const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+    const confirm = within(dialog).getByRole("button", { name: "Confirm live run" });
+
+    expect(cancel).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(confirm).toHaveFocus();
+    await user.tab();
+    expect(cancel).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", {
+      name: "Run a live AI investigation?",
+    })).not.toBeInTheDocument();
+    expect(liveButton).toHaveFocus();
+  });
+
   it("keeps a live timeout visible until the visitor chooses replay", async () => {
     const timeoutProblem: ApiProblem = {
       title: "Model provider timed out",

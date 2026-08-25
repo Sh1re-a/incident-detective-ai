@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 
 import type { Evidence } from "../api/types";
 import {
@@ -6,6 +6,7 @@ import {
   formatTimestamp,
   humanizeCode,
 } from "../lib/presentation";
+import { useDialogFocusTrap } from "../lib/useDialogFocusTrap";
 
 interface EvidenceDrawerProps {
   evidence: Evidence | null;
@@ -14,21 +15,9 @@ interface EvidenceDrawerProps {
 
 export function EvidenceDrawer({ evidence, onClose }: EvidenceDrawerProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    if (!evidence) {
-      return;
-    }
-
-    closeButtonRef.current?.focus();
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [evidence, onClose]);
+  useDialogFocusTrap(Boolean(evidence), drawerRef, closeButtonRef, onClose);
 
   if (!evidence) {
     return null;
@@ -37,6 +26,7 @@ export function EvidenceDrawer({ evidence, onClose }: EvidenceDrawerProps) {
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}>
       <aside
+        ref={drawerRef}
         className="evidence-drawer"
         role="dialog"
         aria-modal="true"
