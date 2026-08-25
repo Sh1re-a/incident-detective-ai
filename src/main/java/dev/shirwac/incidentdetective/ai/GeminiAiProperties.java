@@ -1,0 +1,15 @@
+package dev.shirwac.incidentdetective.ai;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+@ConfigurationProperties(prefix = "incident-detective.ai")
+public record GeminiAiProperties(
+        String geminiApiKey,
+        boolean liveEnabled,
+        String modelId,
+        String promptVersion
+) {
+    public boolean hasApiKey() {
+        return geminiApiKey != null && !geminiApiKey.isBlank();
+    }
+}
