@@ -49,13 +49,26 @@ class GeminiSchemaResourceTest {
                 "ai/prompts/collect-gemini-live-v2.txt",
                 "ai/prompts/synthesize-gemini-live-v2.txt",
                 "ai/prompts/collect-gemini-live-v3.txt",
-                "ai/prompts/synthesize-gemini-live-v3.txt"
+                "ai/prompts/synthesize-gemini-live-v3.txt",
+                "ai/prompts/collect-gemini-live-v4.txt",
+                "ai/prompts/synthesize-gemini-live-v4.txt"
         )) {
             String prompt = new ClassPathResource(resourcePath)
                     .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
             assertFalse(prompt.contains("ground_truth"), resourcePath);
             assertFalse(prompt.contains("allowed_evidence_ids"), resourcePath);
         }
+    }
+
+    @Test
+    void collectionPromptV4KeepsBroadLogsAndRunbooksBounded() throws Exception {
+        String prompt = new ClassPathResource(
+                "ai/prompts/collect-gemini-live-v4.txt"
+        ).getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+
+        assertTrue(prompt.contains("use an empty levels array"));
+        assertTrue(prompt.contains("Retrieve runbooks at most once"));
+        assertTrue(prompt.contains("already_collected_evidence contains a runbook"));
     }
 
     @Test
