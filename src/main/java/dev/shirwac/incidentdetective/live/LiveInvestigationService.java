@@ -11,6 +11,8 @@ import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
 import dev.shirwac.incidentdetective.ai.SynthesisModelResult;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
+import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
+import dev.shirwac.incidentdetective.domain.evidence.TraceEvidence;
 import dev.shirwac.incidentdetective.domain.scenario.Scenario;
 import dev.shirwac.incidentdetective.investigation.CompletedInvestigationVerification;
 import dev.shirwac.incidentdetective.investigation.CompletedInvestigationVerifier;
@@ -111,6 +113,9 @@ public final class LiveInvestigationService {
 
         for (int round = 1; round <= MAX_COLLECTION_ROUNDS; round++) {
             requireWithinDeadline(startedAt);
+            Set<String> traceIdsAvailableToModel = discoveredTraceIds(
+                    evidenceById.values()
+            );
             Optional<Duration> timeout = collectionTimeoutFor(
                     elapsedSince(startedAt),
                     round
@@ -136,6 +141,7 @@ public final class LiveInvestigationService {
             enforceRoundBudget(collection.toolCalls());
             for (CollectionToolCall call : collection.toolCalls()) {
                 enforceToolBudget(call, toolEvents.size(), callsByType, callIds);
+                enforceTraceDiscovery(call, traceIdsAvailableToModel);
                 ToolExecution execution = tools.execute(scenarioId, call);
                 ensureScenarioIsolation(scenarioId, execution.evidence());
                 execution.evidence().forEach(evidence ->
@@ -252,6 +258,38 @@ public final class LiveInvestigationService {
             throw malformed("Model exceeded the per-tool call budget");
         }
         callsByType.put(call.toolName(), nextCount);
+    }
+
+    private void enforceTraceDiscovery(
+            CollectionToolCall call,
+            Set<String> traceIdsAvailableToModel
+    ) {
+        if (call.toolName() != ToolName.GET_TRACE) {
+            return;
+        }
+
+        Object traceId = call.arguments().get("trace_id");
+        if (!(traceId instanceof String value)
+                || !traceIdsAvailableToModel.contains(value)) {
+            throw malformed(
+                    "Model requested a trace ID that was not present in previously collected evidence"
+            );
+        }
+    }
+
+    private Set<String> discoveredTraceIds(Iterable<Evidence> evidence) {
+        Set<String> traceIds = new HashSet<>();
+        for (Evidence item : evidence) {
+            if (item instanceof LogEvidence log) {
+                String traceId = log.content().attributes().get("trace_id");
+                if (traceId != null && !traceId.isBlank()) {
+                    traceIds.add(traceId);
+                }
+            } else if (item instanceof TraceEvidence trace) {
+                traceIds.add(trace.content().traceId());
+            }
+        }
+        return Set.copyOf(traceIds);
     }
 
     private void ensureScenarioIsolation(

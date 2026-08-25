@@ -5,6 +5,8 @@ import dev.shirwac.incidentdetective.ai.CollectionToolCall;
 import dev.shirwac.incidentdetective.ai.InvestigationModelGateway;
 import dev.shirwac.incidentdetective.ai.ModelCallMetadata;
 import dev.shirwac.incidentdetective.ai.ModelPhase;
+import dev.shirwac.incidentdetective.ai.ModelProviderException;
+import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
 import dev.shirwac.incidentdetective.ai.SynthesisModelResult;
 import dev.shirwac.incidentdetective.domain.diagnosis.Claim;
 import dev.shirwac.incidentdetective.domain.diagnosis.ClaimCode;
@@ -164,6 +166,38 @@ class LiveInvestigationServiceTest {
         verify(model, never()).collect(
                 any(), anyList(), anyList(), anyInt(), any()
         );
+        verify(model, never()).synthesize(any(), anyList(), any());
+    }
+
+    @Test
+    void rejectsATraceIdThatWasNotPreviouslyReturnedToTheModel() {
+        when(model.collect(any(), anyList(), anyList(), eq(1), any())).thenReturn(
+                new CollectionModelResult(
+                        List.of(
+                                call("call-logs", ToolName.SEARCH_LOGS, Map.of(
+                                        "services", List.of("PAYMENT_ADAPTER"),
+                                        "levels", List.of(),
+                                        "query", "timeout",
+                                        "start", "2026-08-25T09:55:00Z",
+                                        "end", "2026-08-25T10:15:00Z"
+                                )),
+                                call("call-guessed-trace", ToolName.GET_TRACE, Map.of(
+                                        "trace_id", "cpt-trace-4821"
+                                ))
+                        ),
+                        metadata(ModelPhase.COLLECT, 1, 600, 100)
+                )
+        );
+
+        ModelProviderException exception = assertThrows(
+                ModelProviderException.class,
+                () -> service.investigate(
+                        SCENARIO_ID,
+                        new LiveInvestigationRequest(true)
+                )
+        );
+
+        assertEquals(ModelProviderFailure.MALFORMED_RESPONSE, exception.failure());
         verify(model, never()).synthesize(any(), anyList(), any());
     }
 
