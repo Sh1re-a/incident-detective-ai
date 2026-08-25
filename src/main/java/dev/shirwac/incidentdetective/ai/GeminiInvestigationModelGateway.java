@@ -42,7 +42,7 @@ import java.util.Map;
 public final class GeminiInvestigationModelGateway
         implements InvestigationModelGateway {
 
-    private static final Duration MAX_PROVIDER_TIMEOUT = Duration.ofSeconds(22);
+    private static final Duration MAX_PROVIDER_TIMEOUT = Duration.ofSeconds(28);
     private static final int MAX_TOOL_CALLS_PER_ROUND = 3;
     private static final String COLLECT_PROMPT_RESOURCE =
             "ai/prompts/collect-gemini-live-v1.txt";
@@ -317,7 +317,7 @@ public final class GeminiInvestigationModelGateway
                 || timeout.isNegative()
                 || timeout.compareTo(MAX_PROVIDER_TIMEOUT) > 0) {
             throw new IllegalArgumentException(
-                    "Gemini timeout must be between 1 ms and 22 seconds"
+                    "Gemini timeout must be between 1 ms and 28 seconds"
             );
         }
         int timeoutMs = Math.toIntExact(Math.max(1, timeout.toMillis()));

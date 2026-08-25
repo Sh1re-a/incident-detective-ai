@@ -283,7 +283,7 @@ class LiveInvestigationServiceTest {
     @Test
     void allocatesTheDeadlineWithoutStarvingSynthesis() {
         assertEquals(
-                Duration.ofSeconds(22),
+                Duration.ofSeconds(28),
                 LiveInvestigationService.collectionTimeoutFor(
                         Duration.ZERO,
                         1
@@ -297,11 +297,11 @@ class LiveInvestigationServiceTest {
                 ).orElseThrow()
         );
         assertTrue(LiveInvestigationService.collectionTimeoutFor(
-                Duration.ofSeconds(15),
+                Duration.ofSeconds(22),
                 2
         ).isEmpty());
         assertEquals(
-                Duration.ofSeconds(22),
+                Duration.ofSeconds(28),
                 LiveInvestigationService.synthesisTimeoutFor(
                         Duration.ofSeconds(16)
                 ).orElseThrow()

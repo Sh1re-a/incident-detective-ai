@@ -46,8 +46,9 @@ public final class LiveInvestigationService {
     static final int MAX_TOOL_CALLS_PER_TYPE = 2;
     static final int MAX_TOOL_CALLS_PER_ROUND = 3;
     static final Duration HARD_DEADLINE = Duration.ofSeconds(45);
-    static final Duration PROVIDER_CALL_CAP = Duration.ofSeconds(22);
-    static final Duration SYNTHESIS_RESERVE = Duration.ofSeconds(22);
+    static final Duration PROVIDER_CALL_CAP = Duration.ofSeconds(28);
+    static final Duration SECOND_COLLECTION_CALL_CAP = Duration.ofSeconds(8);
+    static final Duration SYNTHESIS_RESERVE = Duration.ofSeconds(15);
     static final Duration DEADLINE_SAFETY_MARGIN = Duration.ofSeconds(1);
     static final Duration MIN_SECOND_COLLECTION_TIMEOUT = Duration.ofSeconds(8);
 
@@ -269,7 +270,10 @@ public final class LiveInvestigationService {
         if (!available.isPositive()) {
             return Optional.empty();
         }
-        Duration timeout = min(PROVIDER_CALL_CAP, available);
+        Duration callCap = round == 1
+                ? PROVIDER_CALL_CAP
+                : SECOND_COLLECTION_CALL_CAP;
+        Duration timeout = min(callCap, available);
         if (round > 1
                 && timeout.compareTo(MIN_SECOND_COLLECTION_TIMEOUT) < 0) {
             return Optional.empty();
