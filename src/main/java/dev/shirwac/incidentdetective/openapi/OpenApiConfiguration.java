@@ -71,12 +71,11 @@ public class OpenApiConfiguration {
             });
 
             Schema<?> recordedResult = schemas.get("RecordedReplayResult");
-            if (recordedResult != null && recordedResult.getProperties() != null) {
-                Schema<?> nullSchema = new Schema<>().types(Set.of("null"));
-                Schema<?> tokenUsageSchema = new Schema<>().oneOf(List.of(
-                        nullSchema,
-                        new Schema<>().$ref("#/components/schemas/ModelTokenUsage")
-                )).description("Always null because replay uses no model tokens.");
+            if (recordedResult != null
+                    && recordedResult.getProperties() != null) {
+                Schema<?> tokenUsageSchema = new Schema<>()
+                        .types(Set.of("null"))
+                        .description("Always null because replay uses no model tokens.");
                 recordedResult.getProperties().put("token_usage", tokenUsageSchema);
             }
         };

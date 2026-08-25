@@ -49,24 +49,25 @@ public record RecordedReplayResult(
         ReplayComparison comparison,
         @Schema(
                 requiredMode = Schema.RequiredMode.REQUIRED,
-                nullable = true,
+                types = "null",
                 description = "Always null because replay makes no model call."
         )
         String modelId,
         @Schema(
                 requiredMode = Schema.RequiredMode.REQUIRED,
-                nullable = true,
+                types = "null",
                 description = "Always null because replay uses no model prompt."
         )
         String promptVersion,
         @Schema(
                 requiredMode = Schema.RequiredMode.REQUIRED,
+                types = "null",
                 description = "Always null because replay uses no model tokens."
         )
         ModelTokenUsage tokenUsage,
         @Schema(
                 requiredMode = Schema.RequiredMode.REQUIRED,
-                nullable = true,
+                types = "null",
                 description = "Always null because replay has no model API cost."
         )
         BigDecimal estimatedCostUsd

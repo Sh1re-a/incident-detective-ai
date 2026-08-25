@@ -135,12 +135,16 @@ class OpenApiDocumentationTest {
                 ).value(22))
                 .andExpect(jsonPath(
                         "$.components.schemas.RecordedReplayResult.properties"
-                                + ".token_usage.oneOf[0].type"
+                                + ".token_usage.type"
                 ).value("null"))
                 .andExpect(jsonPath(
                         "$.components.schemas.RecordedReplayResult.properties"
-                                + ".token_usage.oneOf[1]['$ref']"
-                ).value("#/components/schemas/ModelTokenUsage"))
+                                + ".model_id.type"
+                ).value("null"))
+                .andExpect(jsonPath(
+                        "$.components.schemas.RecordedReplayResult.properties"
+                                + ".estimated_cost_usd.type"
+                ).value("null"))
                 .andExpect(jsonPath(
                         "$.components.schemas.ApiProblemResponse.properties.code"
                 ).exists())
