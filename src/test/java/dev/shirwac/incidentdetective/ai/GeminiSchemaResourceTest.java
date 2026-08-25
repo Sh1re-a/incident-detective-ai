@@ -8,6 +8,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.io.InputStream;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -49,5 +50,26 @@ class GeminiSchemaResourceTest {
             assertFalse(prompt.contains("ground_truth"), resourcePath);
             assertFalse(prompt.contains("allowed_evidence_ids"), resourcePath);
         }
+    }
+
+    @Test
+    void diagnosisSchemaExposesTheSharedTaxonomyWithoutScenarioAnswers()
+            throws Exception {
+        ClassPathResource resource = new ClassPathResource(
+                "ai/diagnosis-schema-v1.json"
+        );
+        JsonNode schema;
+        try (InputStream input = resource.getInputStream()) {
+            schema = jsonMapper.readTree(input);
+        }
+
+        JsonNode values = schema.get("properties")
+                .get("root_cause_code")
+                .get("enum");
+        assertEquals(3, values.size());
+        assertTrue(values.toString().contains("PAYMENT_TIMEOUT_CONFIG"));
+        assertTrue(values.toString().contains("INVENTORY_SCHEMA_MISMATCH"));
+        assertTrue(values.get(2).isNull());
+        assertFalse(schema.toString().contains("scenario_id"));
     }
 }

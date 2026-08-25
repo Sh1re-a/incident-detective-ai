@@ -8,7 +8,12 @@
     },
     "root_cause_code": {
       "type": ["string", "null"],
-      "description": "Upper snake-case root-cause code, or null when evidence is insufficient."
+      "enum": [
+        "PAYMENT_TIMEOUT_CONFIG",
+        "INVENTORY_SCHEMA_MISMATCH",
+        null
+      ],
+      "description": "One exact code from the shared incident taxonomy, or null when evidence is insufficient."
     },
     "affected_service": {
       "type": ["string", "null"],
