@@ -29,13 +29,15 @@ class RecordedReplayApiTest {
 
     @ParameterizedTest
     @CsvSource({
-            "checkout-orders-at-risk-v1, PAYMENT_TIMEOUT_CONFIG, cpt-v1, cpt-v1-log-inventory-noise",
-            "checkout-cart-segment-failures-v1, INVENTORY_SCHEMA_MISMATCH, cic-v1, cic-v1-log-catalog-noise"
+            "checkout-orders-at-risk-v1, PAYMENT_TIMEOUT_CONFIG, PAYMENT_ADAPTER, cpt-v1, cpt-v1-log-timeout-config, cpt-v1-log-inventory-noise",
+            "checkout-cart-segment-failures-v1, INVENTORY_SCHEMA_MISMATCH, INVENTORY_SERVICE, cic-v1, cic-v1-log-schema-mismatch, cic-v1-log-catalog-noise"
     })
     void returnsACompletedReplayWithoutGroundTruthLeakage(
             String scenarioId,
             String expectedRootCause,
+            String expectedAffectedService,
             String eventPrefix,
+            String expectedClaimEvidenceId,
             String unseenNoiseEvidenceId
     ) throws Exception {
         MvcResult result = mockMvc.perform(post(
@@ -76,9 +78,18 @@ class RecordedReplayApiTest {
                         "retrieve_runbooks"
                 ))
                 .andExpect(jsonPath("$.tool_events[0].evidence[0].evidence_type").exists())
+                .andExpect(jsonPath("$.tool_events[0].evidence[0].evidence_id").value(
+                        eventPrefix + "-metric-checkout-failure-rate"
+                ))
                 .andExpect(jsonPath("$.diagnosis.status").value("diagnosed"))
                 .andExpect(jsonPath("$.diagnosis.root_cause_code").value(
                         expectedRootCause
+                ))
+                .andExpect(jsonPath("$.diagnosis.affected_service").value(
+                        expectedAffectedService
+                ))
+                .andExpect(jsonPath("$.diagnosis.claims[0].evidence_ids[0]").value(
+                        expectedClaimEvidenceId
                 ))
                 .andExpect(jsonPath(
                         "$.diagnosis.safe_next_step.requires_human_approval"
