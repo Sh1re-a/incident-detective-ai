@@ -164,6 +164,25 @@ class DiagnosisTest {
     }
 
     @Test
+    void rejectsCustomerImpactClaimsWhenEvidenceIsInsufficient() {
+        Diagnosis diagnosis = new Diagnosis(
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                "The impact is visible, but the cause is not proven.",
+                "The available evidence does not isolate a root cause.",
+                List.of(claim(
+                        ClaimCode.CUSTOMER_IMPACT,
+                        "CHECKOUT_FAILURES",
+                        "ev-metric-001"
+                )),
+                safeNextStep()
+        );
+
+        assertFalse(validator.validate(diagnosis).isEmpty());
+    }
+
+    @Test
     void rejectsANextStepWithoutHumanApproval() {
         Diagnosis diagnosis = new Diagnosis(
                 DiagnosisStatus.DIAGNOSED,

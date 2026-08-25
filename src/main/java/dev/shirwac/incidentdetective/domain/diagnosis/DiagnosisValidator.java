@@ -53,14 +53,13 @@ public final class DiagnosisValidator implements ConstraintValidator<ValidDiagno
             return false;
         }
 
-        Set<ClaimCode> forbiddenClaims = Set.of(
-                ClaimCode.ROOT_CAUSE,
-                ClaimCode.AFFECTED_SERVICE,
-                ClaimCode.TRIGGER
+        Set<ClaimCode> allowedClaims = Set.of(
+                ClaimCode.OBSERVED_SYMPTOM,
+                ClaimCode.MISSING_EVIDENCE
         );
 
         return diagnosis.claims().stream()
-                .noneMatch(claim -> forbiddenClaims.contains(claim.claimCode()));
+                .allMatch(claim -> allowedClaims.contains(claim.claimCode()));
     }
 
     private boolean hasExactlyOneMatchingClaim(
