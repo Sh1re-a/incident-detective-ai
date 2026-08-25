@@ -32,7 +32,7 @@ class RecordedReplayApiTest {
             "checkout-orders-at-risk-v1, PAYMENT_TIMEOUT_CONFIG, PAYMENT_ADAPTER, cpt-v1, cpt-v1-log-timeout-config, cpt-v1-log-inventory-noise",
             "checkout-cart-segment-failures-v1, INVENTORY_SCHEMA_MISMATCH, INVENTORY_SERVICE, cic-v1, cic-v1-log-schema-mismatch, cic-v1-log-catalog-noise"
     })
-    void returnsACompletedReplayWithoutGroundTruthLeakage(
+    void returnsACompletedReplayWithSanitizedPostCompletionComparison(
             String scenarioId,
             String expectedRootCause,
             String expectedAffectedService,

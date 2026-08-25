@@ -81,6 +81,8 @@ Minsta innehåll:
 
 `GroundTruth` får aldrig skickas till frontend före facitsteget, modellen, prompten, vector store eller något tool.
 
+Efter att verifieringen är avslutad får frontend bara en reducerad `ReplayComparison` med förväntad status, rotorsak och primär tjänst samt matchningsresultaten. Det är den avsiktliga facitvisningen som låter besökaren se om diagnosen stämde. Rå `GroundTruth`, `expected_claims`, `claim_support`, tillåtna evidence IDs, relevanta runbooks och evidens som utredningen inte såg får fortfarande inte lämna backend eller användas av modellen.
+
 ## 5. Tool contracts
 
 | Tool | Tillåten uppgift | Returnerar |
