@@ -48,6 +48,26 @@ class DeterministicVerifierEvidencePrecisionTest {
         assertEquals(2, result.supportedTriples());
         assertEquals(3, result.totalTriples());
         assertEquals(2.0 / 3.0, result.score(), TOLERANCE);
+        assertEquals(List.of(
+                new CitationSupportResult(
+                        ClaimCode.AFFECTED_SERVICE,
+                        "PAYMENT_ADAPTER",
+                        "ev-trace-001",
+                        true
+                ),
+                new CitationSupportResult(
+                        ClaimCode.ROOT_CAUSE,
+                        "PAYMENT_TIMEOUT_CONFIG",
+                        "ev-log-001",
+                        true
+                ),
+                new CitationSupportResult(
+                        ClaimCode.ROOT_CAUSE,
+                        "PAYMENT_TIMEOUT_CONFIG",
+                        "ev-runbook-999",
+                        false
+                )
+        ), result.citationSupport());
     }
 
     @Test
@@ -71,6 +91,7 @@ class DeterministicVerifierEvidencePrecisionTest {
         assertEquals(0, result.supportedTriples());
         assertEquals(0, result.totalTriples());
         assertEquals(0.0, result.score(), TOLERANCE);
+        assertTrue(result.citationSupport().isEmpty());
     }
 
     @Test
@@ -105,6 +126,7 @@ class DeterministicVerifierEvidencePrecisionTest {
         assertEquals(0, result.supportedTriples());
         assertEquals(0, result.totalTriples());
         assertNull(result.score());
+        assertTrue(result.citationSupport().isEmpty());
     }
 
     private static GroundTruth diagnosableGroundTruth() {

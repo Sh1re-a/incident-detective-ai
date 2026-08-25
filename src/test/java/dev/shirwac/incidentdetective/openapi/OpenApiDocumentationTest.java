@@ -122,6 +122,10 @@ class OpenApiDocumentationTest {
                         "$.components.schemas.LiveInvestigationResult.properties.token_usage"
                 ).exists())
                 .andExpect(jsonPath(
+                        "$.components.schemas.EvidencePrecision.properties.citation_support"
+                                + ".items['$ref']"
+                ).value("#/components/schemas/CitationSupportResult"))
+                .andExpect(jsonPath(
                         "$.components.schemas.LiveInvestigationResult"
                                 + ".properties.estimated_cost_basis"
                 ).exists())

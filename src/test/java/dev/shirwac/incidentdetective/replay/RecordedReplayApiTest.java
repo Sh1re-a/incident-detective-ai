@@ -97,6 +97,24 @@ class RecordedReplayApiTest {
                 .andExpect(jsonPath("$.verification.diagnosis_schema_pass").value(true))
                 .andExpect(jsonPath("$.verification.citation_validity.valid").value(true))
                 .andExpect(jsonPath("$.verification.evidence_precision.score").value(1.0))
+                .andExpect(jsonPath(
+                        "$.verification.evidence_precision.citation_support[0]"
+                                + ".claim_code"
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.verification.evidence_precision.citation_support[0]"
+                                + ".claim_value_code"
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.verification.evidence_precision.citation_support[0]"
+                                + ".evidence_id"
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.verification.evidence_precision.citation_support[*]"
+                                + ".supported"
+                ).value(org.hamcrest.Matchers.everyItem(
+                        org.hamcrest.Matchers.is(true)
+                )))
                 .andExpect(jsonPath("$.comparison.root_cause_correct").value(true))
                 .andExpect(jsonPath("$.comparison.affected_service_correct").value(true))
                 .andExpect(jsonPath("$.comparison.expected_root_cause_code").value(

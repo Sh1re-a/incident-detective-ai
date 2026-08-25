@@ -9,6 +9,7 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -58,7 +59,7 @@ public final class DeterministicVerifier {
             diagnosisCorrectness = DiagnosisCorrectness.notEvaluated();
         } else if (!diagnosisSchemaValid) {
             evidencePrecision = groundTruth.expectedStatus() == DiagnosisStatus.DIAGNOSED
-                    ? EvidencePrecision.scored(0, 0)
+                    ? EvidencePrecision.scored(List.of())
                     : EvidencePrecision.notApplicable();
             diagnosisCorrectness = DiagnosisCorrectness.notEvaluated();
         } else {
@@ -103,19 +104,30 @@ public final class DeterministicVerifier {
         }
 
         if (diagnosis.status() != DiagnosisStatus.DIAGNOSED) {
-            return EvidencePrecision.scored(0, 0);
+            return EvidencePrecision.scored(List.of());
         }
 
         Set<CitationTriple> citationTriples = citationTriples(diagnosis);
         Map<ClaimKey, Set<String>> allowedEvidenceByClaim = allowedEvidence(groundTruth);
 
-        int supportedTriples = (int) citationTriples.stream()
-                .filter(triple -> allowedEvidenceByClaim
-                        .getOrDefault(triple.claimKey(), Set.of())
-                        .contains(triple.evidenceId()))
-                .count();
+        List<CitationSupportResult> citationSupport = citationTriples.stream()
+                .sorted(Comparator
+                        .comparing((CitationTriple triple) ->
+                                triple.claimKey().claimCode().wireValue())
+                        .thenComparing(triple ->
+                                triple.claimKey().claimValueCode())
+                        .thenComparing(CitationTriple::evidenceId))
+                .map(triple -> new CitationSupportResult(
+                        triple.claimKey().claimCode(),
+                        triple.claimKey().claimValueCode(),
+                        triple.evidenceId(),
+                        allowedEvidenceByClaim
+                                .getOrDefault(triple.claimKey(), Set.of())
+                                .contains(triple.evidenceId())
+                ))
+                .toList();
 
-        return EvidencePrecision.scored(supportedTriples, citationTriples.size());
+        return EvidencePrecision.scored(citationSupport);
     }
 
     DiagnosisCorrectness verifyDiagnosis(
