@@ -1,9 +1,9 @@
 # Dag‑1‑kontrakt för granskning
 
-- **Status:** för granskning – inte implementerat
-- **Datum:** 24 augusti 2026
+- **Status:** granskning pågår – inte implementerat
+- **Senast uppdaterad:** 25 augusti 2026
 
-Det här dokumentet låser begreppen och säkerhetsgränserna före produktkod. Fältnamn kan få mindre tekniska justeringar när Pydantic- och TypeScript-scheman skapas, men ansvarsfördelningen får inte ändras tyst.
+Det här dokumentet låser begreppen och säkerhetsgränserna före incident- och AI-kod. Fältnamn kan få mindre tekniska justeringar när Java- och TypeScript-kontrakten skapas, men ansvarsfördelningen får inte ändras tyst.
 
 ## 1. Scenario
 
@@ -152,3 +152,14 @@ Schemafel, okända evidence IDs och facitläckage är hårda fel. En korrekt `in
 - [ ] Är live/replay-märkningen omöjlig att misstolka?
 - [ ] Kan verifieringens tre resultat visas och testas var för sig?
 - [ ] Har Shirwac granskat och kan förklara kontrakten innan implementation börjar?
+
+## 10. Preciseringar från granskningen – väntar på godkännande
+
+Följande gör kontraktet entydigt utan att ändra säkerhetsgränserna:
+
+- `GroundTruth` får `expected_status`. `root_cause_code` och `affected_service` är obligatoriska för diagnosbara fall och `null` för avsedda abstentionfall.
+- Tillåtet evidensstöd lagras som typade `claim_support`-poster med `claim_code`, `claim_value_code` och `allowed_evidence_ids`, inte som en odefinierad strängnyckel i JSON.
+- Ett `insufficient_evidence`-svar i ett fall som ska kunna diagnostiseras får evidence precision 0. Korrekt abstention redovisas separat.
+- En handbyggd recorded replay har `model_id`, tokenanvändning och kostnad som `null`. `prompt_version` är också `null` om replayen inte kommer från ett versionshanterat modellpromptflöde.
+- Ett hårt verifieringsfel ger ett tydligt underkänt verifieringsresultat. Det ska inte i sig göra att API:t kraschar med HTTP 500.
+- Facit får visas för besökaren först efter att körningen är avslutad; det skickas aldrig till modellen eller något tool.
