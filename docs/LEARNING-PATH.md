@@ -36,9 +36,9 @@ Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i s
 - Java 21.0.10 LTS, `javac` 21.0.10 och Maven 3.9.12 finns.
 - Projektet använder Spring Boot 4.1.1 och Maven Wrapper 3.3.4 med Maven 3.9.16.
 - IntelliJ IDEA 2025.3.3, Docker och Google Cloud CLI finns.
-- Hela den nätverksfria Maven-testsuiten har 137 gröna tester. Frontend har 7 gröna beteendetester och en godkänd produktionsbuild.
-- Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och `gemini-live-v2`.
-- Två korrekta live smoke-körningar för samma scenario tog cirka 5,1 sekunder. Flera provider-timeouts har också observerats; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
+- Hela den nätverksfria Maven-testsuiten har 148 gröna tester. Frontend har 10 gröna beteendetester och en godkänd produktionsbuild.
+- Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och `gemini-live-v4`.
+- Två aktuella v4-smokes, ett per scenario, gav rätt diagnos, 100 procent giltiga citation IDs och 5/5 direkta evidenskopplingar på 4,55–5,50 sekunder. Äldre körningar innehåller sämre evidensprecision och provider-timeouts; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
 - Livevägen har ett första kostnadsskydd: en samtidig körning och fem starter per rullande tio minuter per backendinstans. Cloud Run-instansgräns och budgetlarm är ännu inte konfigurerade.
 - PostgreSQL-klienten finns inte globalt. Det blockerar inte dag 1 och installeras inte innan retrievalsteget behöver den.
 

@@ -51,7 +51,7 @@ Minsta innehåll:
 - `claims`, där varje påstående har en stabil `claim_code`, en maskinläsbar `claim_value_code`, visningstext och en lista `evidence_ids`,
 - `safe_next_step` som kräver mänskligt godkännande.
 
-`claim_code` är exakt en av `root_cause`, `affected_service`, `trigger`, `customer_impact`, `observed_symptom` och `missing_evidence`. `claim_value_code` gör claimens betydelse jämförbar med facit utan att poängsätta fri visningstext och följer formatet `^[A-Z][A-Z0-9_]{1,63}$`. Den versionshanterade root-cause-taxonomin och tjänstekartan är tillgängliga för modellen; vilket värde som är rätt i ett scenario stannar i `GroundTruth`.
+`claim_code` är exakt en av `root_cause`, `affected_service`, `trigger`, `customer_impact`, `observed_symptom` och `missing_evidence`. `claim_value_code` gör claimens betydelse jämförbar med facit utan att poängsätta fri visningstext. Varje claimkod har en versionshanterad lista med tillåtna värden och den delade taxonomin samt tjänstekartan är tillgängliga för modellen. Vilket värde som är rätt i ett scenario stannar i `GroundTruth`.
 
 Ett `diagnosed`-svar måste uppfylla alla följande invarianter:
 
@@ -89,7 +89,7 @@ Efter att verifieringen är avslutad får frontend bara en reducerad `ReplayComp
 |---|---|---|
 | `get_metrics` | Läsa namngivna metrics inom valt scenario/tidsfönster | Typade metric-evidensposter |
 | `search_logs` | Söka i syntetiska logs med avgränsad fråga och tidsfönster | Typade log-evidensposter |
-| `get_trace` | Hämta en namngiven syntetisk trace som redan är relevant för scenariot | Typade trace/spans med evidence IDs |
+| `get_trace` | Hämta en exakt trace-ID som modellen redan har sett i evidens före den aktuella collection-rundan | Typade trace/spans med evidence IDs |
 | `retrieve_runbooks` | Semantiskt söka i kuraterade runbooks, högst `top_k=4` | Chunks med dokument-, chunk- och versionsmetadata |
 
 Gemensamma regler:
@@ -157,7 +157,7 @@ Schemafel, okända evidence IDs och facitläckage är hårda fel. En korrekt `in
 - [ ] Kan verifieringens tre resultat visas och testas var för sig?
 - [ ] Har Shirwac granskat och kan förklara kontrakten innan implementation börjar?
 
-## 10. Preciseringar från granskningen – väntar på godkännande
+## 10. Implementerade preciseringar – formell kontraktsgranskning kvarstår
 
 Följande gör kontraktet entydigt utan att ändra säkerhetsgränserna:
 

@@ -78,16 +78,16 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 
 | Mätetal | Mål | Nuläge |
 |---|---:|---|
-| Diagnosis accuracy | ≥ 15/18 | Ingen eval; 2 lyckade smokes för samma scenario var korrekta |
-| Schema pass | 100 % | Ingen eval; båda lyckade smokes passerade |
-| Citation ID validity | 100 % | Ingen eval; båda lyckade smokes passerade |
-| Evidence precision | ≥ 90 % | Ingen eval; senaste lyckade UI-smoke gav 40 % för just den körningen |
+| Diagnosis accuracy | ≥ 15/18 | Ingen eval; 2 aktuella v4-smokes, ett per scenario, var korrekta |
+| Schema pass | 100 % | Ingen eval; båda aktuella v4-smokes passerade |
+| Citation ID validity | 100 % | Ingen eval; båda aktuella v4-smokes hade 100 % giltiga IDs |
+| Evidence precision | ≥ 90 % | Ingen eval; båda aktuella v4-smokes gav 5/5, medan äldre smokes gav 40–60 % |
 | Retrieval Hit@4 | ≥ 90 % | Ej mätt |
 | Korrekta abstentions | ≥ 2 | Ej mätt |
-| Warm p95 | < 30 s | Ej mätt; två lyckade runs cirka 5,1 s, flera timeouts observerade |
+| Warm p95 | < 30 s | Ej mätt; två aktuella v4-runs tog 4,55 och 5,50 s, äldre timeouts är dokumenterade |
 | Hard timeout | 45 s | Implementerad och enhetstestad; provider-timeouts observerade |
-| Model/tool calls | ≤ 4 / ≤ 8 | Lyckad smoke: 3 / 5 |
-| Smoke runs | 20 stabila | 2 lyckade live smoke-runs; flera misslyckade timeoutförsök |
+| Model/tool calls | ≤ 4 / ≤ 8 | Båda aktuella v4-smokes: 3 / 5 |
+| Smoke runs | 20 stabila | 2/20 aktuella v4 UI-smokes; äldre blandade resultat och timeouts behålls |
 
 ## SHOULD – endast efter passerad gate
 

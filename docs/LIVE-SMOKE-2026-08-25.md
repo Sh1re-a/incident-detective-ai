@@ -57,7 +57,7 @@ Detta är ett användbart failure signal trots korrekt rotorsak: modellen hittad
 
 ## Två UI-körningar med prompt v4
 
-Efter failure-signalen ovan infördes en delad claim-taxonomi för alla fem claimkategorierna. Collection-prompten ändrades också så att den första loggsökningen inte filtrerar bort INFO-händelser för release och konfiguration, och samma runbook får högst hämtas en gång. GroundTruth och tillåtna evidenslänkar lättades inte för att passa modellen.
+Efter failure-signalen ovan infördes en delad claim-taxonomi för de fem diagnoskategorierna. Collection-prompten ändrades också så att den första loggsökningen inte filtrerar bort INFO-händelser för release och konfiguration, och samma runbook får högst hämtas en gång. GroundTruth och tillåtna evidenslänkar lättades inte för att passa modellen.
 
 | Scenario | Run ID | Resultat | Citationer | Evidensstöd | Latency | Tokens | Betalt listprisestimat |
 |---|---|---|---:|---:|---:|---:|---:|

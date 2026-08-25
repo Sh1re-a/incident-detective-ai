@@ -4,7 +4,7 @@ Incident Detective är mitt individuella Passion Project under SALT Sprint 3, 25
 
 > **Slutmål:** “Simulated incident — real AI investigation.”
 >
-> **Nuvarande läge:** En lokal React-demo har Story View och Engineering View för två syntetiska incidenter. Recorded replay är gratis standardläge. Ett separat, uttryckligen bekräftat liveflöde använder Gemini, fyra typade read-only tools, structured output och Java-verifiering mot dolt facit. Två live smoke-körningar för payment-timeoutfallet har varit korrekta; det andra scenariot har hittills träffat provider-timeout. pgvector, evalharness, container och deployment är ännu inte byggda.
+> **Nuvarande läge:** En lokal, funktionell React-demo har Story View och Engineering View för två syntetiska incidenter. Recorded replay är gratis standardläge. Ett separat, uttryckligen bekräftat liveflöde använder Gemini, fyra typade read-only tools, structured output och Java-verifiering mot dolt facit. Två opt-in UI-smokes med prompt v4, ett per scenario, gav rätt diagnos och 5/5 direkta evidenskopplingar. Det är inte en evalrapport. pgvector, evalharness, container och deployment är ännu inte byggda.
 
 ## Idén i korthet
 
@@ -23,7 +23,7 @@ Det här är inte en chatbot och inte ett autonomt driftssystem. Systemet får r
 |---|---|
 | **Simulerat** | Alla logs, metrics, traces, runbooks, releasehändelser, incidenter och uppskattningar av affärspåverkan är syntetiska. |
 | **Verkligt just nu** | React Story/Engineering View, riktig frontend–API-kommunikation, klickbar tool-returnerad evidens, Java-domänkontrakt, två scenario-paket, fyra typade read-only tools, separata replay/live-endpoints, riktiga Gemini-anrop, function calling, structured diagnosis, dold `GroundTruth`, deterministisk verifiering och uppmätt körmetadata. |
-| **Delvis verkligt** | Runbooks hämtas genom ett riktigt typat tool, men retrieval är ännu lokal och deterministisk i stället för PostgreSQL/pgvector. Två smoke-körningar för samma scenario har lyckats, men det är inte en evalrapport eller ett stabilitetsbevis. |
+| **Delvis verkligt** | Runbooks hämtas genom ett riktigt typat tool, men retrieval är ännu lokal och deterministisk i stället för PostgreSQL/pgvector. Två aktuella v4-smokes över de två fasta scenarierna lyckades, men det är inte en evalrapport eller ett stabilitetsbevis. |
 | **Planerat, inte verifierat** | 18 evalfall, accuracy/p95, pgvector, OpenTelemetry, en deploybar container, Cloud Run och användartester. Kontots framtida billingläge är inte verifierat. Inga mål får anges som uppnådda före faktisk mätning. |
 
 När en sparad körning visas ska den märkas **“Simulated incident — recorded deterministic replay.”** Den får aldrig ha en “Live AI”-badge. Slutmålets live-märkning används först när ett verkligt modellanrop kör utredningen.
@@ -38,11 +38,11 @@ När en sparad körning visas ska den märkas **“Simulated incident — record
 - Livefel ersätts aldrig tyst av replay. Besökaren får själv välja den kostnadsfria recorded-körningen och får då ett nytt replay-resultat med korrekt truth label.
 - Ett lokalt recorded-replay-API returnerar ordnade tool events, endast faktiskt sedd evidens, diagnos, verifieringsrapport och en begränsad facitjämförelse efter avslutad körning.
 - Liveflödet kör `COLLECT → SYNTHESIZE → VERIFY` med `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks`. Modellen ser bara scenario och tool-returnerad evidens; verifieraren öppnar facit först efter sista modellanropet.
-- Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och det versionsmärkta kontraktet `gemini-live-v2`. Live måste både vara aktiverat på servern och bekräftas i varje request.
+- Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och det versionsmärkta kontraktet `gemini-live-v4`. Live måste både vara aktiverat på servern och bekräftas i varje request.
 - Backend tillåter högst en pågående liveutredning och fem starter per rullande tio minuter per applikationsinstans. Över gränsen returneras ett sanerat `429`-svar med `Retry-After`; recorded replay påverkas inte. En framtida Cloud Run-konfiguration måste begränsa antalet instanser för att göra detta till en meningsfull global kostnadsgräns.
-- Den senaste lyckade live-körningen genom det riktiga UI:t gav korrekt rotorsak och tjänst, giltiga citation IDs, 3 modellanrop, 5 tool calls, 4 834 tokens och 5 140 ms. Betalt standardlistpris uppskattades till cirka 0,0034 USD; faktisk free-tier-debitering kan vara 0 USD. Evidence precision blev endast 40 procent för denna körning, vilket visas öppet och ska undersökas i evalsen.
-- Detta är **inte** ett accuracy- eller p95-resultat. `gemini-3.7-flash` timeoutade i två försök och inventory-scenariots första collection-anrop timeoutade i två Flash-Lite-försök. De observerade felen ska ingå i kommande evals och fallbackarbete.
-- Backendens vanliga testsuite har 137 gröna tester. Frontend har 7 gröna beteendetester och en verifierad produktionsbuild. Det explicita nätverksbaserade smoke-testet ingår inte i den vanliga testsuiten.
+- Två aktuella live-körningar gjordes genom det riktiga UI:t med prompt v4. Payment-fallet gav 5/5 direkt stödda claim-evidence-länkar på 5,50 sekunder med 5 653 tokens och cirka 0,0039 USD i betalt listprisestimat. Inventory-fallet gav 5/5 på 4,55 sekunder med 5 363 tokens och cirka 0,0037 USD. Båda använde 3 modellanrop och 5 tool calls; faktisk free-tier-debitering kan vara 0 USD.
+- Detta är **inte** ett accuracy- eller p95-resultat. Äldre körningar innehåller både 40–60 procents evidence precision och provider-timeouts. De observerade felen behålls i smoke-loggen och ska ingå i kommande evals och fallbackarbete.
+- Backendens vanliga testsuite har 148 gröna tester. Frontend har 10 gröna beteendetester och en verifierad produktionsbuild. Det explicita nätverksbaserade smoke-testet ingår inte i den vanliga testsuiten.
 - Projektgrunden är publicerad på GitHub utan open-source-licens. Ingen demo är deployad.
 
 ## Kör den interaktiva demon lokalt
