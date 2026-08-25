@@ -28,7 +28,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.InputStream;
-import java.net.SocketTimeoutException;
+import java.io.InterruptedIOException;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -339,10 +339,10 @@ public final class GeminiInvestigationModelGateway
         }
     }
 
-    private boolean isTimeout(Throwable throwable) {
+    static boolean isTimeout(Throwable throwable) {
         Throwable current = throwable;
         while (current != null) {
-            if (current instanceof SocketTimeoutException
+            if (current instanceof InterruptedIOException
                     || current instanceof HttpTimeoutException
                     || current.getClass().getSimpleName().contains("Timeout")) {
                 return true;
