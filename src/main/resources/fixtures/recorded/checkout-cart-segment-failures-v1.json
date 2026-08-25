@@ -2,14 +2,14 @@
   "scenario": {
     "scenario_id": "checkout-cart-segment-failures-v1",
     "title": "Some carts fail before payment",
-    "description": "Multi-item checkouts began failing shortly after a synthetic webshop release.",
+    "description": "Multi-item checkouts in a synthetic inventory rollout began failing shortly after release.",
     "incident_started_at": "2026-08-25T11:02:00Z",
     "time_window": {
       "start": "2026-08-25T10:55:00Z",
       "end": "2026-08-25T11:15:00Z"
     },
     "affected_services": ["STOREFRONT", "CHECKOUT_API", "INVENTORY_SERVICE"],
-    "business_impact_summary": "Synthetic estimate: 61 of 670 multi-item checkout attempts failed during the incident window.",
+    "business_impact_summary": "Synthetic estimate for 11:02–11:12 UTC: 61 of 670 multi-item checkout attempts failed.",
     "initial_symptoms": [
       {
         "symptom_code": "CHECKOUT_FAILURES_CART_SEGMENT",
@@ -29,7 +29,7 @@
       "evidence_type": "metric",
       "evidence_id": "cic-v1-metric-checkout-failure-rate",
       "scenario_id": "checkout-cart-segment-failures-v1",
-      "observed_at": "2026-08-25T11:04:00Z",
+      "observed_at": "2026-08-25T11:12:00Z",
       "display_summary": "Multi-item checkout failure ratio reached 9.1 percent.",
       "source_ref": "metrics/checkout/multi-item-failure-ratio/11-02-11-12",
       "content": {
@@ -39,7 +39,8 @@
         "labels": {
           "service": "CHECKOUT_API",
           "cart_segment": "multi_item",
-          "attempts": "670"
+          "attempts": "670",
+          "window": "11:02-11:12"
         }
       }
     },
@@ -64,7 +65,7 @@
       "evidence_type": "metric",
       "evidence_id": "cic-v1-metric-contract-errors",
       "scenario_id": "checkout-cart-segment-failures-v1",
-      "observed_at": "2026-08-25T11:05:00Z",
+      "observed_at": "2026-08-25T11:12:00Z",
       "display_summary": "Checkout recorded 61 inventory response validation errors.",
       "source_ref": "metrics/checkout/inventory-contract-errors",
       "content": {
@@ -73,7 +74,9 @@
         "unit": "count",
         "labels": {
           "service": "CHECKOUT_API",
-          "upstream": "INVENTORY_SERVICE"
+          "upstream": "INVENTORY_SERVICE",
+          "cart_segment": "multi_item",
+          "window": "11:02-11:12"
         }
       }
     },
@@ -99,7 +102,7 @@
       "evidence_id": "cic-v1-log-inventory-release",
       "scenario_id": "checkout-cart-segment-failures-v1",
       "observed_at": "2026-08-25T11:00:18Z",
-      "display_summary": "Inventory service released response schema version 2 before failures began.",
+      "display_summary": "Inventory service released response schema 2 to the multi-item reservation path before failures began.",
       "source_ref": "logs/inventory-service/deploy/2026.08.25.2",
       "content": {
         "service": "INVENTORY_SERVICE",
@@ -107,7 +110,8 @@
         "message": "Release inventory-service-2026.08.25.2 completed.",
         "attributes": {
           "release": "inventory-service-2026.08.25.2",
-          "response_schema_version": "2"
+          "response_schema_version": "2",
+          "rollout_scope": "multi_item_reservation"
         }
       }
     },
@@ -116,7 +120,7 @@
       "evidence_id": "cic-v1-log-schema-mismatch",
       "scenario_id": "checkout-cart-segment-failures-v1",
       "observed_at": "2026-08-25T11:04:31Z",
-      "display_summary": "Checkout expected inventory schema 1 but received schema 2 without reservation_token.",
+      "display_summary": "A three-item checkout expected inventory schema 1 but received schema 2 without reservation_token.",
       "source_ref": "logs/checkout-api/inventory-response/cic-7712",
       "content": {
         "service": "CHECKOUT_API",
@@ -126,7 +130,10 @@
           "expected_schema": "1",
           "received_schema": "2",
           "upstream_http_status": "200",
-          "received_field": "reservation.token"
+          "received_field": "reservation.token",
+          "cart_segment": "multi_item",
+          "item_count": "3",
+          "rollout_scope": "multi_item_reservation"
         }
       }
     },
@@ -150,14 +157,14 @@
           {
             "span_id": "cic-span-checkout",
             "service": "CHECKOUT_API",
-            "operation": "confirm-checkout",
+            "operation": "confirm-multi-item-checkout",
             "duration_ms": 63,
             "status": "ERROR"
           },
           {
             "span_id": "cic-span-inventory",
             "service": "INVENTORY_SERVICE",
-            "operation": "reserve-items",
+            "operation": "reserve-multi-item",
             "duration_ms": 36,
             "status": "OK"
           },
@@ -241,7 +248,7 @@
     "root_cause_code": "INVENTORY_SCHEMA_MISMATCH",
     "affected_service": "INVENTORY_SERVICE",
     "business_summary": "Synthetic multi-item checkouts fail before payment because checkout cannot read the new inventory response shape.",
-    "technical_summary": "Inventory response schema 2 moved reservation_token to reservation.token. Checkout still expects schema 1 and rejects the HTTP 200 response during decoding.",
+    "technical_summary": "Inventory rolled response schema 2 out to multi-item reservations and moved reservation_token to reservation.token. Checkout still expects schema 1 and rejects the HTTP 200 response during decoding.",
     "claims": [
       {
         "claim_code": "root_cause",
@@ -272,7 +279,7 @@
       {
         "claim_code": "customer_impact",
         "claim_value_code": "MULTI_ITEM_CHECKOUT_FAILURES",
-        "display_text": "61 of 670 synthetic multi-item checkout attempts failed.",
+        "display_text": "61 of 670 synthetic multi-item checkout attempts failed from 11:02 to 11:12 UTC.",
         "evidence_ids": [
           "cic-v1-metric-checkout-failure-rate",
           "cic-v1-metric-failed-checkouts"
