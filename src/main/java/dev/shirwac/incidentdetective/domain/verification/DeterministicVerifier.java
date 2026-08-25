@@ -5,7 +5,10 @@ import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
 import dev.shirwac.incidentdetective.domain.groundtruth.ClaimSupport;
 import dev.shirwac.incidentdetective.domain.groundtruth.GroundTruth;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -14,6 +17,65 @@ import java.util.Objects;
 import java.util.Set;
 
 public final class DeterministicVerifier {
+
+    private final Validator validator;
+
+    public DeterministicVerifier() {
+        this(DefaultValidatorHolder.INSTANCE);
+    }
+
+    public DeterministicVerifier(Validator validator) {
+        this.validator = Objects.requireNonNull(validator, "validator must not be null");
+    }
+
+    public VerificationReport verify(
+            Diagnosis diagnosis,
+            Set<String> seenEvidenceIds,
+            GroundTruth groundTruth
+    ) {
+        Objects.requireNonNull(diagnosis, "diagnosis must not be null");
+        Objects.requireNonNull(seenEvidenceIds, "seenEvidenceIds must not be null");
+        Objects.requireNonNull(groundTruth, "groundTruth must not be null");
+
+        boolean diagnosisSchemaValid = validator.validate(diagnosis).isEmpty();
+        boolean groundTruthSchemaValid = validator.validate(groundTruth).isEmpty();
+        boolean schemaPass = diagnosisSchemaValid && groundTruthSchemaValid;
+
+        CitationValidity citationValidity = verifyCitations(diagnosis, seenEvidenceIds);
+        List<VerificationErrorCode> hardErrors = new ArrayList<>();
+        if (!diagnosisSchemaValid) {
+            hardErrors.add(VerificationErrorCode.DIAGNOSIS_SCHEMA_INVALID);
+        }
+        if (!groundTruthSchemaValid) {
+            hardErrors.add(VerificationErrorCode.GROUND_TRUTH_SCHEMA_INVALID);
+        }
+        if (!citationValidity.valid()) {
+            hardErrors.add(VerificationErrorCode.UNKNOWN_EVIDENCE_ID);
+        }
+
+        EvidencePrecision evidencePrecision;
+        DiagnosisCorrectness diagnosisCorrectness;
+        if (!groundTruthSchemaValid) {
+            evidencePrecision = EvidencePrecision.notApplicable();
+            diagnosisCorrectness = DiagnosisCorrectness.notEvaluated();
+        } else if (!diagnosisSchemaValid) {
+            evidencePrecision = groundTruth.expectedStatus() == DiagnosisStatus.DIAGNOSED
+                    ? EvidencePrecision.scored(0, 0)
+                    : EvidencePrecision.notApplicable();
+            diagnosisCorrectness = DiagnosisCorrectness.notEvaluated();
+        } else {
+            evidencePrecision = scoreEvidencePrecision(diagnosis, groundTruth);
+            diagnosisCorrectness = verifyDiagnosis(diagnosis, groundTruth);
+        }
+
+        return new VerificationReport(
+                schemaPass,
+                citationValidity,
+                evidencePrecision,
+                diagnosisCorrectness,
+                hardErrors
+        );
+    }
 
     public CitationValidity verifyCitations(
             Diagnosis diagnosis,
@@ -149,5 +211,14 @@ public final class DeterministicVerifier {
                     .addAll(support.allowedEvidenceIds());
         }
         return Map.copyOf(allowedEvidenceByClaim);
+    }
+
+    private static final class DefaultValidatorHolder {
+        private static final Validator INSTANCE = Validation
+                .buildDefaultValidatorFactory()
+                .getValidator();
+
+        private DefaultValidatorHolder() {
+        }
     }
 }
