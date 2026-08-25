@@ -64,7 +64,7 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 | ID | Leverans | Acceptanskriterium | Status |
 |---|---|---|---|
 | M-40 | Deploybar container | Frontend/backend körs som avsedd container och kan deployas till Cloud Run | Ej startad |
-| M-41 | Cloud Run | Godkänd deployment använder server-side secrets, budget/rate limits och inga hemligheter i klienten | Ej startad |
+| M-41 | Cloud Run | Godkänd deployment använder server-side secrets, budget/rate limits och inga hemligheter i klienten | Ej startad – appens per-instansgräns är byggd; Cloud Run, server-side secrets och budgetlarm återstår |
 | M-42 | Ärlig replay-fallback | Livefel/timeout leder till tydligt märkt recorded replay, aldrig falsk Live AI-status | Pågår – lokalt UI och beteendetest är klara; deployad fallback återstår |
 | M-43 | Tillgänglig kärnresa | Mobil, tangentbord, kontrast, textstatus och reduced motion är kontrollerade | Pågår – responsiv layout, tangentbord, textstatus och reduced motion är lokalt kontrollerade; extern test återstår |
 | M-44 | Användartest | Om deltagare finns: tre tekniska och tre icke-tekniska tester dokumenteras utan fake users | Ej startad |
@@ -78,9 +78,9 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 
 | Mätetal | Mål | Nuläge |
 |---|---:|---|
-| Diagnosis accuracy | ≥ 15/18 | Ingen eval; 1 lyckad smoke var korrekt |
-| Schema pass | 100 % | Ingen eval; lyckad smoke passerade |
-| Citation ID validity | 100 % | Ingen eval; lyckad smoke passerade |
+| Diagnosis accuracy | ≥ 15/18 | Ingen eval; 2 lyckade smokes för samma scenario var korrekta |
+| Schema pass | 100 % | Ingen eval; båda lyckade smokes passerade |
+| Citation ID validity | 100 % | Ingen eval; båda lyckade smokes passerade |
 | Evidence precision | ≥ 90 % | Ingen eval; senaste lyckade UI-smoke gav 40 % för just den körningen |
 | Retrieval Hit@4 | ≥ 90 % | Ej mätt |
 | Korrekta abstentions | ≥ 2 | Ej mätt |

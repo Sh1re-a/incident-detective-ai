@@ -176,3 +176,13 @@ Tokenanvändningen kommer från leverantörens verkliga responsmetadata. `estima
 **Varför:** Applikationen kan inte säkert avgöra kontots billingnivå från ett modellsvar. Ett omärkt listpris skulle därför se ut som en faktisk debitering.
 
 **Konsekvens:** Okända modell-ID:n får `null` som kostnadsestimat i stället för ett påhittat pris. Prislistan måste omverifieras före publicerade kostnadsjämförelser.
+
+## DEC-018 – Replay först och begränsade live-starter
+
+**Status:** Accepted, 25 augusti 2026
+
+Recorded replay är det kostnadsfria standardläget. Varje livekörning kräver ett aktivt val i gränssnittet och en explicit bekräftelse i requesten. Backend tillåter högst en pågående liveutredning och fem starter per rullande tio minuter per applikationsinstans. När gränsen nås returneras ett sanerat `429`-svar med `Retry-After`; replay påverkas inte och klienten gör inga automatiska live-retries.
+
+**Varför:** En publik portfolio-demo ska kunna provas utan att en besökstopp, dubbla klick eller automatiska retries skapar okontrollerad modellkostnad. Replay gör samtidigt kärnberättelsen tillgänglig även när livekapaciteten är upptagen.
+
+**Konsekvens:** Gränsen är lokal för varje process och är därför inte ett komplett publikt missbruksskydd. En framtida Cloud Run-deploy ska hålla `min-instances=0`, begränsa `max-instances` och kompletteras med budgetlarm innan den kallas kostnadssäkrad. Exakta molngränser verifieras vid deployment; de är inte genomförda nu.

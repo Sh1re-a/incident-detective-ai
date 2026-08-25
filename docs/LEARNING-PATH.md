@@ -39,6 +39,7 @@ Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i s
 - Hela den nätverksfria Maven-testsuiten har 137 gröna tester. Frontend har 7 gröna beteendetester och en godkänd produktionsbuild.
 - Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och `gemini-live-v2`.
 - Två korrekta live smoke-körningar för samma scenario tog cirka 5,1 sekunder. Flera provider-timeouts har också observerats; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
+- Livevägen har ett första kostnadsskydd: en samtidig körning och fem starter per rullande tio minuter per backendinstans. Cloud Run-instansgräns och budgetlarm är ännu inte konfigurerade.
 - PostgreSQL-klienten finns inte globalt. Det blockerar inte dag 1 och installeras inte innan retrievalsteget behöver den.
 
 API-nyckeln finns endast i en Git-ignorerad lokal fil och ska senare ligga som server-side secret. Värdet får aldrig skrivas i repo, dokumentation, frontendkod eller loggar.

@@ -39,6 +39,7 @@ När en sparad körning visas ska den märkas **“Simulated incident — record
 - Ett lokalt recorded-replay-API returnerar ordnade tool events, endast faktiskt sedd evidens, diagnos, verifieringsrapport och en begränsad facitjämförelse efter avslutad körning.
 - Liveflödet kör `COLLECT → SYNTHESIZE → VERIFY` med `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks`. Modellen ser bara scenario och tool-returnerad evidens; verifieraren öppnar facit först efter sista modellanropet.
 - Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och det versionsmärkta kontraktet `gemini-live-v2`. Live måste både vara aktiverat på servern och bekräftas i varje request.
+- Backend tillåter högst en pågående liveutredning och fem starter per rullande tio minuter per applikationsinstans. Över gränsen returneras ett sanerat `429`-svar med `Retry-After`; recorded replay påverkas inte. En framtida Cloud Run-konfiguration måste begränsa antalet instanser för att göra detta till en meningsfull global kostnadsgräns.
 - Den senaste lyckade live-körningen genom det riktiga UI:t gav korrekt rotorsak och tjänst, giltiga citation IDs, 3 modellanrop, 5 tool calls, 4 834 tokens och 5 140 ms. Betalt standardlistpris uppskattades till cirka 0,0034 USD; faktisk free-tier-debitering kan vara 0 USD. Evidence precision blev endast 40 procent för denna körning, vilket visas öppet och ska undersökas i evalsen.
 - Detta är **inte** ett accuracy- eller p95-resultat. `gemini-3.7-flash` timeoutade i två försök och inventory-scenariots första collection-anrop timeoutade i två Flash-Lite-försök. De observerade felen ska ingå i kommande evals och fallbackarbete.
 - Backendens vanliga testsuite har 137 gröna tester. Frontend har 7 gröna beteendetester och en verifierad produktionsbuild. Det explicita nätverksbaserade smoke-testet ingår inte i den vanliga testsuiten.
@@ -94,6 +95,8 @@ Request body:
 ```
 
 Live kräver både `INCIDENT_DETECTIVE_LIVE_AI_ENABLED=true` på servern och `confirm_live_ai: true` i requesten. Ett lyckat svar märks **“Simulated incident — real AI investigation.”** Endpointen utför aldrig remediation.
+
+Live-anrop begränsas lokalt till en samtidig körning och fem starter per rullande tio minuter per backendinstans. Klienten gör inga automatiska live-retries. Det är ett första kostnads- och överbelastningsskydd, inte ett komplett publikt missbruksskydd; Cloud Run-gränser och budgetlarm återstår före deployment.
 
 ### Swagger och OpenAPI lokalt
 
