@@ -1,6 +1,6 @@
 # Dag‑1‑kontrakt för granskning
 
-- **Status:** granskning pågår – inte implementerat
+- **Status:** granskning pågår – Java-kontrakten är implementerade lokalt men ännu inte godkända eller låsta
 - **Senast uppdaterad:** 25 augusti 2026
 
 Det här dokumentet låser begreppen och säkerhetsgränserna före incident- och AI-kod. Fältnamn kan få mindre tekniska justeringar när Java- och TypeScript-kontrakten skapas, men ansvarsfördelningen får inte ändras tyst.
