@@ -1,0 +1,14 @@
+{
+  "scenarios": [
+    {
+      "scenario_id": "checkout-orders-at-risk-v1",
+      "recorded_resource": "fixtures/recorded/checkout-orders-at-risk-v1.json",
+      "ground_truth_resource": "fixtures/ground-truth/checkout-orders-at-risk-v1.json"
+    },
+    {
+      "scenario_id": "checkout-cart-segment-failures-v1",
+      "recorded_resource": "fixtures/recorded/checkout-cart-segment-failures-v1.json",
+      "ground_truth_resource": "fixtures/ground-truth/checkout-cart-segment-failures-v1.json"
+    }
+  ]
+}
