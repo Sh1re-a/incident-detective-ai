@@ -57,6 +57,10 @@ När backend kör på port 8080 kan API:t läsas och provas här:
 
 Dokumentationen gäller bara det nuvarande recorded-replay-API:t. Den visar därför endast `recorded_replay`, syntetisk incidentdata och manuellt godkända nästa steg. Det finns ingen live-AI-endpoint och ingen automatisk remediation. Inför en framtida Cloud Run-deploy ska det beslutas uttryckligen om Swagger ska vara publik eller avstängd.
 
+### Lokal Gemini-nyckel
+
+Kopiera `local-secrets.properties.example` till `local-secrets.properties` och lägg nyckeln efter `GEMINI_API_KEY=`. Den lokala filen ignoreras av Git, ligger utanför `src` och paketeras inte i applikationens JAR. En miljövariabel med samma namn fungerar också och används senare för deployment. Recorded replay fungerar utan nyckel; riktiga modellanrop ska vara uttryckligen aktiverade.
+
 ## Projektdokument
 
 - [GitHub-repo](https://github.com/Sh1re-a/incident-detective-ai)
