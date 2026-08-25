@@ -4,7 +4,7 @@ Incident Detective är mitt individuella Passion Project under SALT Sprint 3, 25
 
 > **Slutmål:** “Simulated incident — real AI investigation.”
 >
-> **Nuvarande läge:** Planering och kontraktsgranskning. Ingen replay och ingen live-AI-utredning är byggd ännu.
+> **Nuvarande läge:** Planering och kontraktsgranskning. En minimal Java/Spring Boot-grund är skapad och testad, men ingen incidentfunktion, replay eller live-AI-utredning är byggd ännu.
 
 ## Idén i korthet
 
@@ -23,7 +23,7 @@ Det här är inte en chatbot och inte ett autonomt driftssystem. Systemet får r
 |---|---|
 | **Simulerat** | Alla logs, metrics, traces, runbooks, releasehändelser, incidenter och uppskattningar av affärspåverkan är syntetiska. |
 | **Verkligt i slutprodukten** | Modellens verktygsval, tool calling, structured output, runbook-retrieval, deterministisk verifiering, evals, tracing, uppmätt latens, tokenanvändning, kostnadsestimat och Cloud Run-deploy. |
-| **Verkligt just nu** | Projekt-, scope-, beslut- och kontraktsdokumentationen i detta repo. |
+| **Verkligt just nu** | Projekt-, scope-, beslut- och kontraktsdokumentationen samt en körbar Java 21/Spring Boot-grund med ett godkänt starttest. |
 | **Planerat, inte verifierat** | API-åtkomst och billing, exakt modell, live-AI-flöde, mätvärden, evalutfall, Cloud Run och användartester. Inga resultat får anges som uppnådda före faktisk mätning. |
 
 När en sparad körning visas ska den märkas **“Simulated incident — recorded deterministic replay.”** Den får aldrig ha en “Live AI”-badge. Slutmålets live-märkning används först när ett verkligt modellanrop kör utredningen.
@@ -31,10 +31,10 @@ När en sparad körning visas ska den märkas **“Simulated incident — record
 ## Status 25 augusti 2026
 
 - Sprintplan, prioriterad backlog, tekniska beslut och dag‑1‑kontrakt är framtagna för granskning.
-- Ingen frontend, backend, databas, AI-integration, evalharness eller deploy har byggts.
+- En minimal Java 21/Spring Boot 4.1.1-grund med Maven Wrapper och ett starttest finns. Ingen domänmodell, endpoint, frontend, databas, AI-integration, evalharness eller deploy har byggts.
 - Ingen API-åtkomst, billing, modellprestanda, latency, kostnad eller accuracy har verifierats.
 - Projektgrunden är publicerad på GitHub utan open-source-licens. Ingen demo är deployad.
-- Produktkod startar först efter att sprintplan, scope och dag‑1‑kontrakt har granskats.
+- Incident- och AI-kod startar först efter att sprintplan, scope och dag‑1‑kontrakt har granskats.
 
 ## Projektdokument
 
@@ -43,13 +43,14 @@ När en sparad körning visas ska den märkas **“Simulated incident — record
 - [Prioriterad backlog](./BACKLOG.md)
 - [Tekniska beslut](./docs/DECISIONS.md)
 - [Dag‑1‑kontrakt för granskning](./docs/DAY-1-CONTRACTS.md)
+- [Lärspår och verktyg](./docs/LEARNING-PATH.md)
 
 ## Teknisk riktning
 
 Den planerade lösningen är ett monorepo med en deploybar container:
 
 - React, TypeScript och Vite för gränssnittet.
-- Python 3.12+, FastAPI och Pydantic v2 för API och validering.
+- Java 21, Spring Boot 4.1.1, Spring MVC, Jakarta Validation och Jackson för API och validering.
 - OpenAI Responses API med custom function tools och strict structured output. Aktuell officiell dokumentation ska kontrolleras före implementation; exakta modell- och SDK-versioner är ännu inte valda.
 - En explicit och begränsad `COLLECT → SYNTHESIZE → VERIFY`-process.
 - PostgreSQL och pgvector endast för ostrukturerade runbooks. Metrics, logs och traces nås genom typade domänverktyg.
