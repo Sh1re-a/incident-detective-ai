@@ -1,0 +1,300 @@
+{
+  "scenario": {
+    "scenario_id": "checkout-orders-at-risk-v1",
+    "title": "Checkout errors threaten orders",
+    "description": "Checkout failures increased shortly after a synthetic webshop release.",
+    "incident_started_at": "2026-08-25T10:02:00Z",
+    "time_window": {
+      "start": "2026-08-25T09:55:00Z",
+      "end": "2026-08-25T10:15:00Z"
+    },
+    "affected_services": ["STOREFRONT", "CHECKOUT_API", "PAYMENT_ADAPTER"],
+    "business_impact_summary": "Synthetic estimate: 147 of 800 checkout attempts failed during the incident window.",
+    "initial_symptoms": [
+      {
+        "symptom_code": "CHECKOUT_ERROR_RATE_HIGH",
+        "summary": "Checkout failures are above the synthetic baseline.",
+        "observed_at": "2026-08-25T10:04:00Z"
+      },
+      {
+        "symptom_code": "PAYMENT_STEP_SLOW",
+        "summary": "The payment step is slower than the synthetic baseline.",
+        "observed_at": "2026-08-25T10:05:00Z"
+      }
+    ],
+    "version": 1
+  },
+  "evidence_inventory": [
+    {
+      "evidence_type": "metric",
+      "evidence_id": "cpt-v1-metric-checkout-failure-rate",
+      "scenario_id": "checkout-orders-at-risk-v1",
+      "observed_at": "2026-08-25T10:04:00Z",
+      "display_summary": "Checkout failure ratio reached 18.4 percent.",
+      "source_ref": "metrics/checkout/failure-ratio/10-02-10-12",
+      "content": {
+        "metric_name": "checkout_failure_ratio",
+        "value": 0.184,
+        "unit": "ratio",
+        "labels": {
+          "service": "CHECKOUT_API",
+          "attempts": "800",
+          "window": "10:02-10:12"
+        }
+      }
+    },
+    {
+      "evidence_type": "metric",
+      "evidence_id": "cpt-v1-metric-failed-checkouts",
+      "scenario_id": "checkout-orders-at-risk-v1",
+      "observed_at": "2026-08-25T10:12:00Z",
+      "display_summary": "147 synthetic checkout attempts failed.",
+      "source_ref": "metrics/checkout/failed-attempts/10-02-10-12",
+      "content": {
+        "metric_name": "failed_checkout_attempts",
+        "value": 147,
+        "unit": "count",
+        "labels": {
+          "service": "CHECKOUT_API",
+          "window": "10:02-10:12"
+        }
+      }
+    },
+    {
+      "evidence_type": "metric",
+      "evidence_id": "cpt-v1-metric-payment-p95",
+      "scenario_id": "checkout-orders-at-risk-v1",
+      "observed_at": "2026-08-25T10:05:00Z",
+      "display_summary": "Payment authorization p95 rose to 2.04 seconds.",
+      "source_ref": "metrics/payment-adapter/authorization-p95",
+      "content": {
+        "metric_name": "payment_authorization_duration_p95",
+        "value": 2.04,
+        "unit": "seconds",
+        "labels": {
+          "service": "PAYMENT_ADAPTER",
+          "release": "payment-adapter-2026.08.25.1"
+        }
+      }
+    },
+    {
+      "evidence_type": "log",
+      "evidence_id": "cpt-v1-log-release",
+      "scenario_id": "checkout-orders-at-risk-v1",
+      "observed_at": "2026-08-25T10:00:12Z",
+      "display_summary": "Payment adapter release completed before the failures began.",
+      "source_ref": "logs/payment-adapter/deploy/2026.08.25.1",
+      "content": {
+        "service": "PAYMENT_ADAPTER",
+        "level": "INFO",
+        "message": "Release payment-adapter-2026.08.25.1 completed.",
+        "attributes": {
+          "release": "payment-adapter-2026.08.25.1",
+          "result": "success"
+        }
+      }
+    },
+    {
+      "evidence_type": "log",
+      "evidence_id": "cpt-v1-log-timeout-config",
+      "scenario_id": "checkout-orders-at-risk-v1",
+      "observed_at": "2026-08-25T10:00:14Z",
+      "display_summary": "The release reduced the provider read timeout from 5000 to 2000 milliseconds.",
+      "source_ref": "logs/payment-adapter/config-audit/2026.08.25.1",
+      "content": {
+        "service": "PAYMENT_ADAPTER",
+        "level": "INFO",
+        "message": "Configuration changed for PAYMENT_PROVIDER_READ_TIMEOUT_MS.",
+        "attributes": {
+          "previous_value": "5000",
+          "new_value": "2000",
+          "release": "payment-adapter-2026.08.25.1"
+        }
+      }
+    },
+    {
+      "evidence_type": "log",
+      "evidence_id": "cpt-v1-log-timeout-error",
+      "scenario_id": "checkout-orders-at-risk-v1",
+      "observed_at": "2026-08-25T10:04:08Z",
+      "display_summary": "Payment authorization timed out at the configured two-second limit.",
+      "source_ref": "logs/payment-adapter/request/synthetic-pay-4821",
+      "content": {
+        "service": "PAYMENT_ADAPTER",
+        "level": "ERROR",
+        "message": "SocketTimeoutException while awaiting synthetic payment provider.",
+        "attributes": {
+          "configured_timeout_ms": "2000",
+          "elapsed_ms": "2004",
+          "provider": "SYNTHETIC_PAY"
+        }
+      }
+    },
+    {
+      "evidence_type": "trace",
+      "evidence_id": "cpt-v1-trace-failed-checkout",
+      "scenario_id": "checkout-orders-at-risk-v1",
+      "observed_at": "2026-08-25T10:04:08Z",
+      "display_summary": "A failed checkout spent almost all its time in payment authorization.",
+      "source_ref": "traces/cpt-trace-4821",
+      "content": {
+        "trace_id": "cpt-trace-4821",
+        "spans": [
+          {
+            "span_id": "cpt-span-storefront",
+            "service": "STOREFRONT",
+            "operation": "submit-checkout",
+            "duration_ms": 2048,
+            "status": "ERROR"
+          },
+          {
+            "span_id": "cpt-span-checkout",
+            "service": "CHECKOUT_API",
+            "operation": "create-order",
+            "duration_ms": 2040,
+            "status": "ERROR"
+          },
+          {
+            "span_id": "cpt-span-inventory",
+            "service": "INVENTORY_SERVICE",
+            "operation": "reserve-items",
+            "duration_ms": 42,
+            "status": "OK"
+          },
+          {
+            "span_id": "cpt-span-payment",
+            "service": "PAYMENT_ADAPTER",
+            "operation": "authorize-payment",
+            "duration_ms": 2003,
+            "status": "DEADLINE_EXCEEDED"
+          }
+        ]
+      }
+    },
+    {
+      "evidence_type": "runbook",
+      "evidence_id": "cpt-v1-runbook-timeout-precedence",
+      "scenario_id": "checkout-orders-at-risk-v1",
+      "display_summary": "The runbook explains how to compare client timeout settings with upstream latency.",
+      "source_ref": "runbooks/rb-payment-provider-timeouts#timeout-precedence",
+      "content": {
+        "document_id": "rb-payment-provider-timeouts",
+        "chunk_id": "timeout-precedence",
+        "document_version": "1.2",
+        "text": "Compare recent client timeout changes with observed upstream duration. A release event alone is not proof. Recommend rollback only after a human reviews the config change, error timing, and request trace."
+      }
+    },
+    {
+      "evidence_type": "log",
+      "evidence_id": "cpt-v1-log-inventory-noise",
+      "scenario_id": "checkout-orders-at-risk-v1",
+      "observed_at": "2026-08-25T10:03:20Z",
+      "display_summary": "An inventory cache refresh warning was brief and unrelated.",
+      "source_ref": "logs/inventory-service/cache-refresh/882",
+      "content": {
+        "service": "INVENTORY_SERVICE",
+        "level": "WARN",
+        "message": "Cache refresh exceeded its local warning threshold.",
+        "attributes": {
+          "duration_ms": "120",
+          "result": "completed"
+        }
+      }
+    }
+  ],
+  "tool_events": [
+    {
+      "event_id": "cpt-v1-tool-metrics",
+      "tool_name": "get_metrics",
+      "safe_summary": "Read checkout failures and payment latency for the incident window.",
+      "evidence_ids": [
+        "cpt-v1-metric-checkout-failure-rate",
+        "cpt-v1-metric-failed-checkouts",
+        "cpt-v1-metric-payment-p95"
+      ]
+    },
+    {
+      "event_id": "cpt-v1-tool-logs",
+      "tool_name": "search_logs",
+      "safe_summary": "Searched payment adapter release, configuration, and timeout errors.",
+      "evidence_ids": [
+        "cpt-v1-log-release",
+        "cpt-v1-log-timeout-config",
+        "cpt-v1-log-timeout-error"
+      ]
+    },
+    {
+      "event_id": "cpt-v1-tool-trace",
+      "tool_name": "get_trace",
+      "safe_summary": "Opened one representative failed checkout trace.",
+      "evidence_ids": ["cpt-v1-trace-failed-checkout"]
+    },
+    {
+      "event_id": "cpt-v1-tool-runbook",
+      "tool_name": "retrieve_runbooks",
+      "safe_summary": "Retrieved general timeout investigation guidance.",
+      "evidence_ids": ["cpt-v1-runbook-timeout-precedence"]
+    }
+  ],
+  "recorded_diagnosis": {
+    "status": "diagnosed",
+    "root_cause_code": "PAYMENT_TIMEOUT_CONFIG",
+    "affected_service": "PAYMENT_ADAPTER",
+    "business_summary": "Synthetic checkout attempts are failing because payment authorization now times out too early.",
+    "technical_summary": "A payment adapter release reduced the provider read timeout to 2000 ms. Errors and traces end at that limit while inventory remains healthy.",
+    "claims": [
+      {
+        "claim_code": "root_cause",
+        "claim_value_code": "PAYMENT_TIMEOUT_CONFIG",
+        "display_text": "The payment provider read timeout was reduced below observed request duration.",
+        "evidence_ids": [
+          "cpt-v1-log-timeout-config",
+          "cpt-v1-log-timeout-error",
+          "cpt-v1-trace-failed-checkout",
+          "cpt-v1-runbook-timeout-precedence"
+        ]
+      },
+      {
+        "claim_code": "affected_service",
+        "claim_value_code": "PAYMENT_ADAPTER",
+        "display_text": "The failure occurs in payment authorization.",
+        "evidence_ids": [
+          "cpt-v1-log-timeout-error",
+          "cpt-v1-trace-failed-checkout"
+        ]
+      },
+      {
+        "claim_code": "trigger",
+        "claim_value_code": "PAYMENT_ADAPTER_RELEASE",
+        "display_text": "The incident began after the payment adapter release changed its timeout.",
+        "evidence_ids": [
+          "cpt-v1-log-release",
+          "cpt-v1-log-timeout-config"
+        ]
+      },
+      {
+        "claim_code": "customer_impact",
+        "claim_value_code": "CHECKOUT_PAYMENT_FAILURES",
+        "display_text": "147 of 800 synthetic checkout attempts failed in the measured window.",
+        "evidence_ids": [
+          "cpt-v1-metric-checkout-failure-rate",
+          "cpt-v1-metric-failed-checkouts"
+        ]
+      },
+      {
+        "claim_code": "observed_symptom",
+        "claim_value_code": "PAYMENT_LATENCY_SPIKE",
+        "display_text": "Payment latency rose to the same range as the configured timeout.",
+        "evidence_ids": [
+          "cpt-v1-metric-payment-p95",
+          "cpt-v1-log-timeout-error",
+          "cpt-v1-trace-failed-checkout"
+        ]
+      }
+    ],
+    "safe_next_step": {
+      "summary": "Review and approve restoring the previous payment timeout or rolling back the synthetic release. No remediation is automatic.",
+      "requires_human_approval": true
+    }
+  }
+}

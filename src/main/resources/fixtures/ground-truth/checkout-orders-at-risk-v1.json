@@ -1,0 +1,65 @@
+{
+  "scenario_id": "checkout-orders-at-risk-v1",
+  "expected_status": "diagnosed",
+  "root_cause_code": "PAYMENT_TIMEOUT_CONFIG",
+  "affected_service": "PAYMENT_ADAPTER",
+  "expected_claims": [
+    {"claim_code": "root_cause", "claim_value_code": "PAYMENT_TIMEOUT_CONFIG"},
+    {"claim_code": "affected_service", "claim_value_code": "PAYMENT_ADAPTER"},
+    {"claim_code": "trigger", "claim_value_code": "PAYMENT_ADAPTER_RELEASE"},
+    {"claim_code": "customer_impact", "claim_value_code": "CHECKOUT_PAYMENT_FAILURES"},
+    {"claim_code": "observed_symptom", "claim_value_code": "PAYMENT_LATENCY_SPIKE"}
+  ],
+  "claim_support": [
+    {
+      "claim_code": "root_cause",
+      "claim_value_code": "PAYMENT_TIMEOUT_CONFIG",
+      "allowed_evidence_ids": [
+        "cpt-v1-log-timeout-config",
+        "cpt-v1-log-timeout-error",
+        "cpt-v1-trace-failed-checkout",
+        "cpt-v1-runbook-timeout-precedence"
+      ]
+    },
+    {
+      "claim_code": "affected_service",
+      "claim_value_code": "PAYMENT_ADAPTER",
+      "allowed_evidence_ids": [
+        "cpt-v1-log-timeout-error",
+        "cpt-v1-trace-failed-checkout"
+      ]
+    },
+    {
+      "claim_code": "trigger",
+      "claim_value_code": "PAYMENT_ADAPTER_RELEASE",
+      "allowed_evidence_ids": [
+        "cpt-v1-log-release",
+        "cpt-v1-log-timeout-config"
+      ]
+    },
+    {
+      "claim_code": "customer_impact",
+      "claim_value_code": "CHECKOUT_PAYMENT_FAILURES",
+      "allowed_evidence_ids": [
+        "cpt-v1-metric-checkout-failure-rate",
+        "cpt-v1-metric-failed-checkouts"
+      ]
+    },
+    {
+      "claim_code": "observed_symptom",
+      "claim_value_code": "PAYMENT_LATENCY_SPIKE",
+      "allowed_evidence_ids": [
+        "cpt-v1-metric-payment-p95",
+        "cpt-v1-log-timeout-error",
+        "cpt-v1-trace-failed-checkout"
+      ]
+    }
+  ],
+  "relevant_runbooks": [
+    {
+      "document_id": "rb-payment-provider-timeouts",
+      "chunk_id": "timeout-precedence",
+      "document_version": "1.2"
+    }
+  ]
+}
