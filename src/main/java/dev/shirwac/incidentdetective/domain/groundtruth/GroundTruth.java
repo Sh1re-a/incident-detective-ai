@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Pattern;
 
 import java.util.List;
 
+@ValidGroundTruth
 public record GroundTruth(
         @NotBlank String scenarioId,
         @NotNull DiagnosisStatus expectedStatus,
@@ -15,9 +16,9 @@ public record GroundTruth(
         String rootCauseCode,
         @Pattern(regexp = "^[A-Z][A-Z0-9_]{1,63}$")
         String affectedService,
-        @NotNull List<@Valid ExpectedClaim> expectedClaims,
-        @NotNull List<@Valid ClaimSupport> claimSupport,
-        @NotNull List<@Valid RunbookReference> relevantRunbooks
+        @NotNull List<@NotNull @Valid ExpectedClaim> expectedClaims,
+        @NotNull List<@NotNull @Valid ClaimSupport> claimSupport,
+        @NotNull List<@NotNull @Valid RunbookReference> relevantRunbooks
 ) {
     public GroundTruth {
         expectedClaims = expectedClaims == null ? null : List.copyOf(expectedClaims);

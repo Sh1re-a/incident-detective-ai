@@ -66,6 +66,150 @@ class GroundTruthTest {
         );
     }
 
+    @Test
+    void rejectsDiagnosedTruthWithoutRootCauseAndService() {
+        GroundTruth groundTruth = new GroundTruth(
+                "checkout-timeout-v1",
+                DiagnosisStatus.DIAGNOSED,
+                null,
+                null,
+                validGroundTruth().expectedClaims(),
+                validGroundTruth().claimSupport(),
+                validGroundTruth().relevantRunbooks()
+        );
+
+        assertFalse(validator.validate(groundTruth).isEmpty());
+    }
+
+    @Test
+    void rejectsAConflictingRootCauseClaim() {
+        GroundTruth groundTruth = new GroundTruth(
+                "checkout-timeout-v1",
+                DiagnosisStatus.DIAGNOSED,
+                "PAYMENT_TIMEOUT_CONFIG",
+                "PAYMENT_ADAPTER",
+                List.of(
+                        new ExpectedClaim(
+                                ClaimCode.ROOT_CAUSE,
+                                "PAYMENT_TIMEOUT_CONFIG"
+                        ),
+                        new ExpectedClaim(
+                                ClaimCode.ROOT_CAUSE,
+                                "INVENTORY_SCHEMA_MISMATCH"
+                        ),
+                        new ExpectedClaim(
+                                ClaimCode.AFFECTED_SERVICE,
+                                "PAYMENT_ADAPTER"
+                        )
+                ),
+                List.of(
+                        support(ClaimCode.ROOT_CAUSE, "PAYMENT_TIMEOUT_CONFIG", "ev-log-001"),
+                        support(ClaimCode.ROOT_CAUSE, "INVENTORY_SCHEMA_MISMATCH", "ev-log-002"),
+                        support(ClaimCode.AFFECTED_SERVICE, "PAYMENT_ADAPTER", "ev-trace-001")
+                ),
+                List.of()
+        );
+
+        assertFalse(validator.validate(groundTruth).isEmpty());
+    }
+
+    @Test
+    void rejectsSupportWithoutAnExpectedClaim() {
+        GroundTruth groundTruth = new GroundTruth(
+                "checkout-timeout-v1",
+                DiagnosisStatus.DIAGNOSED,
+                "PAYMENT_TIMEOUT_CONFIG",
+                "PAYMENT_ADAPTER",
+                validGroundTruth().expectedClaims(),
+                List.of(
+                        support(ClaimCode.ROOT_CAUSE, "PAYMENT_TIMEOUT_CONFIG", "ev-log-001"),
+                        support(ClaimCode.AFFECTED_SERVICE, "PAYMENT_ADAPTER", "ev-trace-001"),
+                        support(ClaimCode.TRIGGER, "RELEASE_2026_08_25", "ev-log-002")
+                ),
+                List.of()
+        );
+
+        assertFalse(validator.validate(groundTruth).isEmpty());
+    }
+
+    @Test
+    void acceptsAnAbstentionGroundTruth() {
+        GroundTruth groundTruth = new GroundTruth(
+                "checkout-missing-provider-data-v1",
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                List.of(new ExpectedClaim(
+                        ClaimCode.MISSING_EVIDENCE,
+                        "PAYMENT_PROVIDER_RESPONSE"
+                )),
+                List.of(support(
+                        ClaimCode.MISSING_EVIDENCE,
+                        "PAYMENT_PROVIDER_RESPONSE",
+                        "ev-log-001"
+                )),
+                List.of()
+        );
+
+        assertTrue(validator.validate(groundTruth).isEmpty());
+    }
+
+    @Test
+    void rejectsRootCauseFieldsForAnAbstentionCase() {
+        GroundTruth groundTruth = new GroundTruth(
+                "checkout-missing-provider-data-v1",
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                "PAYMENT_TIMEOUT_CONFIG",
+                "PAYMENT_ADAPTER",
+                List.of(),
+                List.of(),
+                List.of()
+        );
+
+        assertFalse(validator.validate(groundTruth).isEmpty());
+    }
+
+    @Test
+    void rejectsRootCauseClaimsForAnAbstentionCase() {
+        GroundTruth groundTruth = new GroundTruth(
+                "checkout-missing-provider-data-v1",
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                List.of(new ExpectedClaim(
+                        ClaimCode.ROOT_CAUSE,
+                        "PAYMENT_TIMEOUT_CONFIG"
+                )),
+                List.of(support(
+                        ClaimCode.ROOT_CAUSE,
+                        "PAYMENT_TIMEOUT_CONFIG",
+                        "ev-log-001"
+                )),
+                List.of()
+        );
+
+        assertFalse(validator.validate(groundTruth).isEmpty());
+    }
+
+    @Test
+    void rejectsDuplicateClaimSupportKeys() {
+        GroundTruth groundTruth = new GroundTruth(
+                "checkout-timeout-v1",
+                DiagnosisStatus.DIAGNOSED,
+                "PAYMENT_TIMEOUT_CONFIG",
+                "PAYMENT_ADAPTER",
+                validGroundTruth().expectedClaims(),
+                List.of(
+                        support(ClaimCode.ROOT_CAUSE, "PAYMENT_TIMEOUT_CONFIG", "ev-log-001"),
+                        support(ClaimCode.ROOT_CAUSE, "PAYMENT_TIMEOUT_CONFIG", "ev-runbook-001"),
+                        support(ClaimCode.AFFECTED_SERVICE, "PAYMENT_ADAPTER", "ev-trace-001")
+                ),
+                List.of()
+        );
+
+        assertFalse(validator.validate(groundTruth).isEmpty());
+    }
+
     private static GroundTruth validGroundTruth() {
         return new GroundTruth(
                 "checkout-timeout-v1",
@@ -99,6 +243,18 @@ class GroundTruthTest {
                         "timeout-precedence",
                         "1.0"
                 ))
+        );
+    }
+
+    private static ClaimSupport support(
+            ClaimCode claimCode,
+            String claimValueCode,
+            String... evidenceIds
+    ) {
+        return new ClaimSupport(
+                claimCode,
+                claimValueCode,
+                List.of(evidenceIds)
         );
     }
 }
