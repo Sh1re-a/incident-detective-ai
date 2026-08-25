@@ -3,6 +3,7 @@ package dev.shirwac.incidentdetective.ai;
 import com.google.genai.types.Candidate;
 import com.google.genai.types.FinishReason;
 import com.google.genai.types.GenerateContentResponse;
+import jakarta.validation.Validation;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
@@ -73,7 +74,10 @@ class GeminiInvestigationModelGatewayTest {
                         GeminiThinkingLevel.LOW,
                         "test-prompt"
                 ),
-                new GeminiDiagnosisDecoder(mapper),
+                new GeminiDiagnosisDecoder(
+                        mapper,
+                        Validation.buildDefaultValidatorFactory().getValidator()
+                ),
                 mapper
         );
     }

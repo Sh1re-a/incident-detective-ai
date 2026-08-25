@@ -169,6 +169,9 @@ public final class LiveInvestigationService {
                 synthesis.diagnosis(),
                 Set.copyOf(evidenceById.keySet())
         );
+        if (!verification.report().diagnosisSchemaPass()) {
+            throw malformed("Model diagnosis failed the validated contract");
+        }
         LiveRunStatus status = verification.report().hardErrors().isEmpty()
                 ? LiveRunStatus.COMPLETED
                 : LiveRunStatus.VERIFICATION_FAILED;

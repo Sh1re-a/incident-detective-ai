@@ -151,6 +151,45 @@ class LiveInvestigationApiTest {
     }
 
     @Test
+    void rejectsAnInvalidDiagnosisWithoutReturningModelContent() throws Exception {
+        when(model.collect(any(), anyList(), anyList(), eq(1), any())).thenReturn(
+                new CollectionModelResult(
+                        List.of(),
+                        metadata(ModelPhase.COLLECT, 1)
+                )
+        );
+        when(model.synthesize(any(), anyList(), any())).thenReturn(
+                new SynthesisModelResult(
+                        new Diagnosis(
+                                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                                null,
+                                null,
+                                "private invalid model summary",
+                                "private invalid technical detail",
+                                List.of(),
+                                new SafeNextStep(
+                                        "Execute an unapproved change.",
+                                        false
+                                )
+                        ),
+                        metadata(ModelPhase.SYNTHESIZE, 1)
+                )
+        );
+
+        MvcResult result = mockMvc.perform(post(PATH, SCENARIO_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirm_live_ai\":true}"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.code").value("MALFORMED_MODEL_RESPONSE"))
+                .andReturn();
+
+        assertFalse(result.getResponse().getContentAsString()
+                .contains("private invalid"));
+        assertFalse(result.getResponse().getContentAsString()
+                .contains("unapproved change"));
+    }
+
+    @Test
     void returnsNotFoundBeforeCallingTheModel() throws Exception {
         mockMvc.perform(post(PATH, "unknown-scenario")
                         .contentType(MediaType.APPLICATION_JSON)
