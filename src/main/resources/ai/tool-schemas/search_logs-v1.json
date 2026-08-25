@@ -1,0 +1,47 @@
+{
+  "$id": "incident-detective/tools/search_logs/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "services": {
+      "type": "array",
+      "description": "Exact service names from the per-scenario log catalog. Use an empty array for every service.",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]{1,63}$"
+      },
+      "maxItems": 8
+    },
+    "levels": {
+      "type": "array",
+      "description": "Exact log levels from the per-scenario log catalog. Use an empty array for every level.",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]{1,31}$"
+      },
+      "maxItems": 8
+    },
+    "query": {
+      "type": "string",
+      "description": "Case-insensitive literal text matched against the synthetic log message and attribute keys or values.",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": ".*[A-Za-z0-9].*"
+    },
+    "start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "end": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "services",
+    "levels",
+    "query",
+    "start",
+    "end"
+  ]
+}
