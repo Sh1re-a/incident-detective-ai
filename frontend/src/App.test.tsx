@@ -85,6 +85,8 @@ describe("Incident Detective experience", () => {
     expect(
       screen.getByText("1 recorded trace event; no tool was called now"),
     ).toBeVisible();
+    expect(screen.getByText("Recorded events", { exact: true })).toBeVisible();
+    expect(screen.queryByText("Tool calls", { exact: true })).not.toBeInTheDocument();
     expect(screen.getByText("100% this run")).toBeVisible();
     expect(
       screen.getByText(/They are not an eval-set accuracy claim/),

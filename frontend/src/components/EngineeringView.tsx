@@ -296,7 +296,7 @@ export function EngineeringView({
             value={isLive ? String(result.model_call_count) : "0"}
           />
           <Metadata
-            label="Tool calls"
+            label={isLive ? "Tool calls" : "Recorded events"}
             value={isLive ? String(result.tool_call_count) : String(result.tool_events.length)}
           />
         </dl>
