@@ -14,7 +14,6 @@ import com.google.genai.types.GenerateContentResponseUsageMetadata;
 import com.google.genai.types.HttpOptions;
 import com.google.genai.types.HttpRetryOptions;
 import com.google.genai.types.ThinkingConfig;
-import com.google.genai.types.ThinkingLevel;
 import com.google.genai.types.Tool;
 import com.google.genai.types.ToolConfig;
 import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
@@ -131,7 +130,7 @@ public final class GeminiInvestigationModelGateway
                         .build())
                 .maxOutputTokens(1_024)
                 .thinkingConfig(ThinkingConfig.builder()
-                        .thinkingLevel(ThinkingLevel.Known.LOW)
+                        .thinkingLevel(properties.thinkingLevel().sdkValue())
                         .includeThoughts(false)
                         .build())
                 .httpOptions(requestHttpOptions(timeout))
@@ -165,7 +164,7 @@ public final class GeminiInvestigationModelGateway
                 .responseJsonSchema(diagnosisSchema)
                 .maxOutputTokens(2_048)
                 .thinkingConfig(ThinkingConfig.builder()
-                        .thinkingLevel(ThinkingLevel.Known.LOW)
+                        .thinkingLevel(properties.thinkingLevel().sdkValue())
                         .includeThoughts(false)
                         .build())
                 .httpOptions(requestHttpOptions(timeout))

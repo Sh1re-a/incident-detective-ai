@@ -7,6 +7,7 @@ public record GeminiAiProperties(
         String geminiApiKey,
         boolean liveEnabled,
         String modelId,
+        GeminiThinkingLevel thinkingLevel,
         String promptVersion
 ) {
     public boolean hasApiKey() {

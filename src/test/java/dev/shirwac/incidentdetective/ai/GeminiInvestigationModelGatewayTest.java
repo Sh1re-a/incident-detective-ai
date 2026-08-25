@@ -70,6 +70,7 @@ class GeminiInvestigationModelGatewayTest {
                         "test-key",
                         true,
                         "gemini-test",
+                        GeminiThinkingLevel.LOW,
                         "test-prompt"
                 ),
                 new GeminiDiagnosisDecoder(mapper),

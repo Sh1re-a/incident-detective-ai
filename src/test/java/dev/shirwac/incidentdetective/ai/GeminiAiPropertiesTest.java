@@ -13,17 +13,20 @@ class GeminiAiPropertiesTest {
                 "test-key",
                 false,
                 "gemini-test",
+                GeminiThinkingLevel.LOW,
                 "prompt-v1"
         );
         GeminiAiProperties enabledWithoutKey = new GeminiAiProperties(
                 " ",
                 true,
                 "gemini-test",
+                GeminiThinkingLevel.MINIMAL,
                 "prompt-v1"
         );
 
         assertTrue(disabled.hasApiKey());
         assertFalse(disabled.liveEnabled());
+        assertTrue(disabled.thinkingLevel() == GeminiThinkingLevel.LOW);
         assertFalse(enabledWithoutKey.hasApiKey());
         assertTrue(enabledWithoutKey.liveEnabled());
     }
