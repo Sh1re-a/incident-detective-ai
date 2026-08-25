@@ -31,6 +31,7 @@ public record LiveInvestigationResult(
         List<ModelCallMetadata> modelCalls,
         ModelTokenUsage tokenUsage,
         BigDecimal estimatedCostUsd,
+        String estimatedCostBasis,
         int toolCallCount,
         int modelCallCount,
         List<String> limitations

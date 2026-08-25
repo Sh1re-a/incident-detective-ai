@@ -3,8 +3,10 @@ package dev.shirwac.incidentdetective.live;
 import dev.shirwac.incidentdetective.ai.CollectionModelResult;
 import dev.shirwac.incidentdetective.ai.CollectionToolCall;
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
+import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.InvestigationModelGateway;
 import dev.shirwac.incidentdetective.ai.ModelCallMetadata;
+import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
 import dev.shirwac.incidentdetective.ai.SynthesisModelResult;
@@ -21,8 +23,6 @@ import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
 import dev.shirwac.incidentdetective.replay.RunMode;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -52,11 +52,6 @@ public final class LiveInvestigationService {
     static final Duration DEADLINE_SAFETY_MARGIN = Duration.ofSeconds(1);
     static final Duration MIN_SECOND_COLLECTION_TIMEOUT = Duration.ofSeconds(8);
 
-    private static final BigDecimal INPUT_USD_PER_MILLION =
-            new BigDecimal("0.75");
-    private static final BigDecimal OUTPUT_USD_PER_MILLION =
-            new BigDecimal("3.75");
-    private static final BigDecimal ONE_MILLION = new BigDecimal("1000000");
     private static final List<String> LIMITATIONS = List.of(
             "All incident data is synthetic.",
             "Runbook retrieval currently uses deterministic local keyword matching, not pgvector.",
@@ -68,6 +63,7 @@ public final class LiveInvestigationService {
     private final InvestigationToolExecutor tools;
     private final InvestigationModelGateway model;
     private final CompletedInvestigationVerifier verifier;
+    private final GeminiCostEstimator costEstimator;
     private final Clock clock;
 
     public LiveInvestigationService(
@@ -76,6 +72,7 @@ public final class LiveInvestigationService {
             InvestigationToolExecutor tools,
             InvestigationModelGateway model,
             CompletedInvestigationVerifier verifier,
+            GeminiCostEstimator costEstimator,
             Clock clock
     ) {
         this.properties = properties;
@@ -83,6 +80,7 @@ public final class LiveInvestigationService {
         this.tools = tools;
         this.model = model;
         this.verifier = verifier;
+        this.costEstimator = costEstimator;
         this.clock = clock;
     }
 
@@ -165,6 +163,10 @@ public final class LiveInvestigationService {
                 ? LiveRunStatus.COMPLETED
                 : LiveRunStatus.VERIFICATION_FAILED;
         ModelTokenUsage usage = aggregateUsage(modelCalls);
+        ModelCostEstimate cost = costEstimator.estimate(
+                properties.modelId(),
+                usage
+        );
         Instant completedAt = clock.instant();
 
         return new LiveInvestigationResult(
@@ -185,7 +187,8 @@ public final class LiveInvestigationService {
                 properties.promptVersion(),
                 modelCalls,
                 usage,
-                estimateCost(usage),
+                cost.estimatedUsd(),
+                cost.basis(),
                 toolEvents.size(),
                 modelCalls.size(),
                 LIMITATIONS
@@ -326,16 +329,6 @@ public final class LiveInvestigationService {
                 .mapToInt(ModelTokenUsage::totalTokens)
                 .sum();
         return new ModelTokenUsage(input, output, total);
-    }
-
-    private BigDecimal estimateCost(ModelTokenUsage usage) {
-        BigDecimal inputCost = BigDecimal.valueOf(usage.inputTokens())
-                .multiply(INPUT_USD_PER_MILLION)
-                .divide(ONE_MILLION, 12, RoundingMode.HALF_UP);
-        BigDecimal outputCost = BigDecimal.valueOf(usage.outputTokens())
-                .multiply(OUTPUT_USD_PER_MILLION)
-                .divide(ONE_MILLION, 12, RoundingMode.HALF_UP);
-        return inputCost.add(outputCost).setScale(8, RoundingMode.HALF_UP);
     }
 
     private ModelProviderException malformed(String message) {

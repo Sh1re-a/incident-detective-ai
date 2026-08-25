@@ -89,6 +89,10 @@ class LiveInvestigationApiTest {
                 .andExpect(jsonPath("$.model_id").value("gemini-test"))
                 .andExpect(jsonPath("$.model_call_count").value(2))
                 .andExpect(jsonPath("$.tool_call_count").value(0))
+                .andExpect(jsonPath("$.estimated_cost_usd").doesNotExist())
+                .andExpect(jsonPath("$.estimated_cost_basis").value(
+                        "No paid list-price estimate is configured for this model."
+                ))
                 .andReturn();
 
         String json = result.getResponse().getContentAsString();

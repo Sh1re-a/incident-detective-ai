@@ -42,7 +42,7 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(properties = {
         "incident-detective.ai.live-enabled=true",
         "incident-detective.ai.gemini-api-key=test-only-key",
-        "incident-detective.ai.model-id=gemini-test",
+        "incident-detective.ai.model-id=gemini-3.5-flash-lite",
         "incident-detective.ai.prompt-version=test-prompt-v1"
 })
 class LiveInvestigationServiceTest {
@@ -84,6 +84,9 @@ class LiveInvestigationServiceTest {
         assertEquals(3, result.modelCallCount());
         assertEquals(2_300, result.tokenUsage().totalTokens());
         assertTrue(result.estimatedCostUsd().signum() > 0);
+        assertTrue(result.estimatedCostBasis().contains(
+                "actual free-tier charge may be USD 0"
+        ));
         assertTrue(result.verification().hardErrors().isEmpty());
         assertTrue(result.comparison().rootCauseCorrect());
         assertTrue(result.comparison().affectedServiceCorrect());
