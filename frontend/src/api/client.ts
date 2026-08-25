@@ -79,6 +79,8 @@ export function toPublicErrorMessage(error: unknown): string {
       case "LIVE_AI_DISABLED":
       case "LIVE_AI_NOT_CONFIGURED":
         return "Live AI is not available right now. The recorded investigation is still ready.";
+      case "LIVE_AI_RATE_LIMITED":
+        return "Live AI is busy or has reached its public demo limit. Wait a moment or use the recorded investigation.";
       case "LIVE_INVESTIGATION_TIMEOUT":
       case "MODEL_PROVIDER_TIMEOUT":
         return "The live investigation reached its time limit. No automatic retry was made.";
