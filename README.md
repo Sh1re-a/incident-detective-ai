@@ -34,7 +34,7 @@ När en sparad körning visas ska den märkas **“Simulated incident — record
 - `Scenario`, `Evidence`, `Diagnosis`, separat `GroundTruth` och tre oberoende verifieringsresultat är implementerade i Java.
 - Två seedade scenarier finns: ett payment-timeoutfall och ett inventory-kontraktsfall. Båda innehåller metrics, logs, trace, runbook och avsiktligt brus.
 - Ett lokalt recorded-replay-API returnerar ordnade tool events, endast faktiskt sedd evidens, diagnos, verifieringsrapport och en begränsad facitjämförelse efter avslutad körning.
-- Maven-paketet och 56 tester är gröna. Den paketerade JAR-filen har startats lokalt; ingen frontend, databas, AI-integration, evalharness eller deploy är byggd.
+- Maven-paketet och 61 tester är gröna. Den paketerade JAR-filen har startats lokalt; ingen frontend, databas, AI-integration, evalharness eller deploy är byggd.
 - Ingen API-åtkomst, billing, modellprestanda, latency, kostnad eller accuracy har verifierats.
 - Projektgrunden är publicerad på GitHub utan open-source-licens. Ingen demo är deployad.
 
