@@ -14,16 +14,16 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 | M-03 | Publik repo-status | GitHub-repot är publikt och det är dokumenterat att ingen open-source-licens eller deploy har lagts till | Klar |
 | M-04 | Veckovisa check-ins | Framsteg, lärande, hinder, beslut och nästa prioriteringar dokumenteras 28 aug, 4 sep, 11 sep och vid finalen 18 sep | Ej startad |
 | M-05 | Klartecken för extern deploy | Shirwac har separat och uttryckligen godkänt Cloud Run-deployen innan den genomförs | Väntar på extern bekräftelse |
-| M-06 | Java-verktygskedja | Java 21, Spring Boot 4.1.1 och Maven Wrapper bygger projektet och starttestet är grönt; ingen incidentlogik ingår | Klar |
+| M-06 | Java-verktygskedja | Java 21, Spring Boot 4.1.1 och Maven Wrapper bygger projektet och starttestet är grönt | Klar |
 
 ## MUST – vecka 1, synlig vertikal slice
 
 | ID | Leverans | Acceptanskriterium | Status |
 |---|---|---|---|
-| M-10 | Låst kärnberättelse | “Checkout errors threaten orders” har tydlig kundpåverkan, tidslinje och ett säkert nästa steg | Ej startad |
+| M-10 | Låst kärnberättelse | “Checkout errors threaten orders” har tydlig kundpåverkan, tidslinje och ett säkert nästa steg | Klar |
 | M-11 | API- och billingcheck | Faktisk modellåtkomst är verifierad utan att token eller hemlighet hamnar i repo/logg | Ej startad |
 | M-12 | Domänkontrakt | `Scenario`, `Evidence`, `Diagnosis` och separat `GroundTruth` är implementerade och validerade | Klar |
-| M-13 | Två scenariopaket | Två seedade, deterministiska paket har minst två evidenstyper, brus och dolt facit; ett integritetstest stoppar `GroundTruth` från publika scenario- och toolpayloads | Ej startad |
+| M-13 | Två scenariopaket | Två seedade, deterministiska paket har minst två evidenstyper, brus och dolt facit; ett integritetstest stoppar `GroundTruth` från publika scenario- och toolpayloads | Klar |
 | M-14 | Backend och verifierare | Riktig frontend–API-kommunikation samt kontroll av schema, citation IDs och facit fungerar; trasiga modellsvar ger valideringsresultat utan HTTP 500 och `seenEvidenceIds` byggs endast från faktiska tool events | Pågår |
 | M-15 | Recorded Story View | Ett helt fall kan följas på högst 90 sekunder och märks “Simulated incident — recorded deterministic replay.” | Ej startad |
 | M-16 | Första liveutredningen | Efter kontraktslås kör ett verkligt modellanrop och läget märks “Simulated incident — real AI investigation.” | Ej startad |
@@ -40,7 +40,7 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 | M-23 | Runbook retrieval | PostgreSQL/pgvector söker endast i 10–15 runbooks och returnerar citerbar dokument-/chunkmetadata | Ej startad |
 | M-24 | Sex incidentfamiljer | Sex rotorsaksfamiljer återanvänder samma syntetiska webbshop, tjänstekarta, checkout-berättelse och UI; minst tre är valbara i demon | Ej startad |
 | M-25 | Story + Engineering View | Berättelse och tekniska detaljer kan växlas utan att privat chain-of-thought visas | Ej startad |
-| M-26 | Körmetadata | Run ID, mode, model ID, promptversion, git SHA, latency, tokens, calls och kostnadsestimat sparas | Ej startad |
+| M-26 | Körmetadata | Run ID, mode, model ID, promptversion, git SHA, latency, tokens, calls och kostnadsestimat sparas | Pågår |
 | M-27 | Grundobservability | Strukturerade JSON-loggar och OpenTelemetry täcker API, verktyg och verifiering utan hemligheter | Ej startad |
 
 **Gate 4 september:** liveutredningen fungerar och Engineering View visar tools, retrieval, evidens och körmetadata.
@@ -51,7 +51,7 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 |---|---|---|---|
 | M-30 | 18 evalfall | Sex familjer × tre variationer, med separata development- och held-out-fall | Ej startad |
 | M-31 | Baseline | Symptom-only baseline och full utredning körs mot samma relevanta fall | Ej startad |
-| M-32 | Tre separata verifieringar | Citation validity, evidence support/precision och diagnosis correctness mäts var för sig | Ej startad |
+| M-32 | Tre separata verifieringar | Citation validity, evidence support/precision och diagnosis correctness mäts var för sig | Pågår |
 | M-33 | Retrievalmått | Hit@4 mäts mot förväntad runbookkälla/chunk för relevanta fall | Ej startad |
 | M-34 | Säkerhets-/abstentionfall | Minst två fall kräver korrekt abstention och ett runbookfall innehåller prompt-injection-liknande text | Ej startad |
 | M-35 | Portabel evalrapport | Samma kommando fungerar lokalt/CI och redovisar accuracy, citations, retrieval, latency, calls och kostnad | Ej startad |

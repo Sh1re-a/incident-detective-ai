@@ -4,7 +4,7 @@ Incident Detective är mitt individuella Passion Project under SALT Sprint 3, 25
 
 > **Slutmål:** “Simulated incident — real AI investigation.”
 >
-> **Nuvarande läge:** Planering och kontraktsgranskning. En minimal Java/Spring Boot-grund är skapad och testad, men ingen incidentfunktion, replay eller live-AI-utredning är byggd ännu.
+> **Nuvarande läge:** Två deterministiska syntetiska incidenter kan köras genom ett lokalt Java/Spring Boot-API som recorded replay. Verifiering, evidence IDs och dolt facit fungerar. Frontend och live-AI är ännu inte byggda.
 
 ## Idén i korthet
 
@@ -23,18 +23,29 @@ Det här är inte en chatbot och inte ett autonomt driftssystem. Systemet får r
 |---|---|
 | **Simulerat** | Alla logs, metrics, traces, runbooks, releasehändelser, incidenter och uppskattningar av affärspåverkan är syntetiska. |
 | **Verkligt i slutprodukten** | Modellens verktygsval, tool calling, structured output, runbook-retrieval, deterministisk verifiering, evals, tracing, uppmätt latens, tokenanvändning, kostnadsestimat och Cloud Run-deploy. |
-| **Verkligt just nu** | Projekt-, scope-, beslut- och kontraktsdokumentationen samt en körbar Java 21/Spring Boot-grund med ett godkänt starttest. |
+| **Verkligt just nu** | Java-domänkontrakt, två syntetiska scenario-paket, recorded tool events, separat dolt `GroundTruth`, deterministisk verifiering och ett lokalt Spring Boot replay-API. |
 | **Planerat, inte verifierat** | API-åtkomst och billing, exakt modell, live-AI-flöde, mätvärden, evalutfall, Cloud Run och användartester. Inga resultat får anges som uppnådda före faktisk mätning. |
 
 När en sparad körning visas ska den märkas **“Simulated incident — recorded deterministic replay.”** Den får aldrig ha en “Live AI”-badge. Slutmålets live-märkning används först när ett verkligt modellanrop kör utredningen.
 
 ## Status 25 augusti 2026
 
-- Sprintplan, prioriterad backlog, tekniska beslut och dag‑1‑kontrakt är framtagna för granskning.
-- En minimal Java 21/Spring Boot 4.1.1-grund med Maven Wrapper och ett starttest finns. Ingen domänmodell, endpoint, frontend, databas, AI-integration, evalharness eller deploy har byggts.
+- Sprintplan, prioriterad backlog, tekniska beslut och dag‑1‑kontrakt finns. Kontraktsgranskningen pågår fortfarande.
+- `Scenario`, `Evidence`, `Diagnosis`, separat `GroundTruth` och tre oberoende verifieringsresultat är implementerade i Java.
+- Två seedade scenarier finns: ett payment-timeoutfall och ett inventory-kontraktsfall. Båda innehåller metrics, logs, trace, runbook och avsiktligt brus.
+- Ett lokalt recorded-replay-API returnerar ordnade tool events, endast faktiskt sedd evidens, diagnos, verifieringsrapport och en begränsad facitjämförelse efter avslutad körning.
+- Maven-paketet och 56 tester är gröna. Den paketerade JAR-filen har startats lokalt; ingen frontend, databas, AI-integration, evalharness eller deploy är byggd.
 - Ingen API-åtkomst, billing, modellprestanda, latency, kostnad eller accuracy har verifierats.
 - Projektgrunden är publicerad på GitHub utan open-source-licens. Ingen demo är deployad.
-- Incident- och AI-kod startar först efter att sprintplan, scope och dag‑1‑kontrakt har granskats.
+
+## Lokalt recorded-replay-API
+
+Starta backend med `./mvnw spring-boot:run`. De två nuvarande körningarna startas med `POST`:
+
+- `/api/v1/scenarios/checkout-orders-at-risk-v1/runs/recorded-replay`
+- `/api/v1/scenarios/checkout-cart-segment-failures-v1/runs/recorded-replay`
+
+Svaret märks alltid **“Simulated incident — recorded deterministic replay.”** Modell-ID, promptversion, tokenanvändning och kostnad är `null`, eftersom ingen modell körs i replay-läget.
 
 ## Projektdokument
 
