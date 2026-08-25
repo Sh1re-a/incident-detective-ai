@@ -25,6 +25,10 @@ class OpenApiDocumentationTest {
             "/api/v1/scenarios/{scenarioId}/runs/recorded-replay";
     private static final String REPLAY_POST =
             "$.paths['" + REPLAY_PATH + "'].post";
+    private static final String LIVE_PATH =
+            "/api/v1/scenarios/{scenarioId}/runs/live-ai";
+    private static final String LIVE_POST =
+            "$.paths['" + LIVE_PATH + "'].post";
 
     @Autowired
     private MockMvc mockMvc;
@@ -74,7 +78,29 @@ class OpenApiDocumentationTest {
                 ).doesNotExist())
                 .andExpect(jsonPath(
                         "$.components.schemas.RecordedReplayResult.properties.mode.enum"
-                ).value(contains("recorded_replay")))
+                ).value(containsInAnyOrder("recorded_replay", "live_ai")))
+                .andExpect(jsonPath(LIVE_POST + ".summary")
+                        .value("Run a live Gemini incident investigation"))
+                .andExpect(jsonPath(
+                        LIVE_POST
+                                + ".requestBody.content['application/json']"
+                                + ".schema['$ref']"
+                ).value("#/components/schemas/LiveInvestigationRequest"))
+                .andExpect(jsonPath(
+                        LIVE_POST
+                                + ".responses['200'].content['application/json']"
+                                + ".schema['$ref']"
+                ).value("#/components/schemas/LiveInvestigationResult"))
+                .andExpect(jsonPath(
+                        "$.components.schemas.LiveInvestigationRequest"
+                                + ".properties.confirm_live_ai"
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.LiveInvestigationResult.properties.model_calls"
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.LiveInvestigationResult.properties.token_usage"
+                ).exists())
                 .andExpect(jsonPath(
                         "$.components.schemas.Evidence.discriminator.propertyName"
                 ).value("evidence_type"))
@@ -139,6 +165,8 @@ class OpenApiDocumentationTest {
         assertFalse(openApiJson.contains("groundTruthResource"));
         assertFalse(openApiJson.contains("recordedResource"));
         assertFalse(openApiJson.contains("/fixtures/"));
+        assertFalse(openApiJson.contains("geminiApiKey"));
+        assertFalse(openApiJson.contains("gemini_api_key"));
     }
 
     @Test

@@ -31,8 +31,9 @@ public class OpenApiConfiguration {
                 .title("Incident Detective API")
                 .version("v1")
                 .description(
-                        "Simulated incident — recorded deterministic replay. "
-                                + "The current API does not run live AI or execute remediation."
+                        "Synthetic incident data with two clearly separated modes: "
+                                + "recorded deterministic replay and an explicitly confirmed "
+                                + "live Gemini investigation. Neither mode executes remediation."
                 ));
     }
 
