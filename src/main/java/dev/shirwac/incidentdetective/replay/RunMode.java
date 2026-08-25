@@ -6,8 +6,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Arrays;
 
 public enum RunMode {
-    RECORDED_REPLAY("recorded_replay"),
-    LIVE_AI("live_ai");
+    RECORDED_REPLAY("recorded_replay");
 
     private final String wireValue;
 
