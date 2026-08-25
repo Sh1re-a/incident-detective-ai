@@ -17,6 +17,7 @@ import com.google.genai.types.ThinkingConfig;
 import com.google.genai.types.ThinkingLevel;
 import com.google.genai.types.Tool;
 import com.google.genai.types.ToolConfig;
+import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
 import dev.shirwac.incidentdetective.domain.scenario.Scenario;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
@@ -168,35 +169,57 @@ public final class GeminiInvestigationModelGateway
 
         TimedResponse timed = generate(prompt, config);
         return new SynthesisModelResult(
-                diagnosisDecoder.decode(timed.response().text()),
+                decodeDiagnosis(timed.response()),
                 metadata(ModelPhase.SYNTHESIZE, 1, timed)
         );
     }
 
-    private List<CollectionToolCall> decodeToolCalls(
+    List<CollectionToolCall> decodeToolCalls(
             GenerateContentResponse response
     ) {
-        List<CollectionToolCall> calls = new ArrayList<>();
-        for (FunctionCall functionCall : response.functionCalls()) {
-            String callId = functionCall.id().orElseThrow(() -> malformed(
-                    "Gemini function call did not include an ID"
-            ));
-            String name = functionCall.name().orElseThrow(() -> malformed(
-                    "Gemini function call did not include a name"
-            ));
-            ToolName toolName;
-            try {
-                toolName = ToolName.fromWireValue(name);
-            } catch (IllegalArgumentException exception) {
-                throw malformed("Gemini requested a tool outside the allowlist");
+        try {
+            List<CollectionToolCall> calls = new ArrayList<>();
+            for (FunctionCall functionCall : response.functionCalls()) {
+                String callId = functionCall.id().orElseThrow(() -> malformed(
+                        "Gemini function call did not include an ID"
+                ));
+                String name = functionCall.name().orElseThrow(() -> malformed(
+                        "Gemini function call did not include a name"
+                ));
+                ToolName toolName;
+                try {
+                    toolName = ToolName.fromWireValue(name);
+                } catch (IllegalArgumentException exception) {
+                    throw malformed("Gemini requested a tool outside the allowlist");
+                }
+                calls.add(new CollectionToolCall(
+                        callId,
+                        toolName,
+                        functionCall.args().orElse(Map.of())
+                ));
             }
-            calls.add(new CollectionToolCall(
-                    callId,
-                    toolName,
-                    functionCall.args().orElse(Map.of())
-            ));
+            return List.copyOf(calls);
+        } catch (ModelProviderException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw malformed(
+                    "Gemini collection response could not be read",
+                    exception
+            );
         }
-        return List.copyOf(calls);
+    }
+
+    Diagnosis decodeDiagnosis(GenerateContentResponse response) {
+        try {
+            return diagnosisDecoder.decode(response.text());
+        } catch (ModelProviderException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw malformed(
+                    "Gemini synthesis response could not be read",
+                    exception
+            );
+        }
     }
 
     private TimedResponse generate(
@@ -364,6 +387,17 @@ public final class GeminiInvestigationModelGateway
         return new ModelProviderException(
                 ModelProviderFailure.MALFORMED_RESPONSE,
                 message
+        );
+    }
+
+    private ModelProviderException malformed(
+            String message,
+            Throwable cause
+    ) {
+        return new ModelProviderException(
+                ModelProviderFailure.MALFORMED_RESPONSE,
+                message,
+                cause
         );
     }
 
