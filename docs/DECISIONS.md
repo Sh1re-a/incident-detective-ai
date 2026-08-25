@@ -25,15 +25,15 @@ Frontend, backend, scenariofixtures, verifierare och evalharness ligger i ett mo
 
 **Konsekvens:** Ingen microservice-fleet, Kubernetes eller Terraform krävs för kärnan.
 
-## DEC-003 – React/Vite och FastAPI/Pydantic
+## DEC-003 – React/Vite och Java/Spring Boot
 
-**Status:** Proposed
+**Status:** Accepted, 25 augusti 2026
 
-Story/Engineering View byggs med React, TypeScript och Vite. API, tool contracts och verifiering byggs med Python 3.12+, FastAPI och Pydantic v2.
+Story/Engineering View byggs med React, TypeScript och Vite. API, tool contracts och verifiering byggs med Java 21, Spring Boot, Spring MVC, Jakarta Validation och Jackson.
 
-**Varför:** Kombinationen ger ett snabbt gränssnitt, typade gränser och ett konkret Python/FastAPI-lärandemål.
+**Varför:** Shirwac kan redan Java och vill använda projektet för att bli bättre på Spring Boot samtidigt som AI-systemet byggs. Java har stöd för den planerade OpenAI-integrationen, så ett extra backend-runtime behövs inte i sprintens kärna.
 
-**Konsekvens:** Delade begrepp måste kontraktstestas mellan TypeScript och Pydantic; de får inte utvecklas som två oberoende sanningar.
+**Konsekvens:** Delade begrepp måste kontraktstestas mellan TypeScript och Java; de får inte utvecklas som två oberoende sanningar. Spring Boot 4 använder Jackson 3, så den framtida sealed `Evidence`-hierarkin ska round-trip-testas innan scenariofixtures byggs. Python ingår inte i kärnarkitekturen.
 
 ## DEC-004 – Fyra separata domänkontrakt
 

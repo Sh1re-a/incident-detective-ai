@@ -13,7 +13,7 @@ Jag vill bygga en liten och tydlig demo av hur AI kan hjälpa till med just den 
 
 ## Varför jag vill bygga det
 
-Projektet låter mig kombinera sådant jag redan arbetar med som software developer – gränssnitt, API:er, typer, Git och deployment – med sådant jag vill fördjupa: Python/FastAPI, tool calling, structured output, RAG, evals och observability.
+Projektet låter mig kombinera sådant jag redan arbetar med som software developer – gränssnitt, API:er, typer, Git och deployment – med sådant jag vill fördjupa: Java/Spring Boot, tool calling, structured output, RAG, evals och observability.
 
 Det viktiga för mig är inte att visa många AI-funktioner. Jag vill visa att jag kan bygga, utvärdera och driftsätta ett avgränsat AI-system och samtidigt förklara dess fel, tradeoffs och säkerhetsgränser. Resultatet ska vara ett ärligt samtalsunderlag för både Software Engineer- och Applied AI-roller.
 
@@ -77,7 +77,7 @@ Jag publicerar bara de siffror som faktiskt har mätts och beskriver testmängd 
 
 När sprinten är klar ska jag själv kunna:
 
-- modellera och validera samma domänkontrakt i Pydantic och TypeScript,
+- modellera och validera samma domänkontrakt i Java/Spring Boot och TypeScript,
 - bygga och felsöka ett begränsat tool-calling-flöde,
 - förklara skillnaden mellan retrievalkvalitet, evidensstöd och korrekt diagnos,
 - designa evals som även visar abstentioner och failure cases,
@@ -174,4 +174,4 @@ Vid varje check-in dokumenterar jag:
 
 ## Startvillkor
 
-Den här planen, MUST/SHOULD/CUT-scope och [dag‑1‑kontrakten](./docs/DAY-1-CONTRACTS.md) ska granskas innan produktkod börjar. Projektgrunden lagras i ett publikt GitHub-repo utan open-source-licens. Ingen produktkod eller deploy ingår i denna första grundfas.
+Den här planen, MUST/SHOULD/CUT-scope och [dag‑1‑kontrakten](./docs/DAY-1-CONTRACTS.md) ska granskas innan incident- och AI-kod börjar. Projektgrunden lagras i ett publikt GitHub-repo utan open-source-licens. En minimal Java/Spring Boot-grund får finnas för att verifiera verktygskedjan; ingen incidentfunktion eller deploy ingår i grundfasen.

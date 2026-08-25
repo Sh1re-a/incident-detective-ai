@@ -8,12 +8,13 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 
 | ID | Leverans | Acceptanskriterium | Status |
 |---|---|---|---|
-| M-00 | Projektgrund | README, sprintplan, backlog, beslut och dag‑1‑kontrakt finns; inga hemligheter, licens eller produktkod | Klar |
+| M-00 | Projektgrund | README, sprintplan, backlog, beslut och dag‑1‑kontrakt finns; inga hemligheter eller open-source-licens | Klar |
 | M-01 | Publik versionshantering | `main` finns i publika `Sh1re-a/incident-detective-ai` och URL/visibility är verifierad | Klar |
-| M-02 | Scope- och kontraktsgranskning | Shirwac har granskat planen, MUST/SHOULD/CUT och dag‑1‑kontrakten innan implementation | Ej startad |
+| M-02 | Scope- och kontraktsgranskning | Shirwac har granskat planen, MUST/SHOULD/CUT och dag‑1‑kontrakten innan implementation | Pågår |
 | M-03 | Publik repo-status | GitHub-repot är publikt och det är dokumenterat att ingen open-source-licens eller deploy har lagts till | Klar |
 | M-04 | Veckovisa check-ins | Framsteg, lärande, hinder, beslut och nästa prioriteringar dokumenteras 28 aug, 4 sep, 11 sep och vid finalen 18 sep | Ej startad |
 | M-05 | Klartecken för extern deploy | Shirwac har separat och uttryckligen godkänt Cloud Run-deployen innan den genomförs | Väntar på extern bekräftelse |
+| M-06 | Java-verktygskedja | Java 21, Spring Boot 4.1.1 och Maven Wrapper bygger projektet och starttestet är grönt; ingen incidentlogik ingår | Klar |
 
 ## MUST – vecka 1, synlig vertikal slice
 
@@ -35,7 +36,7 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 |---|---|---|---|
 | M-20 | Fyra typade read-only tools | `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks` har validerade in-/utdata och kan inte skriva | Ej startad |
 | M-21 | Begränsad state machine | `COLLECT → SYNTHESIZE → VERIFY` följer hela dag‑1‑budgeten: tre collection-rundor, fyra model/åtta tool calls, två per tooltyp, tre parallella reads, tool-free synthesis och 45 s timeout | Ej startad |
-| M-22 | Structured diagnosis | Pydantic v2 validerar `diagnosed` eller `insufficient_evidence`, claims och evidence IDs | Ej startad |
+| M-22 | Structured diagnosis | Java-typer, Jakarta Validation och deterministiska domänregler validerar `diagnosed` eller `insufficient_evidence`, claims och evidence IDs | Ej startad |
 | M-23 | Runbook retrieval | PostgreSQL/pgvector söker endast i 10–15 runbooks och returnerar citerbar dokument-/chunkmetadata | Ej startad |
 | M-24 | Sex incidentfamiljer | Sex rotorsaksfamiljer återanvänder samma syntetiska webbshop, tjänstekarta, checkout-berättelse och UI; minst tre är valbara i demon | Ej startad |
 | M-25 | Story + Engineering View | Berättelse och tekniska detaljer kan växlas utan att privat chain-of-thought visas | Ej startad |
