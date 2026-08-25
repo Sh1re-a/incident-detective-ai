@@ -1,0 +1,16 @@
+{
+  "$id": "incident-detective/tools/get_trace/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "trace_id": {
+      "type": "string",
+      "description": "Exact trace ID already discovered for the current scenario. Prefix and substring searches are not supported.",
+      "pattern": "^[a-z0-9][a-z0-9_-]{1,127}$",
+      "maxLength": 128
+    }
+  },
+  "required": [
+    "trace_id"
+  ]
+}
