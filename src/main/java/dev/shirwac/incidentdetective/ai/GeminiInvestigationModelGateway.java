@@ -43,7 +43,7 @@ import java.util.Map;
 public final class GeminiInvestigationModelGateway
         implements InvestigationModelGateway {
 
-    private static final int PROVIDER_TIMEOUT_MS = 14_000;
+    private static final Duration MAX_PROVIDER_TIMEOUT = Duration.ofSeconds(22);
     private static final int MAX_TOOL_CALLS_PER_ROUND = 3;
     private static final String COLLECT_PROMPT_RESOURCE =
             "ai/prompts/collect-gemini-live-v1.txt";
@@ -99,7 +99,8 @@ public final class GeminiInvestigationModelGateway
             Scenario scenario,
             List<String> availableMetricNames,
             List<Evidence> collectedEvidence,
-            int round
+            int round,
+            Duration timeout
     ) {
         String prompt = collectInstructions + "\n\n"
                 + "collection_round: " + round + "\n"
@@ -133,6 +134,7 @@ public final class GeminiInvestigationModelGateway
                         .thinkingLevel(ThinkingLevel.Known.LOW)
                         .includeThoughts(false)
                         .build())
+                .httpOptions(requestHttpOptions(timeout))
                 .build();
 
         TimedResponse timed = generate(prompt, config);
@@ -152,7 +154,8 @@ public final class GeminiInvestigationModelGateway
     @Override
     public SynthesisModelResult synthesize(
             Scenario scenario,
-            List<Evidence> collectedEvidence
+            List<Evidence> collectedEvidence,
+            Duration timeout
     ) {
         String prompt = synthesizeInstructions + "\n\n"
                 + "scenario:\n" + serialize(scenario) + "\n"
@@ -165,6 +168,7 @@ public final class GeminiInvestigationModelGateway
                         .thinkingLevel(ThinkingLevel.Known.LOW)
                         .includeThoughts(false)
                         .build())
+                .httpOptions(requestHttpOptions(timeout))
                 .build();
 
         TimedResponse timed = generate(prompt, config);
@@ -300,18 +304,30 @@ public final class GeminiInvestigationModelGateway
                         "Gemini API key is not configured"
                 );
             }
-            HttpOptions httpOptions = HttpOptions.builder()
-                    .timeout(PROVIDER_TIMEOUT_MS)
-                    .retryOptions(HttpRetryOptions.builder()
-                            .attempts(1)
-                            .build())
-                    .build();
             client = Client.builder()
                     .apiKey(properties.geminiApiKey())
-                    .httpOptions(httpOptions)
+                    .httpOptions(requestHttpOptions(MAX_PROVIDER_TIMEOUT))
                     .build();
         }
         return client;
+    }
+
+    private HttpOptions requestHttpOptions(Duration timeout) {
+        if (timeout == null
+                || timeout.isZero()
+                || timeout.isNegative()
+                || timeout.compareTo(MAX_PROVIDER_TIMEOUT) > 0) {
+            throw new IllegalArgumentException(
+                    "Gemini timeout must be between 1 ms and 22 seconds"
+            );
+        }
+        int timeoutMs = Math.toIntExact(Math.max(1, timeout.toMillis()));
+        return HttpOptions.builder()
+                .timeout(timeoutMs)
+                .retryOptions(HttpRetryOptions.builder()
+                        .attempts(1)
+                        .build())
+                .build();
     }
 
     @PreDestroy

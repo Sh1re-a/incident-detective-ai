@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -62,7 +63,7 @@ class LiveInvestigationServiceTest {
     @Test
     void completesABoundedRunUsingOnlyToolReturnedEvidence() {
         stubCollections();
-        when(model.synthesize(any(), anyList())).thenReturn(
+        when(model.synthesize(any(), anyList(), any())).thenReturn(
                 new SynthesisModelResult(correctDiagnosis(), metadata(
                         ModelPhase.SYNTHESIZE,
                         1,
@@ -90,7 +91,7 @@ class LiveInvestigationServiceTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Evidence>> evidenceCaptor = ArgumentCaptor
                 .forClass(List.class);
-        verify(model).synthesize(any(), evidenceCaptor.capture());
+        verify(model).synthesize(any(), evidenceCaptor.capture(), any());
         List<String> evidenceIds = evidenceCaptor.getValue().stream()
                 .map(Evidence::evidenceId)
                 .toList();
@@ -127,7 +128,7 @@ class LiveInvestigationServiceTest {
                         true
                 )
         );
-        when(model.synthesize(any(), anyList())).thenReturn(
+        when(model.synthesize(any(), anyList(), any())).thenReturn(
                 new SynthesisModelResult(
                         diagnosis,
                         metadata(ModelPhase.SYNTHESIZE, 1, 500, 200)
@@ -157,12 +158,14 @@ class LiveInvestigationServiceTest {
                 )
         );
 
-        verify(model, never()).collect(any(), anyList(), anyList(), anyInt());
-        verify(model, never()).synthesize(any(), anyList());
+        verify(model, never()).collect(
+                any(), anyList(), anyList(), anyInt(), any()
+        );
+        verify(model, never()).synthesize(any(), anyList(), any());
     }
 
     private void stubCollections() {
-        when(model.collect(any(), anyList(), anyList(), eq(1))).thenReturn(
+        when(model.collect(any(), anyList(), anyList(), eq(1), any())).thenReturn(
                 new CollectionModelResult(
                         List.of(
                                 call("call-metrics", ToolName.GET_METRICS, Map.of(
@@ -189,7 +192,7 @@ class LiveInvestigationServiceTest {
                         metadata(ModelPhase.COLLECT, 1, 600, 100)
                 )
         );
-        when(model.collect(any(), anyList(), anyList(), eq(2))).thenReturn(
+        when(model.collect(any(), anyList(), anyList(), eq(2), any())).thenReturn(
                 new CollectionModelResult(
                         List.of(call("call-trace", ToolName.GET_TRACE, Map.of(
                                 "trace_id", "cpt-trace-4821"
@@ -275,5 +278,36 @@ class LiveInvestigationServiceTest {
                         true
                 )
         );
+    }
+
+    @Test
+    void allocatesTheDeadlineWithoutStarvingSynthesis() {
+        assertEquals(
+                Duration.ofSeconds(22),
+                LiveInvestigationService.collectionTimeoutFor(
+                        Duration.ZERO,
+                        1
+                ).orElseThrow()
+        );
+        assertEquals(
+                Duration.ofSeconds(8),
+                LiveInvestigationService.collectionTimeoutFor(
+                        Duration.ofSeconds(14),
+                        2
+                ).orElseThrow()
+        );
+        assertTrue(LiveInvestigationService.collectionTimeoutFor(
+                Duration.ofSeconds(15),
+                2
+        ).isEmpty());
+        assertEquals(
+                Duration.ofSeconds(22),
+                LiveInvestigationService.synthesisTimeoutFor(
+                        Duration.ofSeconds(16)
+                ).orElseThrow()
+        );
+        assertTrue(LiveInvestigationService.synthesisTimeoutFor(
+                Duration.ofSeconds(44)
+        ).isEmpty());
     }
 }

@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,6 +46,10 @@ public final class LiveInvestigationService {
     static final int MAX_TOOL_CALLS_PER_TYPE = 2;
     static final int MAX_TOOL_CALLS_PER_ROUND = 3;
     static final Duration HARD_DEADLINE = Duration.ofSeconds(45);
+    static final Duration PROVIDER_CALL_CAP = Duration.ofSeconds(22);
+    static final Duration SYNTHESIS_RESERVE = Duration.ofSeconds(22);
+    static final Duration DEADLINE_SAFETY_MARGIN = Duration.ofSeconds(1);
+    static final Duration MIN_SECOND_COLLECTION_TIMEOUT = Duration.ofSeconds(8);
 
     private static final BigDecimal INPUT_USD_PER_MILLION =
             new BigDecimal("0.75");
@@ -97,12 +102,24 @@ public final class LiveInvestigationService {
 
         for (int round = 1; round <= MAX_COLLECTION_ROUNDS; round++) {
             requireWithinDeadline(startedAt);
+            Optional<Duration> timeout = collectionTimeoutFor(
+                    elapsedSince(startedAt),
+                    round
+            );
+            if (timeout.isEmpty()) {
+                if (round == 1) {
+                    throw deadlineExceeded();
+                }
+                break;
+            }
             CollectionModelResult collection = model.collect(
                     scenario,
                     availableMetricNames,
                     List.copyOf(evidenceById.values()),
-                    round
+                    round,
+                    timeout.orElseThrow()
             );
+            requireWithinDeadline(startedAt);
             modelCalls.add(collection.metadata());
             if (collection.toolCalls().isEmpty()) {
                 break;
@@ -127,10 +144,15 @@ public final class LiveInvestigationService {
         }
 
         requireWithinDeadline(startedAt);
+        Duration synthesisTimeout = synthesisTimeoutFor(
+                elapsedSince(startedAt)
+        ).orElseThrow(this::deadlineExceeded);
         SynthesisModelResult synthesis = model.synthesize(
                 scenario,
-                List.copyOf(evidenceById.values())
+                List.copyOf(evidenceById.values()),
+                synthesisTimeout
         );
+        requireWithinDeadline(startedAt);
         modelCalls.add(synthesis.metadata());
 
         CompletedInvestigationVerification verification = verifier.verify(
@@ -229,12 +251,61 @@ public final class LiveInvestigationService {
     }
 
     private void requireWithinDeadline(Instant startedAt) {
-        if (Duration.between(startedAt, clock.instant()).compareTo(HARD_DEADLINE) >= 0) {
-            throw new LiveInvestigationException(
-                    LiveInvestigationFailure.DEADLINE_EXCEEDED,
-                    "Live investigation exceeded its hard deadline"
-            );
+        if (elapsedSince(startedAt).compareTo(HARD_DEADLINE) >= 0) {
+            throw deadlineExceeded();
         }
+    }
+
+    static Optional<Duration> collectionTimeoutFor(
+            Duration elapsed,
+            int round
+    ) {
+        if (round < 1 || round > MAX_COLLECTION_ROUNDS) {
+            throw new IllegalArgumentException("Collection round is outside the budget");
+        }
+        Duration available = remainingFor(elapsed)
+                .minus(SYNTHESIS_RESERVE)
+                .minus(DEADLINE_SAFETY_MARGIN);
+        if (!available.isPositive()) {
+            return Optional.empty();
+        }
+        Duration timeout = min(PROVIDER_CALL_CAP, available);
+        if (round > 1
+                && timeout.compareTo(MIN_SECOND_COLLECTION_TIMEOUT) < 0) {
+            return Optional.empty();
+        }
+        return Optional.of(timeout);
+    }
+
+    static Optional<Duration> synthesisTimeoutFor(Duration elapsed) {
+        Duration available = remainingFor(elapsed)
+                .minus(DEADLINE_SAFETY_MARGIN);
+        if (!available.isPositive()) {
+            return Optional.empty();
+        }
+        return Optional.of(min(PROVIDER_CALL_CAP, available));
+    }
+
+    private static Duration remainingFor(Duration elapsed) {
+        Duration normalized = elapsed.isNegative() ? Duration.ZERO : elapsed;
+        Duration remaining = HARD_DEADLINE.minus(normalized);
+        return remaining.isNegative() ? Duration.ZERO : remaining;
+    }
+
+    private static Duration min(Duration first, Duration second) {
+        return first.compareTo(second) <= 0 ? first : second;
+    }
+
+    private Duration elapsedSince(Instant startedAt) {
+        Duration elapsed = Duration.between(startedAt, clock.instant());
+        return elapsed.isNegative() ? Duration.ZERO : elapsed;
+    }
+
+    private LiveInvestigationException deadlineExceeded() {
+        return new LiveInvestigationException(
+                LiveInvestigationFailure.DEADLINE_EXCEEDED,
+                "Live investigation exceeded its hard deadline"
+        );
     }
 
     private ModelTokenUsage aggregateUsage(List<ModelCallMetadata> calls) {

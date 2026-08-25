@@ -3,6 +3,7 @@ package dev.shirwac.incidentdetective.ai;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
 import dev.shirwac.incidentdetective.domain.scenario.Scenario;
 
+import java.time.Duration;
 import java.util.List;
 
 public interface InvestigationModelGateway {
@@ -11,11 +12,13 @@ public interface InvestigationModelGateway {
             Scenario scenario,
             List<String> availableMetricNames,
             List<Evidence> collectedEvidence,
-            int round
+            int round,
+            Duration timeout
     );
 
     SynthesisModelResult synthesize(
             Scenario scenario,
-            List<Evidence> collectedEvidence
+            List<Evidence> collectedEvidence,
+            Duration timeout
     );
 }
