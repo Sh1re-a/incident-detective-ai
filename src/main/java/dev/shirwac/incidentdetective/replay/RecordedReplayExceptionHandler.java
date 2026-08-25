@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.replay;
 
+import dev.shirwac.incidentdetective.api.ApiProblemFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -10,11 +11,11 @@ public final class RecordedReplayExceptionHandler {
 
     @ExceptionHandler(ScenarioNotFoundException.class)
     ProblemDetail handleScenarioNotFound(ScenarioNotFoundException exception) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+        return ApiProblemFactory.create(
                 HttpStatus.NOT_FOUND,
-                exception.getMessage()
+                "Recorded scenario not found",
+                exception.getMessage(),
+                "SCENARIO_NOT_FOUND"
         );
-        problem.setTitle("Recorded scenario not found");
-        return problem;
     }
 }

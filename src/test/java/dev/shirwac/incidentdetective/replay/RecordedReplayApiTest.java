@@ -156,6 +156,7 @@ class RecordedReplayApiTest {
                 ))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Recorded scenario not found"))
+                .andExpect(jsonPath("$.code").value("SCENARIO_NOT_FOUND"))
                 .andExpect(jsonPath("$.detail").value(
                         "Recorded scenario not found: unknown-scenario"
                 ));

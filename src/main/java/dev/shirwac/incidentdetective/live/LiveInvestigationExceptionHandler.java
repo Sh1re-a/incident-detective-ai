@@ -1,6 +1,7 @@
 package dev.shirwac.incidentdetective.live;
 
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
+import dev.shirwac.incidentdetective.api.ApiProblemFactory;
 import dev.shirwac.incidentdetective.investigation.InvestigationScenarioNotFoundException;
 import dev.shirwac.incidentdetective.investigation.tools.InvalidToolArgumentsException;
 import org.springframework.http.HttpStatus;
@@ -20,7 +21,7 @@ public final class LiveInvestigationExceptionHandler {
         String detail = exception.rejection() == LiveAdmissionRejection.CONCURRENT_RUN
                 ? "Another live investigation is already running."
                 : "The public live investigation limit has been reached.";
-        ProblemDetail problem = problem(
+        ProblemDetail problem = ApiProblemFactory.create(
                 HttpStatus.TOO_MANY_REQUESTS,
                 "Live AI is busy",
                 detail,
@@ -38,25 +39,25 @@ public final class LiveInvestigationExceptionHandler {
     @ExceptionHandler(LiveInvestigationException.class)
     ProblemDetail handleLiveFailure(LiveInvestigationException exception) {
         return switch (exception.failure()) {
-            case CONFIRMATION_REQUIRED -> problem(
+            case CONFIRMATION_REQUIRED -> ApiProblemFactory.create(
                     HttpStatus.BAD_REQUEST,
                     "Live AI confirmation required",
                     "Set confirm_live_ai to true to allow this model call.",
                     "LIVE_AI_CONFIRMATION_REQUIRED"
             );
-            case LIVE_AI_DISABLED -> problem(
+            case LIVE_AI_DISABLED -> ApiProblemFactory.create(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "Live AI unavailable",
                     "Live AI is disabled by server configuration.",
                     "LIVE_AI_DISABLED"
             );
-            case API_KEY_MISSING -> problem(
+            case API_KEY_MISSING -> ApiProblemFactory.create(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "Live AI unavailable",
                     "The model provider is not configured on the server.",
                     "LIVE_AI_NOT_CONFIGURED"
             );
-            case DEADLINE_EXCEEDED -> problem(
+            case DEADLINE_EXCEEDED -> ApiProblemFactory.create(
                     HttpStatus.GATEWAY_TIMEOUT,
                     "Live investigation timed out",
                     "The live investigation exceeded its 45 second deadline.",
@@ -68,19 +69,19 @@ public final class LiveInvestigationExceptionHandler {
     @ExceptionHandler(ModelProviderException.class)
     ProblemDetail handleProviderFailure(ModelProviderException exception) {
         return switch (exception.failure()) {
-            case TIMEOUT -> problem(
+            case TIMEOUT -> ApiProblemFactory.create(
                     HttpStatus.GATEWAY_TIMEOUT,
                     "Model provider timed out",
                     "Gemini did not respond within the bounded timeout.",
                     "MODEL_PROVIDER_TIMEOUT"
             );
-            case UPSTREAM -> problem(
+            case UPSTREAM -> ApiProblemFactory.create(
                     HttpStatus.BAD_GATEWAY,
                     "Model provider failed",
                     "Gemini could not complete the bounded model request.",
                     "MODEL_PROVIDER_ERROR"
             );
-            case MALFORMED_RESPONSE -> problem(
+            case MALFORMED_RESPONSE -> ApiProblemFactory.create(
                     HttpStatus.BAD_GATEWAY,
                     "Model response rejected",
                     "Gemini returned output outside the allowed contract.",
@@ -93,7 +94,7 @@ public final class LiveInvestigationExceptionHandler {
     ProblemDetail handleInvalidModelToolArguments(
             InvalidToolArgumentsException exception
     ) {
-        return problem(
+        return ApiProblemFactory.create(
                 HttpStatus.BAD_GATEWAY,
                 "Model tool arguments rejected",
                 "Gemini returned arguments outside the strict read-only tool contract.",
@@ -105,7 +106,7 @@ public final class LiveInvestigationExceptionHandler {
     ProblemDetail handleScenarioNotFound(
             InvestigationScenarioNotFoundException exception
     ) {
-        return problem(
+        return ApiProblemFactory.create(
                 HttpStatus.NOT_FOUND,
                 "Investigation scenario not found",
                 exception.getMessage(),
@@ -113,15 +114,4 @@ public final class LiveInvestigationExceptionHandler {
         );
     }
 
-    private ProblemDetail problem(
-            HttpStatus status,
-            String title,
-            String detail,
-            String code
-    ) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
-        problem.setTitle(title);
-        problem.setProperty("code", code);
-        return problem;
-    }
 }

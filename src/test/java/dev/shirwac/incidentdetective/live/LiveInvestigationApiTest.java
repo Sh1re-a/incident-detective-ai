@@ -119,6 +119,27 @@ class LiveInvestigationApiTest {
     }
 
     @Test
+    void rejectsMalformedAndUnexpectedRequestFieldsBeforeCallingTheModel()
+            throws Exception {
+        mockMvc.perform(post(PATH, SCENARIO_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{not-valid-json}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST_BODY"));
+
+        mockMvc.perform(post(PATH, SCENARIO_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirm_live_ai\":true,\"surprise\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST_BODY"));
+
+        verify(model, never()).collect(
+                any(), anyList(), anyList(), anyInt(), any()
+        );
+        verify(model, never()).synthesize(any(), anyList(), any());
+    }
+
+    @Test
     void mapsProviderContractAndTimeoutFailuresWithoutRawDetails() throws Exception {
         when(model.collect(any(), anyList(), anyList(), eq(1), any()))
                 .thenThrow(new ModelProviderException(
