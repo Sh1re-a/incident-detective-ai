@@ -45,9 +45,9 @@ public final class GeminiInvestigationModelGateway
     private static final Duration MAX_PROVIDER_TIMEOUT = Duration.ofSeconds(28);
     private static final int MAX_TOOL_CALLS_PER_ROUND = 3;
     private static final String COLLECT_PROMPT_RESOURCE =
-            "ai/prompts/collect-gemini-live-v1.txt";
+            "ai/prompts/collect-gemini-live-v2.txt";
     private static final String SYNTHESIZE_PROMPT_RESOURCE =
-            "ai/prompts/synthesize-gemini-live-v1.txt";
+            "ai/prompts/synthesize-gemini-live-v2.txt";
 
     private final GeminiAiProperties properties;
     private final GeminiDiagnosisDecoder diagnosisDecoder;
@@ -68,7 +68,7 @@ public final class GeminiInvestigationModelGateway
         this.jsonMapper = jsonMapper;
         collectInstructions = loadText(COLLECT_PROMPT_RESOURCE);
         synthesizeInstructions = loadText(SYNTHESIZE_PROMPT_RESOURCE);
-        diagnosisSchema = loadSchema("ai/diagnosis-schema-v1.json");
+        diagnosisSchema = loadSchema("ai/diagnosis-schema-v2.json");
         functionDeclarations = List.of(
                 function(
                         ToolName.GET_METRICS,

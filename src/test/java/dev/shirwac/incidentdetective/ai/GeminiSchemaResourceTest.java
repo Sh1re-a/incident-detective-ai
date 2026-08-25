@@ -20,6 +20,7 @@ class GeminiSchemaResourceTest {
     void diagnosisAndToolSchemasAreStrictObjects() throws Exception {
         List<String> resources = List.of(
                 "ai/diagnosis-schema-v1.json",
+                "ai/diagnosis-schema-v2.json",
                 "ai/tool-schemas/get_metrics-v1.json",
                 "ai/tool-schemas/search_logs-v1.json",
                 "ai/tool-schemas/get_trace-v1.json",
@@ -42,8 +43,8 @@ class GeminiSchemaResourceTest {
     @Test
     void versionedPromptsDoNotMentionGroundTruth() throws Exception {
         for (String resourcePath : List.of(
-                "ai/prompts/collect-gemini-live-v1.txt",
-                "ai/prompts/synthesize-gemini-live-v1.txt"
+                "ai/prompts/collect-gemini-live-v2.txt",
+                "ai/prompts/synthesize-gemini-live-v2.txt"
         )) {
             String prompt = new ClassPathResource(resourcePath)
                     .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
@@ -56,7 +57,7 @@ class GeminiSchemaResourceTest {
     void diagnosisSchemaExposesTheSharedTaxonomyWithoutScenarioAnswers()
             throws Exception {
         ClassPathResource resource = new ClassPathResource(
-                "ai/diagnosis-schema-v1.json"
+                "ai/diagnosis-schema-v2.json"
         );
         JsonNode schema;
         try (InputStream input = resource.getInputStream()) {
