@@ -1,0 +1,30 @@
+{
+  "$id": "incident-detective/tools/get_metrics/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "metric_names": {
+      "type": "array",
+      "description": "Metric names from the per-scenario catalog supplied with this tool.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{1,63}$"
+      },
+      "minItems": 1,
+      "maxItems": 8
+    },
+    "start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "end": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "metric_names",
+    "start",
+    "end"
+  ]
+}
