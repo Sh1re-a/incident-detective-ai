@@ -1,6 +1,6 @@
 # Lärspår och verktyg
 
-- **Status:** Replay/live-API, fyra typade read-only tools och första riktiga Gemini-körningen är verifierade
+- **Status:** Story/Engineering View, replay/live-API, fyra typade read-only tools och riktiga Gemini-körningar är verifierade
 - **Senast verifierad:** 25 augusti 2026
 
 Målet är inte att läsa allt innan jag bygger. Jag följer samma korta loop:
@@ -26,7 +26,7 @@ Maven används i stället för Gradle i sprinten. Det finns redan på datorn, fu
 | Nu | Google Gen AI SDK för Java 1.67.0 | Verklig function calling och structured output bakom en liten intern gateway. |
 | Vecka 2 | PostgreSQL och pgvector | Retrieval endast över 10–15 runbooks. |
 | Vecka 2–3 | Strukturerade JSON-loggar och OpenTelemetry | Förklara körningar, fel och latency. |
-| När backendkontraktet är stabilt | React, TypeScript och Vite | Story View och Engineering View. |
+| Nu | React 19, TypeScript och Vite | Story View, Engineering View och beteendetester mot API-kontraktet. |
 | Vecka 4 | Docker och Google Cloud CLI | Containerkontroll och separat godkänd Cloud Run-deploy. |
 
 Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i sprintens kärna. Flödet är den egna, begränsade processen `COLLECT → SYNTHESIZE → VERIFY`.
@@ -36,9 +36,9 @@ Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i s
 - Java 21.0.10 LTS, `javac` 21.0.10 och Maven 3.9.12 finns.
 - Projektet använder Spring Boot 4.1.1 och Maven Wrapper 3.3.4 med Maven 3.9.16.
 - IntelliJ IDEA 2025.3.3, Docker och Google Cloud CLI finns.
-- Hela den nätverksfria Maven-testsuiten har 131 gröna tester.
+- Hela den nätverksfria Maven-testsuiten har 137 gröna tester. Frontend har 7 gröna beteendetester och en godkänd produktionsbuild.
 - Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och `gemini-live-v2`.
-- En korrekt live smoke-körning tog 5 209 ms. Flera provider-timeouts har också observerats; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
+- Två korrekta live smoke-körningar för samma scenario tog cirka 5,1 sekunder. Flera provider-timeouts har också observerats; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
 - PostgreSQL-klienten finns inte globalt. Det blockerar inte dag 1 och installeras inte innan retrievalsteget behöver den.
 
 API-nyckeln finns endast i en Git-ignorerad lokal fil och ska senare ligga som server-side secret. Värdet får aldrig skrivas i repo, dokumentation, frontendkod eller loggar.
@@ -109,7 +109,7 @@ Byggresultat: en lokalt testad container och därefter en separat godkänd deplo
 
 ## Nuvarande kodgrund
 
-Nu finns Spring Boot replay/live-API, domänkontrakt, separat dold `GroundTruth`, deterministisk verifierare, två fixturepaket, Swagger/OpenAPI, fyra typade tools, Gemini-gateway, strict structured output, kostnadsestimat och 131 gröna nätverksfria tester. Frontend, PostgreSQL/pgvector, evalharness, observability och deploy saknas fortfarande.
+Nu finns React Story/Engineering View, säker scenario-lista, klickbar evidens, ärlig replay/live-fallback, Spring Boot replay/live-API, separat dold `GroundTruth`, deterministisk verifierare, två fixturepaket, Swagger/OpenAPI, fyra typade tools, Gemini-gateway, strict structured output och kostnadsestimat. PostgreSQL/pgvector, evalharness, observability, container och deploy saknas fortfarande.
 
 ## Två implementerade startscenarier
 

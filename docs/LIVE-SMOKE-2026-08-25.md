@@ -33,6 +33,25 @@ All incidentdata var syntetisk. API-nyckeln lästes från en Git-ignorerad lokal
 
 Att just denna körning var korrekt betyder inte att modellen har 100 procent accuracy. De misslyckade försöken behålls som failure cases och nästa kvalitetssteg är en portabel evalharness över flera variationer, inte fler handplockade smoke-anrop.
 
+## Livekörning genom Story/Engineering View
+
+Efter att frontend kopplats till API:t kördes payment-timeoutscenariot genom den riktiga bekräftelsedialogen och live-endpointen. Run ID var `8711d460-dd18-4478-b64b-938dd9254e8e`.
+
+- truth label: `Simulated incident — real AI investigation.`
+- root cause: `PAYMENT_TIMEOUT_CONFIG` – korrekt mot dolt facit
+- affected service: `PAYMENT_ADAPTER` – korrekt mot dolt facit
+- diagnosis schema: godkänt
+- citation ID validity: 100 procent
+- evidence precision: 2 av 5 claim-evidence-länkar, alltså 40 procent för denna körning
+- model calls: 3
+- tool calls: 5
+- tokens: 4 834
+- latency: 5 140 ms
+- uppskattat betalt standardlistpris: cirka 0,0034 USD
+- faktisk debitering: inte avläst; kan vara 0 USD på free tier
+
+Detta är ett användbart failure signal trots korrekt rotorsak: modellen hittade rätt diagnos men motiverade flera claims med evidens som inte matchade facitstödet tillräckligt precist. UI:t visar därför 40 procent och texten “this run” i stället för att kalla resultatet 100 procent korrekt. Prompt/tool-retrieval ska jämföras i den planerade evalharnessen innan någon kvalitetsclaim publiceras.
+
 ## Reproducerbart opt-in-kommando
 
 Den vanliga testsuiten gör inga nätverksanrop. Ett live-smoketest måste aktiveras uttryckligen:

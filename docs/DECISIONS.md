@@ -101,9 +101,9 @@ Verifieraren mäter separat:
 
 ## DEC-010 – Story View och Engineering View, inte chain-of-thought
 
-**Status:** Proposed
+**Status:** Accepted, 25 augusti 2026
 
-Story View prioriterar affärspåverkan, tidslinje, rotorsak, bevis och nästa steg. Engineering View visar säkra tool events, evidence IDs, schemas, versions- och körmetadata samt evals. Privat chain-of-thought sparas eller visas inte.
+Story View prioriterar affärspåverkan, tidslinje, rotorsak, bevis och nästa steg. Engineering View visar säkra tool events, evidence IDs, schemas, versions- och körmetadata. Privat chain-of-thought sparas eller visas inte. Recorded replay får spela upp en tydligt märkt färdig verktygssekvens; liveflödet visar inga påhittade tool events medan requesten pågår.
 
 **Varför:** Två målgrupper behöver olika detaljnivå, men ingen behöver modellens privata resonemang.
 

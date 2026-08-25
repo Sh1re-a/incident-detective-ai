@@ -24,8 +24,8 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 | M-11 | API- och billingcheck | Faktisk modellåtkomst är verifierad utan att token eller hemlighet hamnar i repo/logg; kontots framtida billingläge dokumenteras separat | Pågår – liveåtkomst verifierad, billingläge ej verifierat |
 | M-12 | Domänkontrakt | `Scenario`, `Evidence`, `Diagnosis` och separat `GroundTruth` är implementerade och validerade | Klar |
 | M-13 | Två scenariopaket | Två seedade, deterministiska paket har minst två evidenstyper, brus och dolt facit; ett integritetstest stoppar `GroundTruth` från publika scenario- och toolpayloads | Klar |
-| M-14 | Backend och verifierare | Riktig frontend–API-kommunikation samt kontroll av schema, citation IDs och facit fungerar; trasiga modellsvar ger valideringsresultat utan HTTP 500 och `seenEvidenceIds` byggs endast från faktiska tool events | Pågår |
-| M-15 | Recorded Story View | Ett helt fall kan följas på högst 90 sekunder och märks “Simulated incident — recorded deterministic replay.” | Ej startad |
+| M-14 | Backend och verifierare | Riktig frontend–API-kommunikation samt kontroll av schema, citation IDs och facit fungerar; trasiga modellsvar ger valideringsresultat utan HTTP 500 och `seenEvidenceIds` byggs endast från faktiska tool events | Klar |
+| M-15 | Recorded Story View | Ett helt fall kan följas på högst 90 sekunder och märks “Simulated incident — recorded deterministic replay.” | Pågår – flödet är byggt och lokalt verifierat; tidsatt test med person återstår |
 | M-16 | Första liveutredningen | Efter kontraktslås kör ett verkligt modellanrop och läget märks “Simulated incident — real AI investigation.” | Klar |
 
 **Gate 28 augusti:** ett fall förstås på högst 90 sekunder, minst två evidenstyper visas, resultatet är strukturerat, evidence IDs är klickbara och giltiga och replay/live-märkningen är sann.
@@ -39,7 +39,7 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 | M-22 | Structured diagnosis | Java-typer, Jakarta Validation och deterministiska domänregler validerar `diagnosed` eller `insufficient_evidence`, claims och evidence IDs | Klar |
 | M-23 | Runbook retrieval | PostgreSQL/pgvector söker endast i 10–15 runbooks och returnerar citerbar dokument-/chunkmetadata | Ej startad |
 | M-24 | Sex incidentfamiljer | Sex rotorsaksfamiljer återanvänder samma syntetiska webbshop, tjänstekarta, checkout-berättelse och UI; minst tre är valbara i demon | Ej startad |
-| M-25 | Story + Engineering View | Berättelse och tekniska detaljer kan växlas utan att privat chain-of-thought visas | Ej startad |
+| M-25 | Story + Engineering View | Berättelse och tekniska detaljer kan växlas utan att privat chain-of-thought visas | Klar |
 | M-26 | Körmetadata | Run ID, mode, model ID, promptversion, git SHA, latency, tokens, calls och kostnadsestimat sparas | Pågår – git SHA och beständig lagring återstår |
 | M-27 | Grundobservability | Strukturerade JSON-loggar och OpenTelemetry täcker API, verktyg och verifiering utan hemligheter | Ej startad |
 
@@ -65,8 +65,8 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 |---|---|---|---|
 | M-40 | Deploybar container | Frontend/backend körs som avsedd container och kan deployas till Cloud Run | Ej startad |
 | M-41 | Cloud Run | Godkänd deployment använder server-side secrets, budget/rate limits och inga hemligheter i klienten | Ej startad |
-| M-42 | Ärlig replay-fallback | Livefel/timeout leder till tydligt märkt recorded replay, aldrig falsk Live AI-status | Ej startad |
-| M-43 | Tillgänglig kärnresa | Mobil, tangentbord, kontrast, textstatus och reduced motion är kontrollerade | Ej startad |
+| M-42 | Ärlig replay-fallback | Livefel/timeout leder till tydligt märkt recorded replay, aldrig falsk Live AI-status | Pågår – lokalt UI och beteendetest är klara; deployad fallback återstår |
+| M-43 | Tillgänglig kärnresa | Mobil, tangentbord, kontrast, textstatus och reduced motion är kontrollerade | Pågår – responsiv layout, tangentbord, textstatus och reduced motion är lokalt kontrollerade; extern test återstår |
 | M-44 | Användartest | Om deltagare finns: tre tekniska och tre icke-tekniska tester dokumenteras utan fake users | Ej startad |
 | M-45 | Slutdokumentation | README, arkitekturbild, limitations, evalrapport och faktisk mätmetod är reproducerbara | Ej startad |
 | M-46 | Demoartefakter | 60–90 s video och max 10 min presentation visar värde, bevis, begränsningar och lärdomar | Ej startad |
@@ -81,13 +81,13 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 | Diagnosis accuracy | ≥ 15/18 | Ingen eval; 1 lyckad smoke var korrekt |
 | Schema pass | 100 % | Ingen eval; lyckad smoke passerade |
 | Citation ID validity | 100 % | Ingen eval; lyckad smoke passerade |
-| Evidence precision | ≥ 90 % | Ej mätt |
+| Evidence precision | ≥ 90 % | Ingen eval; senaste lyckade UI-smoke gav 40 % för just den körningen |
 | Retrieval Hit@4 | ≥ 90 % | Ej mätt |
 | Korrekta abstentions | ≥ 2 | Ej mätt |
-| Warm p95 | < 30 s | Ej mätt; en lyckad run 5 209 ms, flera timeouts observerade |
+| Warm p95 | < 30 s | Ej mätt; två lyckade runs cirka 5,1 s, flera timeouts observerade |
 | Hard timeout | 45 s | Implementerad och enhetstestad; provider-timeouts observerade |
 | Model/tool calls | ≤ 4 / ≤ 8 | Lyckad smoke: 3 / 5 |
-| Smoke runs | 20 stabila | 1 lyckad live smoke; flera misslyckade timeoutförsök |
+| Smoke runs | 20 stabila | 2 lyckade live smoke-runs; flera misslyckade timeoutförsök |
 
 ## SHOULD – endast efter passerad gate
 
