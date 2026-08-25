@@ -9,9 +9,9 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 | ID | Leverans | Acceptanskriterium | Status |
 |---|---|---|---|
 | M-00 | Projektgrund | README, sprintplan, backlog, beslut och dag‑1‑kontrakt finns; inga hemligheter, licens eller produktkod | Klar |
-| M-01 | Publik versionshantering | `main` finns i publika `Sh1re-a/incident-detective-ai` och URL/visibility är verifierad | Pågår |
+| M-01 | Publik versionshantering | `main` finns i publika `Sh1re-a/incident-detective-ai` och URL/visibility är verifierad | Klar |
 | M-02 | Scope- och kontraktsgranskning | Shirwac har granskat planen, MUST/SHOULD/CUT och dag‑1‑kontrakten innan implementation | Ej startad |
-| M-03 | Publik repo-status | GitHub-repot är publikt och det är dokumenterat att ingen open-source-licens eller deploy har lagts till | Pågår |
+| M-03 | Publik repo-status | GitHub-repot är publikt och det är dokumenterat att ingen open-source-licens eller deploy har lagts till | Klar |
 | M-04 | Veckovisa check-ins | Framsteg, lärande, hinder, beslut och nästa prioriteringar dokumenteras 28 aug, 4 sep, 11 sep och vid finalen 18 sep | Ej startad |
 | M-05 | Klartecken för extern deploy | Shirwac har separat och uttryckligen godkänt Cloud Run-deployen innan den genomförs | Väntar på extern bekräftelse |
 
