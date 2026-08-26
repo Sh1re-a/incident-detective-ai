@@ -1,6 +1,6 @@
 package dev.shirwac.incidentdetective.rag;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -10,10 +10,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Repository
-@ConditionalOnProperty(
-        name = "incident-detective.rag.mode",
-        havingValue = "pgvector"
-)
+@Profile("rag")
 public final class JdbcRunbookVectorStore implements RunbookVectorStore {
 
     private static final String PROFILE_WHERE = """

@@ -20,12 +20,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers(disabledWithoutDocker = true)
-class JdbcRunbookVectorStoreTest {
+class JdbcRunbookVectorStoreIT {
 
     private static final String IMAGE = "pgvector/pgvector:0.8.6-pg17-bookworm";
     private static final String CORPUS_VERSION = "test-corpus-v1";
     private static final RagProperties PROFILE = new RagProperties(
-            "pgvector",
             "gemini-embedding-2",
             768,
             "search-result-v1"

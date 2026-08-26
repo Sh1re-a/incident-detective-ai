@@ -4,7 +4,7 @@ import dev.shirwac.incidentdetective.domain.evidence.RunbookEvidence;
 import dev.shirwac.incidentdetective.investigation.InvestigationData;
 import dev.shirwac.incidentdetective.investigation.InvestigationDataCatalog;
 import dev.shirwac.incidentdetective.investigation.InvestigationScenarioNotFoundException;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
@@ -13,11 +13,7 @@ import java.util.List;
 import java.util.Locale;
 
 @Service
-@ConditionalOnProperty(
-        name = "incident-detective.rag.mode",
-        havingValue = "fixture",
-        matchIfMissing = true
-)
+@Profile("!rag")
 public final class FixtureRunbookRetrievalStrategy
         implements RunbookRetrievalStrategy {
 

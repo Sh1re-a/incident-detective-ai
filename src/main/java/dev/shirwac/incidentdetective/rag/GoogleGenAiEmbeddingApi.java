@@ -9,14 +9,11 @@ import com.google.genai.types.HttpOptions;
 import com.google.genai.types.HttpRetryOptions;
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
 import jakarta.annotation.PreDestroy;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnProperty(
-        name = "incident-detective.rag.mode",
-        havingValue = "pgvector"
-)
+@Profile("rag")
 public final class GoogleGenAiEmbeddingApi implements GeminiEmbeddingApi {
 
     private static final int TIMEOUT_MS = 10_000;

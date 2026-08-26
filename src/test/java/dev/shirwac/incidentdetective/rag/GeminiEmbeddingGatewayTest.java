@@ -92,7 +92,6 @@ class GeminiEmbeddingGatewayTest {
         return new GeminiEmbeddingGateway(
                 api,
                 new RagProperties(
-                        "pgvector",
                         "gemini-embedding-2",
                         DIMENSIONS,
                         "search-result-v1"

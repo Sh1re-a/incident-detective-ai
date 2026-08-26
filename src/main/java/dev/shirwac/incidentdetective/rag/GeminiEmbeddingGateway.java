@@ -5,7 +5,7 @@ import com.google.genai.types.ContentEmbeddingStatistics;
 import com.google.genai.types.EmbedContentConfig;
 import com.google.genai.types.EmbedContentMetadata;
 import com.google.genai.types.EmbedContentResponse;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -13,10 +13,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Component
-@ConditionalOnProperty(
-        name = "incident-detective.rag.mode",
-        havingValue = "pgvector"
-)
+@Profile("rag")
 public final class GeminiEmbeddingGateway implements EmbeddingGateway {
 
     private static final String QUERY_PREFIX = "task: search result | query: ";
