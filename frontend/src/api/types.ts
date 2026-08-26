@@ -136,6 +136,12 @@ export interface Verification {
       supported: boolean;
     }>;
   };
+  claim_coverage: {
+    applicable: boolean;
+    matched_claim_count: number;
+    reference_claim_count: number;
+    score: number | null;
+  };
   diagnosis_correctness: {
     evaluated: boolean;
     diagnosis_applicable: boolean;

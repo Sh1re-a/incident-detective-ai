@@ -193,6 +193,24 @@ export function EngineeringView({
               detail={`${result.verification.evidence_precision.supported_triples}/${result.verification.evidence_precision.total_triples} supported claim-evidence links`}
             />
             <VerificationCard
+              label="Claim coverage"
+              value={
+                result.verification.claim_coverage.applicable &&
+                result.verification.claim_coverage.score !== null
+                  ? `${Math.round(result.verification.claim_coverage.score * 100)}% this run`
+                  : "Not applicable"
+              }
+              passed={
+                !result.verification.claim_coverage.applicable ||
+                result.verification.claim_coverage.score === 1
+              }
+              detail={
+                result.verification.claim_coverage.applicable
+                  ? `${result.verification.claim_coverage.matched_claim_count}/${result.verification.claim_coverage.reference_claim_count} hidden-reference claims matched`
+                  : "No reference claims apply to this result"
+              }
+            />
+            <VerificationCard
               label="Root cause"
               value={
                 result.diagnosis.status === "insufficient_evidence"

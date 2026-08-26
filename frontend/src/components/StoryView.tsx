@@ -348,9 +348,12 @@ function DiagnosisPanel({
   const abstained = diagnosis.status === "insufficient_evidence";
   const correct = diagnosisResultCorrect(result);
   const precision = result.verification.evidence_precision;
+  const coverage = result.verification.claim_coverage;
+  const coveragePassed = !coverage.applicable || coverage.score === 1;
   const evidenceProofPassed =
     result.verification.citation_validity.valid &&
     (!precision.applicable || precision.score === 1);
+  const verificationProofPassed = evidenceProofPassed && coveragePassed;
   const unknownEvidenceIds = new Set(
     result.verification.citation_validity.unknown_evidence_ids,
   );
@@ -366,7 +369,7 @@ function DiagnosisPanel({
   );
   const verdictTone = rejected
     ? "rejected"
-    : abstained || (correct && !evidenceProofPassed)
+    : abstained || (correct && !verificationProofPassed)
       ? "safe"
       : "verified";
 
@@ -378,11 +381,11 @@ function DiagnosisPanel({
             ? "Rejected by verifier"
             : abstained
               ? "Safe abstention"
-              : correct && evidenceProofPassed
+              : correct && verificationProofPassed
                 ? "Verified for this run"
                 : correct
-                  ? "Diagnosis matched · evidence support incomplete"
-                : "Verification finding"}
+                  ? "Diagnosis matched · verification incomplete"
+                  : "Verification finding"}
         </span>
         <span className="mode-label">
           {result.mode === "live_ai" ? "Live AI" : "Recorded replay"}
@@ -476,6 +479,15 @@ function DiagnosisPanel({
                 : "Not applicable"
           }
           passed={evidenceProofPassed}
+        />
+        <ProofItem
+          label="Answer coverage"
+          value={
+            coverage.applicable
+              ? `${coverage.matched_claim_count}/${coverage.reference_claim_count} key facts`
+              : "Not applicable"
+          }
+          passed={coveragePassed}
         />
         <ProofItem
           label="Hidden answer"

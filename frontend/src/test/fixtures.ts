@@ -118,6 +118,12 @@ export const recordedResult: RecordedReplayResult = {
         },
       ],
     },
+    claim_coverage: {
+      applicable: true,
+      matched_claim_count: 1,
+      reference_claim_count: 1,
+      score: 1,
+    },
     diagnosis_correctness: {
       evaluated: true,
       diagnosis_applicable: true,

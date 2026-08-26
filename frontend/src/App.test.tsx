@@ -87,7 +87,7 @@ describe("Incident Detective experience", () => {
     ).toBeVisible();
     expect(screen.getByText("Recorded events", { exact: true })).toBeVisible();
     expect(screen.queryByText("Tool calls", { exact: true })).not.toBeInTheDocument();
-    expect(screen.getByText("100% this run")).toBeVisible();
+    expect(screen.getAllByText("100% this run").length).toBeGreaterThanOrEqual(2);
     expect(
       screen.getByText(/They are not an eval-set accuracy claim/),
     ).toBeVisible();
@@ -287,11 +287,42 @@ describe("Incident Detective experience", () => {
     await user.click(screen.getByRole("button", { name: "Confirm live run" }));
 
     expect(
-      await screen.findByText("Diagnosis matched · evidence support incomplete"),
+      await screen.findByText("Diagnosis matched · verification incomplete"),
     ).toBeVisible();
     expect(screen.queryByText("Verified for this run")).not.toBeInTheDocument();
     expect(screen.getByText("0/1 direct")).toBeVisible();
     expect(screen.getByText(/not direct support/)).toBeVisible();
+  });
+
+  it("does not call incomplete claim coverage verified", async () => {
+    const incompleteResult: LiveInvestigationResult = {
+      ...liveResult,
+      verification: {
+        ...liveResult.verification,
+        claim_coverage: {
+          applicable: true,
+          matched_claim_count: 4,
+          reference_claim_count: 5,
+          score: 0.8,
+        },
+      },
+    };
+    installApiMock({ liveResponse: incompleteResult });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Run live AI" }));
+    await user.click(screen.getByRole("button", { name: "Confirm live run" }));
+
+    expect(
+      await screen.findByText("Diagnosis matched · verification incomplete"),
+    ).toBeVisible();
+    expect(screen.queryByText("Verified for this run")).not.toBeInTheDocument();
+    expect(screen.getByText("4/5 key facts")).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "Engineering View" }));
+    expect(screen.getByText("80% this run")).toBeVisible();
+    expect(screen.getByText("4/5 hidden-reference claims matched")).toBeVisible();
   });
 
   it("explains the learning project and supports keyboard view navigation", async () => {
