@@ -14,14 +14,24 @@ class GeminiCostEstimatorTest {
     private final GeminiCostEstimator estimator = new GeminiCostEstimator();
 
     @Test
-    void estimatesFlashLiteFromItsPaidStandardTokenPrices() {
+    void estimatesTheDefaultFlashLiteFromItsPaidStandardTokenPrices() {
+        ModelCostEstimate estimate = estimator.estimate(
+                "gemini-3.1-flash-lite",
+                new ModelTokenUsage(1_000_000, 1_000_000, 2_000_000)
+        );
+
+        assertEquals(new BigDecimal("1.75000000"), estimate.estimatedUsd());
+        assertTrue(estimate.basis().contains("free-tier charge may be USD 0"));
+    }
+
+    @Test
+    void keepsTheMeasuredFlashLiteComparisonPrice() {
         ModelCostEstimate estimate = estimator.estimate(
                 "gemini-3.5-flash-lite",
                 new ModelTokenUsage(1_000_000, 1_000_000, 2_000_000)
         );
 
         assertEquals(new BigDecimal("2.80000000"), estimate.estimatedUsd());
-        assertTrue(estimate.basis().contains("free-tier charge may be USD 0"));
     }
 
     @Test

@@ -11,12 +11,13 @@ import java.util.Map;
 public final class GeminiCostEstimator {
 
     static final String PAID_LIST_PRICE_BASIS =
-            "Gemini paid standard list price checked 2026-08-25; "
+            "Gemini paid standard list price checked 2026-08-26; "
                     + "actual free-tier charge may be USD 0.";
     private static final String UNKNOWN_PRICE_BASIS =
             "No paid list-price estimate is configured for this model.";
     private static final BigDecimal ONE_MILLION = new BigDecimal("1000000");
     private static final Map<String, Pricing> PRICES = Map.of(
+            "gemini-3.1-flash-lite", new Pricing("0.25", "1.50"),
             "gemini-3.5-flash-lite", new Pricing("0.30", "2.50"),
             "gemini-3.6-flash", new Pricing("0.75", "3.75"),
             "gemini-3.7-flash", new Pricing("0.75", "3.75")
