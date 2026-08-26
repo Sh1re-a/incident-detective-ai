@@ -9,12 +9,14 @@ public record VerificationReport(
         boolean groundTruthSchemaPass,
         CitationValidity citationValidity,
         EvidencePrecision evidencePrecision,
+        ClaimCoverage claimCoverage,
         DiagnosisCorrectness diagnosisCorrectness,
         List<VerificationErrorCode> hardErrors
 ) {
     public VerificationReport {
         Objects.requireNonNull(citationValidity, "citationValidity must not be null");
         Objects.requireNonNull(evidencePrecision, "evidencePrecision must not be null");
+        Objects.requireNonNull(claimCoverage, "claimCoverage must not be null");
         Objects.requireNonNull(diagnosisCorrectness, "diagnosisCorrectness must not be null");
         Objects.requireNonNull(hardErrors, "hardErrors must not be null");
         hardErrors = List.copyOf(hardErrors);

@@ -102,6 +102,14 @@ class LiveInvestigationApiTest {
                 .andExpect(jsonPath("$.model_id").value("gemini-test"))
                 .andExpect(jsonPath("$.model_call_count").value(2))
                 .andExpect(jsonPath("$.tool_call_count").value(0))
+                .andExpect(jsonPath(
+                        "$.verification.claim_coverage.matched_claim_count"
+                ).value(0))
+                .andExpect(jsonPath(
+                        "$.verification.claim_coverage.reference_claim_count"
+                ).value(5))
+                .andExpect(jsonPath("$.verification.claim_coverage.score")
+                        .value(0.0))
                 .andExpect(jsonPath("$.estimated_cost_usd").doesNotExist())
                 .andExpect(jsonPath("$.estimated_cost_basis").value(
                         "No paid list-price estimate is configured for this model."
@@ -113,6 +121,7 @@ class LiveInvestigationApiTest {
         assertFalse(json.contains("\"ground_truth\":"));
         assertFalse(json.contains("claim_support"));
         assertFalse(json.contains("allowed_evidence_ids"));
+        assertFalse(json.contains("\"expected_claims\""));
         assertFalse(json.contains("cpt-v1-log-inventory-noise"));
     }
 
@@ -170,6 +179,14 @@ class LiveInvestigationApiTest {
                         .value(true))
                 .andExpect(jsonPath("$.verification.evidence_precision.score")
                         .value(1.0))
+                .andExpect(jsonPath(
+                        "$.verification.claim_coverage.matched_claim_count"
+                ).value(4))
+                .andExpect(jsonPath(
+                        "$.verification.claim_coverage.reference_claim_count"
+                ).value(5))
+                .andExpect(jsonPath("$.verification.claim_coverage.score")
+                        .value(0.8))
                 .andExpect(jsonPath("$.verification.hard_errors.length()")
                         .value(0))
                 .andExpect(jsonPath("$.comparison.root_cause_correct")
@@ -190,6 +207,7 @@ class LiveInvestigationApiTest {
         assertFalse(json.contains("test-only-key"));
         assertFalse(json.contains("\"ground_truth\":"));
         assertFalse(json.contains("allowed_evidence_ids"));
+        assertFalse(json.contains("\"expected_claims\""));
         assertFalse(json.contains("cpt-v1-log-inventory-noise"));
     }
 

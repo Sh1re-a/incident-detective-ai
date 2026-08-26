@@ -218,6 +218,19 @@ class OpenApiDocumentationTest {
                                 + ".items['$ref']"
                 ).value("#/components/schemas/CitationSupportResult"))
                 .andExpect(jsonPath(
+                        "$.components.schemas.VerificationReport.properties.claim_coverage"
+                                + "['$ref']"
+                ).value("#/components/schemas/ClaimCoverage"))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ClaimCoverage.properties.matched_claim_count"
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.ClaimCoverage.properties.reference_claim_count"
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.ClaimCoverage.properties.expected_claims"
+                ).doesNotExist())
+                .andExpect(jsonPath(
                         "$.components.schemas.LiveInvestigationResult"
                                 + ".properties.estimated_cost_basis"
                 ).exists())

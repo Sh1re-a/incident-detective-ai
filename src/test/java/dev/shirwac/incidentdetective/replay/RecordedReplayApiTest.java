@@ -97,6 +97,16 @@ class RecordedReplayApiTest {
                 .andExpect(jsonPath("$.verification.diagnosis_schema_pass").value(true))
                 .andExpect(jsonPath("$.verification.citation_validity.valid").value(true))
                 .andExpect(jsonPath("$.verification.evidence_precision.score").value(1.0))
+                .andExpect(jsonPath("$.verification.claim_coverage.applicable")
+                        .value(true))
+                .andExpect(jsonPath(
+                        "$.verification.claim_coverage.matched_claim_count"
+                ).value(5))
+                .andExpect(jsonPath(
+                        "$.verification.claim_coverage.reference_claim_count"
+                ).value(5))
+                .andExpect(jsonPath("$.verification.claim_coverage.score")
+                        .value(1.0))
                 .andExpect(jsonPath(
                         "$.verification.evidence_precision.citation_support[0]"
                                 + ".claim_code"

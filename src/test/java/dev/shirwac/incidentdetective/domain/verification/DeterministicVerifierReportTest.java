@@ -37,6 +37,9 @@ class DeterministicVerifierReportTest {
         assertEquals(2, report.evidencePrecision().supportedTriples());
         assertEquals(2, report.evidencePrecision().totalTriples());
         assertEquals(1.0, report.evidencePrecision().score(), TOLERANCE);
+        assertEquals(2, report.claimCoverage().matchedClaimCount());
+        assertEquals(2, report.claimCoverage().referenceClaimCount());
+        assertEquals(1.0, report.claimCoverage().score(), TOLERANCE);
         assertTrue(report.diagnosisCorrectness().rootCauseCorrect());
         assertTrue(report.diagnosisCorrectness().affectedServiceCorrect());
         assertTrue(report.hardErrors().isEmpty());
@@ -87,6 +90,7 @@ class DeterministicVerifierReportTest {
         assertTrue(report.groundTruthSchemaPass());
         assertTrue(report.citationValidity().valid());
         assertEquals(0.0, report.evidencePrecision().score(), TOLERANCE);
+        assertEquals(0.0, report.claimCoverage().score(), TOLERANCE);
         assertFalse(report.diagnosisCorrectness().evaluated());
         assertEquals(
                 List.of(VerificationErrorCode.DIAGNOSIS_SCHEMA_INVALID),
@@ -115,6 +119,7 @@ class DeterministicVerifierReportTest {
         assertTrue(report.diagnosisSchemaPass());
         assertFalse(report.groundTruthSchemaPass());
         assertFalse(report.evidencePrecision().applicable());
+        assertFalse(report.claimCoverage().applicable());
         assertFalse(report.diagnosisCorrectness().evaluated());
         assertEquals(
                 List.of(VerificationErrorCode.GROUND_TRUTH_SCHEMA_INVALID),

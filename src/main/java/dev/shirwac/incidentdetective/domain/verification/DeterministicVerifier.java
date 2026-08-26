@@ -4,6 +4,7 @@ import dev.shirwac.incidentdetective.domain.diagnosis.Claim;
 import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
 import dev.shirwac.incidentdetective.domain.groundtruth.ClaimSupport;
+import dev.shirwac.incidentdetective.domain.groundtruth.ExpectedClaim;
 import dev.shirwac.incidentdetective.domain.groundtruth.GroundTruth;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -53,17 +54,23 @@ public final class DeterministicVerifier {
         }
 
         EvidencePrecision evidencePrecision;
+        ClaimCoverage claimCoverage;
         DiagnosisCorrectness diagnosisCorrectness;
         if (!groundTruthSchemaValid) {
             evidencePrecision = EvidencePrecision.notApplicable();
+            claimCoverage = ClaimCoverage.notApplicable();
             diagnosisCorrectness = DiagnosisCorrectness.notEvaluated();
         } else if (!diagnosisSchemaValid) {
             evidencePrecision = groundTruth.expectedStatus() == DiagnosisStatus.DIAGNOSED
                     ? EvidencePrecision.scored(List.of())
                     : EvidencePrecision.notApplicable();
+            claimCoverage = groundTruth.expectedClaims().isEmpty()
+                    ? ClaimCoverage.notApplicable()
+                    : ClaimCoverage.scored(0, groundTruth.expectedClaims().size());
             diagnosisCorrectness = DiagnosisCorrectness.notEvaluated();
         } else {
             evidencePrecision = scoreEvidencePrecision(diagnosis, groundTruth);
+            claimCoverage = scoreClaimCoverage(diagnosis, groundTruth);
             diagnosisCorrectness = verifyDiagnosis(diagnosis, groundTruth);
         }
 
@@ -72,6 +79,7 @@ public final class DeterministicVerifier {
                 groundTruthSchemaValid,
                 citationValidity,
                 evidencePrecision,
+                claimCoverage,
                 diagnosisCorrectness,
                 hardErrors
         );
@@ -128,6 +136,39 @@ public final class DeterministicVerifier {
                 .toList();
 
         return EvidencePrecision.scored(citationSupport);
+    }
+
+    ClaimCoverage scoreClaimCoverage(
+            Diagnosis diagnosis,
+            GroundTruth groundTruth
+    ) {
+        Objects.requireNonNull(diagnosis, "diagnosis must not be null");
+        Objects.requireNonNull(groundTruth, "groundTruth must not be null");
+
+        if (groundTruth.expectedClaims() == null || groundTruth.expectedClaims().isEmpty()) {
+            return ClaimCoverage.notApplicable();
+        }
+
+        Set<ClaimKey> referenceClaims = groundTruth.expectedClaims().stream()
+                .filter(Objects::nonNull)
+                .map(this::claimKey)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        Set<ClaimKey> modelClaims = diagnosis.claims() == null
+                ? Set.of()
+                : diagnosis.claims().stream()
+                        .filter(Objects::nonNull)
+                        .filter(claim -> claim.claimCode() != null)
+                        .filter(claim -> claim.claimValueCode() != null)
+                        .map(claim -> new ClaimKey(
+                                claim.claimCode(),
+                                claim.claimValueCode()
+                        ))
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+
+        int matchedClaims = (int) referenceClaims.stream()
+                .filter(modelClaims::contains)
+                .count();
+        return ClaimCoverage.scored(matchedClaims, referenceClaims.size());
     }
 
     DiagnosisCorrectness verifyDiagnosis(
@@ -222,6 +263,13 @@ public final class DeterministicVerifier {
                     .addAll(support.allowedEvidenceIds());
         }
         return Map.copyOf(allowedEvidenceByClaim);
+    }
+
+    private ClaimKey claimKey(ExpectedClaim expectedClaim) {
+        return new ClaimKey(
+                expectedClaim.claimCode(),
+                expectedClaim.claimValueCode()
+        );
     }
 
     private static final class DefaultValidatorHolder {
