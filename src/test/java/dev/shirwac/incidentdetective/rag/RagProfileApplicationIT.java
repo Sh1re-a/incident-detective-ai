@@ -51,7 +51,7 @@ class RagProfileApplicationIT {
         assertEquals("0.8.6", jdbc.sql("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
                 .query(String.class)
                 .single());
-        assertEquals("2", flyway.info().current().getVersion().getVersion());
+        assertEquals("3", flyway.info().current().getVersion().getVersion());
         assertEquals(0L, jdbc.sql("SELECT COUNT(*) FROM runbook_embeddings")
                 .query(Long.class)
                 .single());
