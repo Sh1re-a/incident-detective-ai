@@ -4,6 +4,17 @@ Backloggen är ordnad efter de fyra veckogatesen. **MUST** är sprintens kontrak
 
 Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse`.
 
+## Omedelbar byggordning
+
+1. Lås prompt v5 och Swagger med hela testsviten och en enda representativ live-smoke. **Klar 26 augusti.**
+2. Bygg en fristående, versionshanterad runbookkorpus och riktig PostgreSQL/pgvector-retrieval. **Nästa.**
+3. Mät retrieval på 10 positiva frågor och två negativa frågor innan fler incidentfamiljer byggs.
+4. Utöka därefter till sex familjer och 18 fulla evalfall, inklusive abstention och adversarial runbook.
+5. Lägg på körpersistens, git SHA, JSON-loggar och OpenTelemetry när AI-flödet är mätbart.
+6. Bygg CI och container före separat godkänd Cloud Run-deploy.
+
+Denna ordning stoppar UI-polish, modelljämförelser och fler ramverk från att tränga undan de bevis som fortfarande saknas.
+
 ## Grundfas – före produktkod
 
 | ID | Leverans | Acceptanskriterium | Status |
@@ -37,11 +48,11 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 | M-20 | Fyra typade read-only tools | `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks` är scenarioavgränsade, skrivskyddade och testade | Klar |
 | M-21 | Begränsad state machine | `COLLECT → SYNTHESIZE → VERIFY` har högst två collection-rundor, tre model/åtta tool calls, två per tooltyp, högst tre calls per runda, tool-free synthesis och 45 s timeout | Klar |
 | M-22 | Structured diagnosis | Java-typer, Jakarta Validation och deterministiska domänregler validerar `diagnosed` eller `insufficient_evidence`, claims och evidence IDs | Klar |
-| M-23 | Runbook retrieval | PostgreSQL/pgvector söker endast i 10–15 runbooks och returnerar citerbar dokument-/chunkmetadata | Ej startad |
+| M-23 | Runbook retrieval | En fristående korpus med 10–15 syntetiska runbooks indexeras med `gemini-embedding-2` i 768 dimensioner; PostgreSQL/pgvector gör exakt cosine-sökning med top-k ≤ 4 och returnerar dokument, chunk, version, rank, similarity, embeddingmodell och backend | Ej startad – dagens tool gör endast lokal keyword matching |
 | M-24 | Sex incidentfamiljer | Sex rotorsaksfamiljer återanvänder samma syntetiska webbshop, tjänstekarta, checkout-berättelse och UI; minst tre är valbara i demon | Ej startad |
 | M-25 | Story + Engineering View | Berättelse och tekniska detaljer kan växlas utan att privat chain-of-thought visas | Klar |
-| M-26 | Körmetadata | Run ID, mode, model ID, promptversion, git SHA, latency, tokens, calls och kostnadsestimat sparas | Pågår – git SHA och beständig lagring återstår |
-| M-27 | Grundobservability | Strukturerade JSON-loggar och OpenTelemetry täcker API, verktyg och verifiering utan hemligheter | Ej startad |
+| M-26 | Körmetadata | Run ID, mode, model ID, promptversion, embeddingmodell, korpusversion, retrieval-backend, git SHA, latency, tokens, calls och kostnadsestimat sparas | Pågår – retrievalmetadata, git SHA och beständig lagring återstår |
+| M-27 | Grundobservability | Strukturerade JSON-loggar och OpenTelemetry täcker API → collect → tool → synthesize → verify utan nycklar, råa prompts eller privat chain-of-thought | Ej startad |
 
 **Gate 4 september:** liveutredningen fungerar och Engineering View visar tools, retrieval, evidens och körmetadata.
 
@@ -52,9 +63,9 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 | M-30 | 18 evalfall | Sex familjer × tre variationer, med separata development- och held-out-fall | Ej startad |
 | M-31 | Baseline | Symptom-only baseline och full utredning körs mot samma relevanta fall | Ej startad |
 | M-32 | Tre separata verifieringar | Citation validity, evidence support/precision och diagnosis correctness mäts var för sig | Klar |
-| M-33 | Retrievalmått | Hit@4 mäts mot förväntad runbookkälla/chunk för relevanta fall | Ej startad |
-| M-34 | Säkerhets-/abstentionfall | Minst två fall kräver korrekt abstention och ett runbookfall innehåller prompt-injection-liknande text | Ej startad |
-| M-35 | Portabel evalrapport | Samma kommando fungerar lokalt/CI och redovisar accuracy, citations, retrieval, latency, calls och kostnad | Ej startad |
+| M-33 | Retrievalmått | Minst 10 positiva retrievalfrågor mäter Hit@4 mot exakt dokument/chunk/version; två no-result-fall redovisas separat och målet ≥ 90 % betyder minst 9/10 | Ej startad |
+| M-34 | Säkerhets-/abstentionfall | Minst två fall kräver korrekt abstention; ett adversarial runbook hämtas faktiskt i topp 4 men får inte styra diagnos, bli incidentbevis eller kringgå mänskligt godkännande | Ej startad |
+| M-35 | Portabel evalrapport | Samma kommando skapar JSON- och Markdownrapport lokalt/CI med accuracy, schema, citations, retrieval, latency, calls, kostnad, datasetversion och git SHA; vanlig CI gör inga betalda liveanrop | Ej startad |
 | M-36 | Failure cases | Alla verkligt observerade missar och kända begränsningar dokumenteras; inget minimiantal eller konstruerad miss krävs | Ej startad |
 
 **Gate 11 september:** evalrapporten är reproducerbar, publika claims har mätstöd och feature freeze börjar.
@@ -63,8 +74,8 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 
 | ID | Leverans | Acceptanskriterium | Status |
 |---|---|---|---|
-| M-40 | Deploybar container | Frontend/backend körs som avsedd container och kan deployas till Cloud Run | Ej startad |
-| M-41 | Cloud Run | Godkänd deployment använder server-side secrets, budget/rate limits och inga hemligheter i klienten | Ej startad – appens per-instansgräns är byggd; Cloud Run, server-side secrets och budgetlarm återstår |
+| M-40 | Deploybar container | En multi-stage-container bygger frontend/backend, kör som non-root, lyssnar på `$PORT`, har healthcheck och innehåller inga hemligheter | Ej startad |
+| M-41 | Cloud Run | Godkänd deployment använder Secret Manager, låg max-instances/concurrency, persistent global livegräns och budgetlarm; larm beskrivs ärligt som varning och inte hårt kostnadstak | Ej startad – appens per-instansgräns är byggd; Cloud Run, globala gränser och budgetlarm återstår |
 | M-42 | Ärlig replay-fallback | Livefel/timeout leder till tydligt märkt recorded replay, aldrig falsk Live AI-status | Pågår – lokalt UI och beteendetest är klara; deployad fallback återstår |
 | M-43 | Tillgänglig kärnresa | Mobil, tangentbord, kontrast, textstatus och reduced motion är kontrollerade | Pågår – responsiv layout, tangentbord, textstatus och reduced motion är lokalt kontrollerade; extern test återstår |
 | M-44 | Användartest | Om deltagare finns: tre tekniska och tre icke-tekniska tester dokumenteras utan fake users | Ej startad |
@@ -78,16 +89,16 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 
 | Mätetal | Mål | Nuläge |
 |---|---:|---|
-| Diagnosis accuracy | ≥ 15/18 | Ingen eval; 2 aktuella v4-smokes, ett per scenario, var korrekta |
-| Schema pass | 100 % | Ingen eval; båda aktuella v4-smokes passerade |
-| Citation ID validity | 100 % | Ingen eval; båda aktuella v4-smokes hade 100 % giltiga IDs |
-| Evidence precision | ≥ 90 % | Ingen eval; båda aktuella v4-smokes gav 5/5, medan äldre smokes gav 40–60 % |
+| Diagnosis accuracy | ≥ 15/18 | Ingen eval; senaste v5-smoken var korrekt men är bara ett fall |
+| Schema pass | 100 % | Ingen eval; senaste v5-smoken passerade |
+| Citation ID validity | 100 % | Ingen eval; senaste v5-smoken hade 100 % giltiga IDs |
+| Evidence precision | ≥ 90 % | Ingen eval; senaste v5-smoken gav 5/5 efter att en v4-regression gav 3/5 |
 | Retrieval Hit@4 | ≥ 90 % | Ej mätt |
 | Korrekta abstentions | ≥ 2 | Ej mätt |
-| Warm p95 | < 30 s | Ej mätt; två aktuella v4-runs tog 4,55 och 5,50 s, äldre timeouts är dokumenterade |
+| Warm p95 | < 30 s | Ej mätt; senaste v5-smoken tog 4,96 s, men historiken innehåller långsammare körningar och timeouts |
 | Hard timeout | 45 s | Implementerad och enhetstestad; provider-timeouts observerade |
-| Model/tool calls | ≤ 4 / ≤ 8 | Båda aktuella v4-smokes: 3 / 5 |
-| Smoke runs | 20 stabila | 2/20 aktuella v4 UI-smokes; äldre blandade resultat och timeouts behålls |
+| Model/tool calls | ≤ 4 / ≤ 8 | Senaste v5-smoken: 3 / 4 |
+| Smoke runs | 20 stabila | 0/20 release-smokes; flera utvecklingssmokes behålls som historik |
 
 ## SHOULD – endast efter passerad gate
 

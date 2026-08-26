@@ -3,7 +3,7 @@
 - **Period:** tisdag 25 augusti–fredag 18 september 2026
 - **Projekt:** SALT Sprint 3 – The Passion Project
 - **Omfattning:** cirka 95–115 fokuserade timmar
-- **Dokumentstatus:** version 1.1 för granskning, 25 augusti 2026
+- **Dokumentstatus:** version 1.2 granskad, 26 augusti 2026
 
 ## Problemet jag vill arbeta med
 
@@ -59,7 +59,7 @@ För en icke-teknisk person ska värdet gå att förstå inom 30–60 sekunder o
 
 Följande är **release targets, inte uppnådda resultat**:
 
-| Mål till release | Status 24 aug |
+| Mål till release | Nuläge vid sprintstart |
 |---|---|
 | Minst 15 av 18 korrekta diagnoser | Ej mätt |
 | 100 % schema pass | Ej mätt |
@@ -107,7 +107,7 @@ Jag börjar med berättelsen och kontrakten, inte med en snygg webbplats.
 - Implementera `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks` som typade read-only tools.
 - Lägga 10–15 kuraterade runbooks i PostgreSQL/pgvector med citerbar källmetadata.
 - Bygga den begränsade `COLLECT → SYNTHESIZE → VERIFY`-processen.
-- Hålla körningen till högst tre collection-rundor, fyra modellanrop, åtta tool calls, två anrop per verktygstyp, tre parallella read-only-anrop och 45 sekunder. Sista synthesis-rundan saknar tools och följs bara av deterministisk verifiering.
+- Hålla körningen under planens yttersta tak: högst tre collection-rundor, fyra modellanrop, åtta tool calls, två anrop per verktygstyp, tre parallella read-only-anrop och 45 sekunder. Den nuvarande implementationen är striktare med högst två collection-rundor och tre modellanrop. Sista synthesis-rundan saknar tools och följs bara av deterministisk verifiering.
 - Utöka till sex rotorsaksfamiljer inom samma syntetiska webbshop, tjänstekarta, checkout-berättelse och UI. Minst tre kan visas i den publika demon.
 - Spara model ID, promptversion, git SHA, latens, tokens och kostnadsestimat per körning.
 
