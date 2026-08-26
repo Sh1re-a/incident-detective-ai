@@ -77,13 +77,13 @@ Det aktuella liveflödet använder Gemini Developer API genom den officiella Jav
 
 ## DEC-008 – RAG endast för runbooks
 
-**Status:** Accepted design, not implemented, updated 26 augusti 2026
+**Status:** Accepted and implemented for retrieval v1, updated 26 augusti 2026
 
-PostgreSQL/pgvector ska användas för en fristående korpus med 10–15 ostrukturerade runbooks. Metrics, logs och traces nås genom sina typade tools och läggs inte i vector store. Korpusen bäddas in med `gemini-embedding-2` i 768 dimensioner och söks med exakt cosine distance; ett approximate index behövs inte för denna lilla datamängd.
+PostgreSQL/pgvector används för en fristående korpus med 10 ostrukturerade runbooks och 12 chunks. Metrics, logs och traces nås genom sina typade tools och läggs inte i vector store. Korpusen bäddas in med `gemini-embedding-2` i 768 dimensioner och söks med exakt cosine distance; ett approximate index behövs inte för denna lilla datamängd.
 
 **Varför:** Retrieval löser ett verkligt textproblem utan att göra all telemetri otydlig eller svår att verifiera.
 
-**Konsekvens:** Runbookresultat måste ha dokument-, chunk- och versionsmetadata samt rank, similarity, embeddingmodell, innehållshash, korpusversion och retrieval-backend. Ett märkt live-RAG-flöde får inte tyst falla tillbaka till keyword matching. Hit@4 mäts på minst 10 positiva frågor; två no-result-frågor redovisas separat. Dagens scenarioförvalda keyword-sökning är endast en övergång och får inte beskrivas som RAG.
+**Konsekvens:** Import är ett explicit och idempotent kommando; vanlig uppstart gör inga embedding-anrop. RAG-profilen vägrar retrieval om antal eller innehållshash inte matchar aktuell korpus och faller aldrig tyst tillbaka till keyword matching. Runbookresultat visar dokument-, chunk- och versionsmetadata samt rank, similarity, embeddingmodell, innehållshash, korpusversion och retrieval-backend. Tröskeln kalibreras endast på development. Retrieval v1 gav 5/5 development och 4/5 held-out Hit@4, medan tre no-match-fall gav 3/3. Den missade held-out-frågan och unsafe top-1 behålls som öppet kvalitetsproblem.
 
 ## DEC-009 – Tre olika verifieringsfrågor
 
@@ -109,23 +109,23 @@ Story View prioriterar affärspåverkan, tidslinje, rotorsak, bevis och nästa s
 
 ## DEC-011 – Portabel evalharness
 
-**Status:** Accepted design, not implemented, updated 26 augusti 2026
+**Status:** Accepted; retrieval slice implemented, full harness pending, updated 26 augusti 2026
 
 Evals ska kunna köras med lokala/CI-kommandon över versionshanterade fixtures och deterministiska scorers.
 
 **Varför:** Utvärderingen ska överleva leverantörsförändringar och vara reproducerbar för en teknisk granskare.
 
-**Konsekvens:** Ingen avvecklad provider-hostad Evals API-funktion får vara kritisk väg. Samma versionshanterade fall ska kunna ge JSON- och Markdownrapport. Vanlig CI kör deterministiska scorers och retrievaltest utan betalda generativa anrop; en live-eval kräver explicit opt-in och redovisar modell, prompt, embeddingmodell, datasetversion och git SHA.
+**Konsekvens:** Ingen avvecklad provider-hostad Evals API-funktion får vara kritisk väg. Retrieval v1 har ett explicit lokalt kommando som ger JSON- och Markdownrapport med development/held-out, tröskel, rank, similarity, corpus/dataset-hash, embeddingprofil, nullable provider-usage, latency och git SHA. Vanlig CI kör deterministiska scorers utan betalda provideranrop; den explicita retrieval-evalen gör riktiga embeddings. Den fulla diagnos-evalen ska även identifiera modellprofil, prompt, diagnosschema och git SHA. När dataset, prompt, schema, korpus, chunkning, embeddingkonfiguration eller scorer ändras behandlas tidigare resultat som historiska tills relevant evalsvit har körts igen.
 
 ## DEC-012 – JSON-loggar och OpenTelemetry först
 
 **Status:** Accepted design, not implemented, updated 26 augusti 2026
 
-Systemet använder strukturerade JSON-loggar och OpenTelemetry för API-, tool- och verifieringsspår. Langfuse läggs bara till om ett konkret gap finns efter kärnflödet.
+Systemet ska använda strukturerade JSON-loggar och OpenTelemetry för API-, tool- och verifieringsspår. Detta är ännu inte implementerat. Langfuse läggs bara till om ett konkret gap finns efter kärnflödet.
 
 **Varför:** Observability ska förklara beteende utan att bli ett eget projekt.
 
-**Konsekvens:** Hemligheter, rå promptdata med känsligt innehåll och privat chain-of-thought loggas inte. Trace-strukturen ska minst kunna följas som API → collect → tool → synthesize → verify, och test ska visa att saneringen gäller.
+**Konsekvens:** Telemetrin ska använda en uttrycklig allowlist. API-nycklar, råa prompts, providerresponser, full evidenstext, tool arguments, `GroundTruth` och privat chain-of-thought får inte loggas. Trace-strukturen ska minst kunna följas som API → collect → tool → synthesize → verify, och test ska visa att saneringen gäller. Observability får inte beskrivas som implementerad innan både spans och sanering har verifierats.
 
 ## DEC-013 – Cloud Run med server-side secrets
 

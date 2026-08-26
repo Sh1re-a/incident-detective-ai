@@ -7,9 +7,9 @@ Statusvärden: `Klar`, `Pågår`, `Ej startad`, `Väntar på extern bekräftelse
 ## Omedelbar byggordning
 
 1. Lås prompt v5 och Swagger med hela testsviten och en enda representativ live-smoke. **Klar 26 augusti.**
-2. Bygg en fristående, versionshanterad runbookkorpus och riktig PostgreSQL/pgvector-retrieval. **Nästa.**
-3. Mät retrieval på 10 positiva frågor och två negativa frågor innan fler incidentfamiljer byggs.
-4. Utöka därefter till sex familjer och 18 fulla evalfall, inklusive abstention och adversarial runbook.
+2. Bygg en fristående, versionshanterad runbookkorpus och riktig PostgreSQL/pgvector-retrieval. **Klar 26 augusti.**
+3. Mät retrieval på 10 positiva frågor och minst två negativa frågor innan fler incidentfamiljer byggs. **Klar 26 augusti; held-out-missen är dokumenterad.**
+4. Utöka nu till sex familjer och 18 fulla evalfall, inklusive abstention och ett separat synthesis-test med den adversarial runbook som redan hämtats.
 5. Lägg på körpersistens, git SHA, JSON-loggar och OpenTelemetry när AI-flödet är mätbart.
 6. Bygg CI och container före separat godkänd Cloud Run-deploy.
 
@@ -48,10 +48,10 @@ Denna ordning stoppar UI-polish, modelljämförelser och fler ramverk från att 
 | M-20 | Fyra typade read-only tools | `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks` är scenarioavgränsade, skrivskyddade och testade | Klar |
 | M-21 | Begränsad state machine | `COLLECT → SYNTHESIZE → VERIFY` har högst två collection-rundor, tre model/åtta tool calls, två per tooltyp, högst tre calls per runda, tool-free synthesis och 45 s timeout | Klar |
 | M-22 | Structured diagnosis | Java-typer, Jakarta Validation och deterministiska domänregler validerar `diagnosed` eller `insufficient_evidence`, claims och evidence IDs | Klar |
-| M-23 | Runbook retrieval | En fristående korpus med 10–15 syntetiska runbooks indexeras med `gemini-embedding-2` i 768 dimensioner; PostgreSQL/pgvector gör exakt cosine-sökning med top-k ≤ 4 och returnerar dokument, chunk, version, rank, similarity, embeddingmodell och backend | Ej startad – dagens tool gör endast lokal keyword matching |
+| M-23 | Runbook retrieval | En fristående korpus med 10–15 syntetiska runbooks indexeras med `gemini-embedding-2` i 768 dimensioner; PostgreSQL/pgvector gör exakt cosine-sökning med top-k ≤ 4 och returnerar dokument, chunk, version, rank, similarity, embeddingmodell och backend | Klar – 10 dokument/12 chunks, explicit import, hash-readiness och ingen tyst keyword-fallback |
 | M-24 | Sex incidentfamiljer | Sex rotorsaksfamiljer återanvänder samma syntetiska webbshop, tjänstekarta, checkout-berättelse och UI; minst tre är valbara i demon | Ej startad |
 | M-25 | Story + Engineering View | Berättelse och tekniska detaljer kan växlas utan att privat chain-of-thought visas | Klar |
-| M-26 | Körmetadata | Run ID, mode, model ID, promptversion, embeddingmodell, korpusversion, retrieval-backend, git SHA, latency, tokens, calls och kostnadsestimat sparas | Pågår – retrievalmetadata, git SHA och beständig lagring återstår |
+| M-26 | Körmetadata | Run ID, mode, model ID, promptversion, embeddingmodell, korpusversion, retrieval-backend, git SHA, latency, tokens, calls och kostnadsestimat sparas | Pågår – live/API visar retrievalmetadata; evalrapporten har git SHA; beständig runlagring och live-git-SHA återstår |
 | M-27 | Grundobservability | Strukturerade JSON-loggar och OpenTelemetry täcker API → collect → tool → synthesize → verify utan nycklar, råa prompts eller privat chain-of-thought | Ej startad |
 
 **Gate 4 september:** liveutredningen fungerar och Engineering View visar tools, retrieval, evidens och körmetadata.
@@ -63,10 +63,10 @@ Denna ordning stoppar UI-polish, modelljämförelser och fler ramverk från att 
 | M-30 | 18 evalfall | Sex familjer × tre variationer, med separata development- och held-out-fall | Ej startad |
 | M-31 | Baseline | Symptom-only baseline och full utredning körs mot samma relevanta fall | Ej startad |
 | M-32 | Tre separata verifieringar | Citation validity, evidence support/precision och diagnosis correctness mäts var för sig | Klar |
-| M-33 | Retrievalmått | Minst 10 positiva retrievalfrågor mäter Hit@4 mot exakt dokument/chunk/version; två no-result-fall redovisas separat och målet ≥ 90 % betyder minst 9/10 | Ej startad |
-| M-34 | Säkerhets-/abstentionfall | Minst två fall kräver korrekt abstention; ett adversarial runbook hämtas faktiskt i topp 4 men får inte styra diagnos, bli incidentbevis eller kringgå mänskligt godkännande | Ej startad |
-| M-35 | Portabel evalrapport | Samma kommando skapar JSON- och Markdownrapport lokalt/CI med accuracy, schema, citations, retrieval, latency, calls, kostnad, datasetversion och git SHA; vanlig CI gör inga betalda liveanrop | Ej startad |
-| M-36 | Failure cases | Alla verkligt observerade missar och kända begränsningar dokumenteras; inget minimiantal eller konstruerad miss krävs | Ej startad |
+| M-33 | Retrievalmått | Minst 10 positiva retrievalfrågor mäter Hit@4 mot exakt dokument/chunk/version; två no-result-fall redovisas separat och målet ≥ 90 % betyder minst 9/10 | Klar för v1 – 9/10 totalt, men held-out endast 4/5; tre no-match gav 3/3 |
+| M-34 | Säkerhets-/abstentionfall | Minst två fall kräver korrekt abstention; ett adversarial runbook hämtas faktiskt i topp 4 men får inte styra diagnos, bli incidentbevis eller kringgå mänskligt godkännande | Pågår – adversarial runbook hämtades rank 1; synthesis-säkerhet och fulla abstentionfall återstår |
+| M-35 | Portabel evalrapport | Samma kommando skapar JSON- och Markdownrapport lokalt/CI med accuracy, schema, citations, retrieval, latency, calls, kostnad, datasetversion och git SHA; vanlig CI gör inga betalda liveanrop | Pågår – retrieval-slicen skapar JSON/Markdown med dataset, korpus, embeddingprofil, git SHA, latency och nullable usage; full diagnosrapport och CI återstår |
+| M-36 | Failure cases | Alla verkligt observerade missar och kända begränsningar dokumenteras; inget minimiantal eller konstruerad miss krävs | Pågår – held-out retrieval-miss, unsafe top-1 och ny provider-timeout är dokumenterade |
 
 **Gate 11 september:** evalrapporten är reproducerbar, publika claims har mätstöd och feature freeze börjar.
 
@@ -93,7 +93,7 @@ Denna ordning stoppar UI-polish, modelljämförelser och fler ramverk från att 
 | Schema pass | 100 % | Ingen eval; senaste v5-smoken passerade |
 | Citation ID validity | 100 % | Ingen eval; senaste v5-smoken hade 100 % giltiga IDs |
 | Evidence precision | ≥ 90 % | Ingen eval; senaste v5-smoken gav 5/5 efter att en v4-regression gav 3/5 |
-| Retrieval Hit@4 | ≥ 90 % | Ej mätt |
+| Retrieval Hit@4 | ≥ 90 % | v1 totalt 9/10 (90 %), men held-out 4/5 (80 %); behöver förbättras utan held-out-tuning |
 | Korrekta abstentions | ≥ 2 | Ej mätt |
 | Warm p95 | < 30 s | Ej mätt; senaste v5-smoken tog 4,96 s, men historiken innehåller långsammare körningar och timeouts |
 | Hard timeout | 45 s | Implementerad och enhetstestad; provider-timeouts observerade |
