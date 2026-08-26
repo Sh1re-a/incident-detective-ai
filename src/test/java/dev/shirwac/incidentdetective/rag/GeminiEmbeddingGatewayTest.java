@@ -14,6 +14,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GeminiEmbeddingGatewayTest {
 
@@ -41,7 +42,7 @@ class GeminiEmbeddingGatewayTest {
         assertEquals("gemini-embedding-2", api.models().getFirst());
         assertEquals(DIMENSIONS, api.configs().getFirst()
                 .outputDimensionality().orElseThrow());
-        assertFalse(api.configs().getFirst().autoTruncate().orElseThrow());
+        assertFalse(api.configs().getFirst().autoTruncate().isPresent());
         assertTrueEmpty(api.configs().getFirst());
         assertEquals(DIMENSIONS, query.values().size());
         assertEquals(42, document.billableCharacters());
@@ -86,6 +87,17 @@ class GeminiEmbeddingGatewayTest {
                         .embeddings(truncated)
                         .build())).embedQuery("timeout")
         );
+    }
+
+    @Test
+    void rejectsOversizedInputBeforeCallingTheProvider() {
+        CapturingApi api = new CapturingApi(validResponse());
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> gateway(api).embedDocument("title", "x".repeat(4_001))
+        );
+        assertTrue(api.inputs().isEmpty());
     }
 
     private GeminiEmbeddingGateway gateway(GeminiEmbeddingApi api) {

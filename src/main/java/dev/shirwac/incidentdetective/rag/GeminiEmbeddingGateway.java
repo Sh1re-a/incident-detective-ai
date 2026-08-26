@@ -17,6 +17,7 @@ import java.util.List;
 public final class GeminiEmbeddingGateway implements EmbeddingGateway {
 
     private static final String QUERY_PREFIX = "task: search result | query: ";
+    private static final int MAX_INPUT_CHARACTERS = 4_000;
 
     private final GeminiEmbeddingApi api;
     private final RagProperties properties;
@@ -41,9 +42,13 @@ public final class GeminiEmbeddingGateway implements EmbeddingGateway {
     }
 
     private EmbeddingResult embed(String input) {
+        if (input.length() > MAX_INPUT_CHARACTERS) {
+            throw new IllegalArgumentException(
+                    "embedding input exceeds the local 4000 character limit"
+            );
+        }
         EmbedContentConfig config = EmbedContentConfig.builder()
                 .outputDimensionality(properties.embeddingDimensions())
-                .autoTruncate(false)
                 .build();
         Instant startedAt = Instant.now();
         EmbedContentResponse response = api.embed(
