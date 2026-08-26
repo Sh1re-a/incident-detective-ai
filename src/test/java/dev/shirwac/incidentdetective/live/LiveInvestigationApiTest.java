@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "incident-detective.ai.live-enabled=true",
         "incident-detective.ai.gemini-api-key=test-only-key",
-        "incident-detective.ai.model-id=gemini-test",
+        "incident-detective.ai.model-id=gemini-3.1-flash-lite",
         "incident-detective.ai.prompt-version=test-prompt-v1"
 })
 @AutoConfigureMockMvc
@@ -99,7 +99,8 @@ class LiveInvestigationApiTest {
                 .andExpect(jsonPath("$.status").value("completed"))
                 .andExpect(jsonPath("$.diagnosis.status")
                         .value("insufficient_evidence"))
-                .andExpect(jsonPath("$.model_id").value("gemini-test"))
+                .andExpect(jsonPath("$.model_id")
+                        .value("gemini-3.1-flash-lite"))
                 .andExpect(jsonPath("$.model_call_count").value(2))
                 .andExpect(jsonPath("$.tool_call_count").value(0))
                 .andExpect(jsonPath(
@@ -110,10 +111,12 @@ class LiveInvestigationApiTest {
                 ).value(5))
                 .andExpect(jsonPath("$.verification.claim_coverage.score")
                         .value(0.0))
-                .andExpect(jsonPath("$.estimated_cost_usd").doesNotExist())
-                .andExpect(jsonPath("$.estimated_cost_basis").value(
-                        "No paid list-price estimate is configured for this model."
-                ))
+                .andExpect(jsonPath("$.estimated_cost_usd").isNumber())
+                .andExpect(jsonPath("$.model_cost_breakdown.cached_input_usd")
+                        .isNumber())
+                .andExpect(jsonPath(
+                        "$.model_cost_breakdown.observed_cache_savings_usd"
+                ).isNumber())
                 .andReturn();
 
         String json = result.getResponse().getContentAsString();
@@ -209,6 +212,18 @@ class LiveInvestigationApiTest {
                         .value(3))
                 .andExpect(jsonPath("$.prompt_cache.cached_input_tokens").value(210))
                 .andExpect(jsonPath("$.prompt_cache.cache_hit_observed").value(true))
+                .andExpect(jsonPath("$.estimated_cost_usd").value(0.00053775))
+                .andExpect(jsonPath(
+                        "$.model_cost_breakdown.uncached_input_usd"
+                ).value(0.000225))
+                .andExpect(jsonPath(
+                        "$.model_cost_breakdown.cached_input_usd"
+                ).value(0.00000525))
+                .andExpect(jsonPath("$.model_cost_breakdown.output_usd")
+                        .value(0.0003075))
+                .andExpect(jsonPath(
+                        "$.model_cost_breakdown.observed_cache_savings_usd"
+                ).value(0.00004725))
                 .andExpect(jsonPath("$.tool_call_count").value(4))
                 .andExpect(jsonPath("$.model_call_count").value(3))
                 .andExpect(jsonPath("$.limitations.length()").value(3))

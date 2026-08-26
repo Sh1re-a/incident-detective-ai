@@ -146,7 +146,7 @@ class OpenApiDocumentationTest {
                 )))
                 .andExpect(jsonPath(
                         "$.components.schemas.LiveInvestigationResult.required.length()"
-                ).value(23))
+                ).value(24))
                 .andExpect(jsonPath(
                         "$.components.schemas.RecordedReplayResult.properties"
                                 + ".token_usage.type"
@@ -221,6 +221,12 @@ class OpenApiDocumentationTest {
                 ).value(contains("provider_implicit")))
                 .andExpect(jsonPath(
                         "$.components.schemas.PromptCacheTelemetry.properties.cached_input_tokens"
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.LiveInvestigationResult.properties.model_cost_breakdown"
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.ModelCostBreakdown.properties.observed_cache_savings_usd"
                 ).exists())
                 .andExpect(jsonPath(
                         "$.components.schemas.EvidencePrecision.properties.citation_support"

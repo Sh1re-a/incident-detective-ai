@@ -1,6 +1,7 @@
 package dev.shirwac.incidentdetective.live;
 
 import dev.shirwac.incidentdetective.ai.ModelCallMetadata;
+import dev.shirwac.incidentdetective.ai.ModelCostBreakdown;
 import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.scenario.Scenario;
 import dev.shirwac.incidentdetective.domain.verification.VerificationReport;
@@ -70,6 +71,12 @@ public record LiveInvestigationResult(
                 description = "Null when no paid list-price estimate is configured."
         )
         BigDecimal estimatedCostUsd,
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                nullable = true,
+                description = "Null when the model price or core provider usage is unavailable."
+        )
+        ModelCostBreakdown modelCostBreakdown,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         String estimatedCostBasis,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "0")

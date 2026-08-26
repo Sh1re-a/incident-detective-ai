@@ -21,7 +21,54 @@ class GeminiCostEstimatorTest {
         );
 
         assertEquals(new BigDecimal("1.75000000"), estimate.estimatedUsd());
-        assertTrue(estimate.basis().contains("free-tier charge may be USD 0"));
+        assertEquals(
+                new BigDecimal("0.25000000"),
+                estimate.breakdown().uncachedInputUsd()
+        );
+        assertNull(estimate.breakdown().cachedInputUsd());
+        assertEquals(
+                new BigDecimal("1.50000000"),
+                estimate.breakdown().outputUsd()
+        );
+        assertNull(estimate.breakdown().observedCacheSavingsUsd());
+        assertTrue(estimate.basis().contains("not a provider invoice"));
+        assertTrue(estimate.basis().contains("conservatively priced"));
+    }
+
+    @Test
+    void pricesOnlyProviderReportedCacheHitsAtTheCachedRate() {
+        ModelCostEstimate estimate = estimator.estimate(
+                "gemini-3.1-flash-lite",
+                new ModelTokenUsage(
+                        1_000_000,
+                        400_000,
+                        600_000,
+                        1_000_000,
+                        0,
+                        1_000_000,
+                        0,
+                        2_000_000
+                )
+        );
+
+        assertEquals(new BigDecimal("1.66000000"), estimate.estimatedUsd());
+        assertEquals(
+                new BigDecimal("0.15000000"),
+                estimate.breakdown().uncachedInputUsd()
+        );
+        assertEquals(
+                new BigDecimal("0.01000000"),
+                estimate.breakdown().cachedInputUsd()
+        );
+        assertEquals(
+                new BigDecimal("1.50000000"),
+                estimate.breakdown().outputUsd()
+        );
+        assertEquals(
+                new BigDecimal("0.09000000"),
+                estimate.breakdown().observedCacheSavingsUsd()
+        );
+        assertTrue(estimate.basis().contains("Provider-reported"));
     }
 
     @Test
@@ -60,9 +107,21 @@ class GeminiCostEstimatorTest {
         );
 
         assertNull(estimate.estimatedUsd());
+        assertNull(estimate.breakdown());
         assertEquals(
                 "No paid list-price estimate is configured for this model.",
                 estimate.basis()
         );
+    }
+
+    @Test
+    void keepsTheEstimateUnavailableWhenCoreUsageIsMissing() {
+        ModelCostEstimate estimate = estimator.estimate(
+                "gemini-3.1-flash-lite",
+                new ModelTokenUsage(null, null, null, null, null, null, null, null)
+        );
+
+        assertNull(estimate.estimatedUsd());
+        assertNull(estimate.breakdown());
     }
 }

@@ -218,6 +218,7 @@ public final class LiveInvestigationService {
                 usage,
                 aggregatePromptCache(modelCalls),
                 cost.estimatedUsd(),
+                cost.breakdown(),
                 cost.basis(),
                 toolEvents.size(),
                 modelCalls.size(),

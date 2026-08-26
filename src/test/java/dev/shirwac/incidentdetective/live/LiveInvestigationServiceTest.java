@@ -98,8 +98,24 @@ class LiveInvestigationServiceTest {
         assertEquals(300, result.promptCache().cachedInputTokens());
         assertTrue(result.promptCache().cacheHitObserved());
         assertTrue(result.estimatedCostUsd().signum() > 0);
+        assertEquals(
+                new java.math.BigDecimal("0.00045000"),
+                result.modelCostBreakdown().uncachedInputUsd()
+        );
+        assertEquals(
+                new java.math.BigDecimal("0.00000900"),
+                result.modelCostBreakdown().cachedInputUsd()
+        );
+        assertEquals(
+                new java.math.BigDecimal("0.00125000"),
+                result.modelCostBreakdown().outputUsd()
+        );
+        assertEquals(
+                new java.math.BigDecimal("0.00008100"),
+                result.modelCostBreakdown().observedCacheSavingsUsd()
+        );
         assertTrue(result.estimatedCostBasis().contains(
-                "actual free-tier charge may be USD 0"
+                "not a provider invoice"
         ));
         assertTrue(result.verification().hardErrors().isEmpty());
         assertTrue(result.comparison().rootCauseCorrect());
