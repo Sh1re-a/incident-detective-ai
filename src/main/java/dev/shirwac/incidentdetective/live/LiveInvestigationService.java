@@ -54,12 +54,6 @@ public final class LiveInvestigationService {
     static final Duration DEADLINE_SAFETY_MARGIN = Duration.ofSeconds(1);
     static final Duration MIN_SECOND_COLLECTION_TIMEOUT = Duration.ofSeconds(8);
 
-    private static final List<String> LIMITATIONS = List.of(
-            "All incident data is synthetic.",
-            "Runbook retrieval currently uses deterministic local keyword matching, not pgvector.",
-            "The system recommends next steps but never executes remediation."
-    );
-
     private final GeminiAiProperties properties;
     private final InvestigationScenarioCatalog scenarios;
     private final InvestigationToolExecutor tools;
@@ -210,7 +204,15 @@ public final class LiveInvestigationService {
                 cost.basis(),
                 toolEvents.size(),
                 modelCalls.size(),
-                LIMITATIONS
+                limitations()
+        );
+    }
+
+    private List<String> limitations() {
+        return List.of(
+                "All incident data is synthetic.",
+                tools.runbookRetrievalLimitation(),
+                "The system recommends next steps but never executes remediation."
         );
     }
 

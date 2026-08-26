@@ -1,15 +1,10 @@
 package dev.shirwac.incidentdetective.investigation.tools;
 
-import dev.shirwac.incidentdetective.domain.evidence.RunbookEvidence;
-import dev.shirwac.incidentdetective.investigation.InvestigationData;
-import dev.shirwac.incidentdetective.investigation.InvestigationDataCatalog;
-import dev.shirwac.incidentdetective.investigation.InvestigationScenarioNotFoundException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -18,14 +13,14 @@ import java.util.stream.Collectors;
 @Service
 public final class RetrieveRunbooksTool {
 
-    private final InvestigationDataCatalog catalog;
+    private final RunbookRetrievalStrategy retrieval;
     private final Validator validator;
 
     public RetrieveRunbooksTool(
-            InvestigationDataCatalog catalog,
+            RunbookRetrievalStrategy retrieval,
             Validator validator
     ) {
-        this.catalog = catalog;
+        this.retrieval = retrieval;
         this.validator = validator;
     }
 
@@ -35,39 +30,18 @@ public final class RetrieveRunbooksTool {
 
     public RetrieveRunbooksResult execute(
             String scenarioId,
-            RetrieveRunbooksArguments arguments
+        RetrieveRunbooksArguments arguments
     ) {
         validate(arguments);
-        InvestigationData data = catalog.findById(scenarioId)
-                .orElseThrow(() -> new InvestigationScenarioNotFoundException(scenarioId));
-        List<RunbookEvidence> runbooks = data.evidenceInventory().stream()
-                .filter(RunbookEvidence.class::isInstance)
-                .map(RunbookEvidence.class::cast)
-                .toList();
-        List<String> queryTokens = tokens(arguments.query());
+        return retrieval.retrieve(scenarioId, arguments);
+    }
 
-        List<ScoredRunbook> matches = runbooks.stream()
-                .map(runbook -> new ScoredRunbook(runbook, score(runbook, queryTokens)))
-                .filter(match -> match.score() > 0)
-                .sorted(Comparator.comparingInt(ScoredRunbook::score)
-                        .reversed()
-                        .thenComparing(match -> match.runbook().evidenceId()))
-                .toList();
-        List<RunbookEvidence> evidence = matches.stream()
-                .limit(arguments.maxResults())
-                .map(ScoredRunbook::runbook)
-                .toList();
+    public String safeModeDescription() {
+        return retrieval.safeModeDescription();
+    }
 
-        return new RetrieveRunbooksResult(
-                runbooks.stream()
-                        .map(runbook -> runbook.content().documentId())
-                        .distinct()
-                        .sorted()
-                        .toList(),
-                evidence,
-                evidence.size(),
-                matches.size() > evidence.size()
-        );
+    public String limitation() {
+        return retrieval.limitation();
     }
 
     private void validate(RetrieveRunbooksArguments arguments) {
@@ -92,18 +66,6 @@ public final class RetrieveRunbooksTool {
         }
     }
 
-    private int score(RunbookEvidence runbook, List<String> queryTokens) {
-        String searchable = String.join(" ",
-                runbook.displaySummary(),
-                runbook.content().documentId(),
-                runbook.content().chunkId(),
-                runbook.content().text()
-        ).toLowerCase(Locale.ROOT);
-        return (int) queryTokens.stream()
-                .filter(searchable::contains)
-                .count();
-    }
-
     private List<String> tokens(String query) {
         if (query == null) {
             return List.of();
@@ -114,6 +76,4 @@ public final class RetrieveRunbooksTool {
                 .toList();
     }
 
-    private record ScoredRunbook(RunbookEvidence runbook, int score) {
-    }
 }

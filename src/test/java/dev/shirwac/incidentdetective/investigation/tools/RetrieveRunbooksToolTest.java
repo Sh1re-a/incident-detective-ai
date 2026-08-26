@@ -22,6 +22,8 @@ class RetrieveRunbooksToolTest {
         );
 
         assertEquals(ToolName.RETRIEVE_RUNBOOKS, tool.name());
+        assertEquals("deterministic fixture retrieval", tool.safeModeDescription());
+        assertTrue(tool.limitation().contains("not pgvector"));
         assertEquals(1, result.returnedCount());
         assertEquals(
                 "cpt-v1-runbook-timeout-precedence",

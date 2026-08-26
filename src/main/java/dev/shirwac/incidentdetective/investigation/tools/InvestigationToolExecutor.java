@@ -111,9 +111,14 @@ public final class InvestigationToolExecutor {
         return execution(
                 call,
                 "Returned " + result.returnedCount()
-                        + " bounded runbook chunk(s) using local keyword retrieval.",
+                        + " bounded runbook chunk(s) using "
+                        + retrieveRunbooks.safeModeDescription() + ".",
                 List.copyOf(result.evidence())
         );
+    }
+
+    public String runbookRetrievalLimitation() {
+        return retrieveRunbooks.limitation();
     }
 
     private ToolExecution execution(
