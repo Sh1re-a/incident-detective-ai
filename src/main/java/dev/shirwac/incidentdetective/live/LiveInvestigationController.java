@@ -4,6 +4,7 @@ import dev.shirwac.incidentdetective.api.ApiProblemResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -54,7 +55,16 @@ public final class LiveInvestigationController {
                     description = "Invalid request body or live model call not confirmed",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ApiProblemResponse.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "title": "Live AI confirmation required",
+                                      "status": 400,
+                                      "detail": "Set confirm_live_ai to true to allow this model call.",
+                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                      "code": "LIVE_AI_CONFIRMATION_REQUIRED"
+                                    }
+                                    """)
                     )
             ),
             @ApiResponse(
@@ -62,7 +72,16 @@ public final class LiveInvestigationController {
                     description = "Synthetic scenario not found",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ApiProblemResponse.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "title": "Investigation scenario not found",
+                                      "status": 404,
+                                      "detail": "Investigation scenario not found: unknown-scenario",
+                                      "instance": "/api/v1/scenarios/unknown-scenario/runs/live-ai",
+                                      "code": "SCENARIO_NOT_FOUND"
+                                    }
+                                    """)
                     )
             ),
             @ApiResponse(
@@ -70,7 +89,16 @@ public final class LiveInvestigationController {
                     description = "Request body is not application/json",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ApiProblemResponse.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "title": "Unsupported media type",
+                                      "status": 415,
+                                      "detail": "Send the request body as application/json.",
+                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                      "code": "UNSUPPORTED_MEDIA_TYPE"
+                                    }
+                                    """)
                     )
             ),
             @ApiResponse(
@@ -78,7 +106,16 @@ public final class LiveInvestigationController {
                     description = "Live AI concurrency or rolling start limit reached",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ApiProblemResponse.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "title": "Live AI is busy",
+                                      "status": 429,
+                                      "detail": "Another live investigation is already running.",
+                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                      "code": "LIVE_AI_RATE_LIMITED"
+                                    }
+                                    """)
                     )
             ),
             @ApiResponse(
@@ -86,7 +123,16 @@ public final class LiveInvestigationController {
                     description = "Provider response or model tool arguments were invalid",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ApiProblemResponse.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "title": "Model provider failed",
+                                      "status": 502,
+                                      "detail": "Gemini could not complete the bounded model request.",
+                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                      "code": "MODEL_PROVIDER_ERROR"
+                                    }
+                                    """)
                     )
             ),
             @ApiResponse(
@@ -94,7 +140,16 @@ public final class LiveInvestigationController {
                     description = "Live AI is disabled or not configured",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ApiProblemResponse.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "title": "Live AI unavailable",
+                                      "status": 503,
+                                      "detail": "Live AI is disabled by server configuration.",
+                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                      "code": "LIVE_AI_DISABLED"
+                                    }
+                                    """)
                     )
             ),
             @ApiResponse(
@@ -102,7 +157,16 @@ public final class LiveInvestigationController {
                     description = "Provider or investigation deadline exceeded",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ApiProblemResponse.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "title": "Live investigation timed out",
+                                      "status": 504,
+                                      "detail": "The live investigation exceeded its 45 second deadline.",
+                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                      "code": "LIVE_INVESTIGATION_TIMEOUT"
+                                    }
+                                    """)
                     )
             )
     })

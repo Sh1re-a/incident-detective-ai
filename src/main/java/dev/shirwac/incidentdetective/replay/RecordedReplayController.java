@@ -4,6 +4,7 @@ import dev.shirwac.incidentdetective.api.ApiProblemResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -52,7 +53,16 @@ public final class RecordedReplayController {
                     description = "Recorded scenario not found",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ApiProblemResponse.class)
+                            schema = @Schema(implementation = ApiProblemResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "title": "Recorded scenario not found",
+                                      "status": 404,
+                                      "detail": "Recorded scenario not found: unknown-scenario",
+                                      "instance": "/api/v1/scenarios/unknown-scenario/runs/recorded-replay",
+                                      "code": "SCENARIO_NOT_FOUND"
+                                    }
+                                    """)
                     )
             )
     })

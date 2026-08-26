@@ -32,6 +32,8 @@ class OpenApiDocumentationTest {
             "/api/v1/scenarios/{scenarioId}/runs/live-ai";
     private static final String LIVE_POST =
             "$.paths['" + LIVE_PATH + "'].post";
+    private static final String PROBLEM_JSON_EXAMPLE =
+            ".content['application/problem+json'].example";
 
     @Autowired
     private MockMvc mockMvc;
@@ -83,6 +85,18 @@ class OpenApiDocumentationTest {
                                 + ".responses['404'].content['application/problem+json']"
                                 + ".schema['$ref']"
                 ).value("#/components/schemas/ApiProblemResponse"))
+                .andExpect(jsonPath(
+                        REPLAY_POST + ".responses['404']" + PROBLEM_JSON_EXAMPLE
+                                + ".status"
+                ).value(404))
+                .andExpect(jsonPath(
+                        REPLAY_POST + ".responses['404']" + PROBLEM_JSON_EXAMPLE
+                                + ".code"
+                ).value("SCENARIO_NOT_FOUND"))
+                .andExpect(jsonPath(
+                        REPLAY_POST + ".responses['404']" + PROBLEM_JSON_EXAMPLE
+                                + ".instance"
+                ).value("/api/v1/scenarios/unknown-scenario/runs/recorded-replay"))
                 .andExpect(jsonPath("$.components.schemas.RecordedReplayResult").exists())
                 .andExpect(jsonPath(
                         "$.components.schemas.RecordedReplayResult.properties.scenario_id"
@@ -148,6 +162,15 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.ApiProblemResponse.properties.code"
                 ).exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.ApiProblemResponse.properties.status.example"
+                ).doesNotExist())
+                .andExpect(jsonPath(
+                        "$.components.schemas.ApiProblemResponse.properties.instance.example"
+                ).doesNotExist())
+                .andExpect(jsonPath(
+                        "$.components.schemas.ApiProblemResponse.properties.code.example"
+                ).doesNotExist())
                 .andExpect(jsonPath("$.paths.length()").value(3))
                 .andExpect(jsonPath(LIVE_POST + ".responses['400']").exists())
                 .andExpect(jsonPath(LIVE_POST + ".responses['404']").exists())
@@ -156,6 +179,34 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath(LIVE_POST + ".responses['502']").exists())
                 .andExpect(jsonPath(LIVE_POST + ".responses['503']").exists())
                 .andExpect(jsonPath(LIVE_POST + ".responses['504']").exists())
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['400']" + PROBLEM_JSON_EXAMPLE
+                                + ".code"
+                ).value("LIVE_AI_CONFIRMATION_REQUIRED"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['404']" + PROBLEM_JSON_EXAMPLE
+                                + ".code"
+                ).value("SCENARIO_NOT_FOUND"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['415']" + PROBLEM_JSON_EXAMPLE
+                                + ".code"
+                ).value("UNSUPPORTED_MEDIA_TYPE"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['429']" + PROBLEM_JSON_EXAMPLE
+                                + ".code"
+                ).value("LIVE_AI_RATE_LIMITED"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['502']" + PROBLEM_JSON_EXAMPLE
+                                + ".code"
+                ).value("MODEL_PROVIDER_ERROR"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['503']" + PROBLEM_JSON_EXAMPLE
+                                + ".code"
+                ).value("LIVE_AI_DISABLED"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['504']" + PROBLEM_JSON_EXAMPLE
+                                + ".code"
+                ).value("LIVE_INVESTIGATION_TIMEOUT"))
                 .andExpect(jsonPath(
                         "$.components.schemas.LiveInvestigationResult.properties.model_calls"
                 ).exists())
