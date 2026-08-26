@@ -11,8 +11,10 @@ public record RunbookImportReport(
         int totalChunks,
         int importedChunks,
         int skippedChunks,
-        int billableCharacters,
-        double inputTokens,
+        int inputCharacters,
+        Integer providerBillableCharacters,
+        Double providerInputTokens,
+        boolean providerUsageMetadataComplete,
         long embeddingLatencyMs,
         Instant completedAt,
         List<RunbookImportItem> items

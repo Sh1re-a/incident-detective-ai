@@ -60,11 +60,12 @@ public final class GeminiEmbeddingGateway implements EmbeddingGateway {
                 0,
                 Duration.between(startedAt, Instant.now()).toMillis()
         );
-        return decode(response, latencyMs);
+        return decode(response, input.length(), latencyMs);
     }
 
     private EmbeddingResult decode(
             EmbedContentResponse response,
+            int inputCharacters,
             long latencyMs
     ) {
         if (response == null) {
@@ -87,17 +88,18 @@ public final class GeminiEmbeddingGateway implements EmbeddingGateway {
         if (statistics != null && statistics.truncated().orElse(false)) {
             throw malformed("Gemini truncated an embedding input");
         }
-        double inputTokens = statistics == null
-                ? 0
-                : statistics.tokenCount().orElse(0.0f);
+        Double providerInputTokens = statistics == null
+                ? null
+                : statistics.tokenCount().map(Float::doubleValue).orElse(null);
         EmbedContentMetadata metadata = response.metadata().orElse(null);
-        int billableCharacters = metadata == null
-                ? 0
-                : metadata.billableCharacterCount().orElse(0);
+        Integer providerBillableCharacters = metadata == null
+                ? null
+                : metadata.billableCharacterCount().orElse(null);
         return new EmbeddingResult(
                 values,
-                billableCharacters,
-                inputTokens,
+                inputCharacters,
+                providerBillableCharacters,
+                providerInputTokens,
                 latencyMs
         );
     }

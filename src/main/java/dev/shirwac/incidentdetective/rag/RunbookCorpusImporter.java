@@ -35,8 +35,10 @@ public final class RunbookCorpusImporter {
         List<RunbookImportItem> items = new ArrayList<>();
         int imported = 0;
         int skipped = 0;
-        int billableCharacters = 0;
-        double inputTokens = 0;
+        int inputCharacters = 0;
+        int providerBillableCharacters = 0;
+        double providerInputTokens = 0;
+        boolean providerUsageMetadataComplete = true;
         long embeddingLatencyMs = 0;
 
         for (RunbookCorpusEntry entry : corpus.entries()) {
@@ -47,7 +49,8 @@ public final class RunbookCorpusImporter {
                         entry.contentSha256(),
                         RunbookImportStatus.SKIPPED_UNCHANGED,
                         0,
-                        0,
+                        null,
+                        null,
                         0
                 ));
                 continue;
@@ -59,15 +62,22 @@ public final class RunbookCorpusImporter {
             );
             store.upsert(corpus.version(), entry, properties, embedding);
             imported++;
-            billableCharacters += embedding.billableCharacters();
-            inputTokens += embedding.inputTokens();
+            inputCharacters += embedding.inputCharacters();
+            if (embedding.providerBillableCharacters() == null
+                    || embedding.providerInputTokens() == null) {
+                providerUsageMetadataComplete = false;
+            } else {
+                providerBillableCharacters += embedding.providerBillableCharacters();
+                providerInputTokens += embedding.providerInputTokens();
+            }
             embeddingLatencyMs += embedding.latencyMs();
             items.add(new RunbookImportItem(
                     entry.evidenceId(),
                     entry.contentSha256(),
                     RunbookImportStatus.IMPORTED,
-                    embedding.billableCharacters(),
-                    embedding.inputTokens(),
+                    embedding.inputCharacters(),
+                    embedding.providerBillableCharacters(),
+                    embedding.providerInputTokens(),
                     embedding.latencyMs()
             ));
         }
@@ -80,8 +90,14 @@ public final class RunbookCorpusImporter {
                 corpus.entries().size(),
                 imported,
                 skipped,
-                billableCharacters,
-                inputTokens,
+                inputCharacters,
+                imported > 0 && providerUsageMetadataComplete
+                        ? providerBillableCharacters
+                        : null,
+                imported > 0 && providerUsageMetadataComplete
+                        ? providerInputTokens
+                        : null,
+                imported == 0 || providerUsageMetadataComplete,
                 embeddingLatencyMs,
                 clock.instant(),
                 items

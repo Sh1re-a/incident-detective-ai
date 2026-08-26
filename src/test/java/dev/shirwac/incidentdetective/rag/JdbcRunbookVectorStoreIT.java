@@ -81,7 +81,12 @@ class JdbcRunbookVectorStoreIT {
                 "Contract compatibility",
                 "Check response schema compatibility."
         );
-        store.upsert(CORPUS_VERSION, payment, PROFILE, embedding(unitVector(0)));
+        store.upsert(
+                CORPUS_VERSION,
+                payment,
+                PROFILE,
+                new EmbeddingResult(unitVector(0), 20, null, null, 5)
+        );
         store.upsert(CORPUS_VERSION, contract, PROFILE, embedding(unitVector(1)));
 
         List<RunbookSearchHit> hits = store.search(
@@ -145,7 +150,7 @@ class JdbcRunbookVectorStoreIT {
     }
 
     private static EmbeddingResult embedding(List<Float> values) {
-        return new EmbeddingResult(values, 10, 3.0, 5);
+        return new EmbeddingResult(values, 20, 10, 3.0, 5);
     }
 
     private static List<Float> unitVector(int activeIndex) {

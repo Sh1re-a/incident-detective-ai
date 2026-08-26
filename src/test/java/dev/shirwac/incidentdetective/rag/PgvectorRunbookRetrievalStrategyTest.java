@@ -163,6 +163,7 @@ class PgvectorRunbookRetrievalStrategyTest {
             queries.add(query);
             return new EmbeddingResult(
                     java.util.Collections.nCopies(768, 0.25f),
+                    query.length(),
                     10,
                     3.0,
                     5

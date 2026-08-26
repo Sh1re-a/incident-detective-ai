@@ -13,6 +13,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -45,8 +46,9 @@ class GeminiEmbeddingGatewayTest {
         assertFalse(api.configs().getFirst().autoTruncate().isPresent());
         assertTrueEmpty(api.configs().getFirst());
         assertEquals(DIMENSIONS, query.values().size());
-        assertEquals(42, document.billableCharacters());
-        assertEquals(9.0, document.inputTokens());
+        assertEquals(api.inputs().get(1).length(), document.inputCharacters());
+        assertEquals(42, document.providerBillableCharacters());
+        assertEquals(9.0, document.providerInputTokens());
     }
 
     @Test
@@ -61,6 +63,22 @@ class GeminiEmbeddingGatewayTest {
         );
 
         assertEquals(RunbookEmbeddingFailure.MALFORMED_RESPONSE, exception.failure());
+    }
+
+    @Test
+    void keepsMissingProviderUsageDistinctFromZeroUsage() {
+        EmbedContentResponse response = EmbedContentResponse.builder()
+                .embeddings(ContentEmbedding.builder()
+                        .values(Collections.nCopies(DIMENSIONS, 0.25f))
+                        .build())
+                .build();
+
+        EmbeddingResult result = gateway(new CapturingApi(response))
+                .embedQuery("payment timeout");
+
+        assertTrue(result.inputCharacters() > 0);
+        assertNull(result.providerBillableCharacters());
+        assertNull(result.providerInputTokens());
     }
 
     @Test

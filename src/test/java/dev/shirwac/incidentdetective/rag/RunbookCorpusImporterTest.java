@@ -47,8 +47,10 @@ class RunbookCorpusImporterTest {
         assertEquals(1, report.skippedChunks());
         assertEquals(11, embeddings.inputs.size());
         assertEquals(11, store.upserted.size());
-        assertEquals(110, report.billableCharacters());
-        assertEquals(33.0, report.inputTokens());
+        assertTrue(report.inputCharacters() > 0);
+        assertEquals(110, report.providerBillableCharacters());
+        assertEquals(33.0, report.providerInputTokens());
+        assertTrue(report.providerUsageMetadataComplete());
         assertEquals(55, report.embeddingLatencyMs());
         assertEquals(Instant.parse("2026-08-26T10:00:00Z"), report.completedAt());
         assertTrue(embeddings.inputs.stream().allMatch(input -> input.startsWith("title: ")));
@@ -78,6 +80,7 @@ class RunbookCorpusImporterTest {
             inputs.add("title: " + title + " | text: " + text);
             return new EmbeddingResult(
                     java.util.Collections.nCopies(768, 0.25f),
+                    ("title: " + title + " | text: " + text).length(),
                     10,
                     3.0,
                     5

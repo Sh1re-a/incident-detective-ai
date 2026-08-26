@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -70,8 +71,9 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                     embedding_dimensions,
                     embedding_format_version,
                     embedding,
-                    billable_characters,
-                    input_tokens,
+                    input_characters,
+                    provider_billable_characters,
+                    provider_input_tokens,
                     embedding_latency_ms
                 ) VALUES (
                     :corpusVersion,
@@ -88,8 +90,9 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                     :embeddingDimensions,
                     :embeddingFormatVersion,
                     CAST(:embedding AS vector),
-                    :billableCharacters,
-                    :inputTokens,
+                    :inputCharacters,
+                    :providerBillableCharacters,
+                    :providerInputTokens,
                     :embeddingLatencyMs
                 )
                 ON CONFLICT (
@@ -108,8 +111,9 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                     body = EXCLUDED.body,
                     content_sha256 = EXCLUDED.content_sha256,
                     embedding = EXCLUDED.embedding,
-                    billable_characters = EXCLUDED.billable_characters,
-                    input_tokens = EXCLUDED.input_tokens,
+                    input_characters = EXCLUDED.input_characters,
+                    provider_billable_characters = EXCLUDED.provider_billable_characters,
+                    provider_input_tokens = EXCLUDED.provider_input_tokens,
                     embedding_latency_ms = EXCLUDED.embedding_latency_ms,
                     embedded_at = CURRENT_TIMESTAMP
                 """, corpusVersion, profile)
@@ -123,8 +127,17 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                 .param("body", entry.text())
                 .param("contentSha256", entry.contentSha256())
                 .param("embedding", vectorLiteral(embedding.values()))
-                .param("billableCharacters", embedding.billableCharacters())
-                .param("inputTokens", embedding.inputTokens())
+                .param("inputCharacters", embedding.inputCharacters())
+                .param(
+                        "providerBillableCharacters",
+                        embedding.providerBillableCharacters(),
+                        Types.INTEGER
+                )
+                .param(
+                        "providerInputTokens",
+                        embedding.providerInputTokens(),
+                        Types.DOUBLE
+                )
                 .param("embeddingLatencyMs", embedding.latencyMs())
                 .update();
     }
