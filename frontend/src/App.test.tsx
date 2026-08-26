@@ -125,6 +125,14 @@ describe("Incident Detective experience", () => {
     expect(screen.getByText("gemini-3.5-flash-lite")).toBeVisible();
     expect(screen.getByText("$0.0032")).toBeVisible();
     expect(screen.getByText(/estimate, not a provider invoice/)).toBeVisible();
+    expect(screen.getByText("Investigation model estimate")).toBeVisible();
+    await user.click(screen.getByText("Retrieval metadata"));
+    expect(screen.getByText("pgvector_exact_cosine")).toBeVisible();
+    expect(screen.getByText("gemini-embedding-2")).toBeVisible();
+    expect(screen.getByText("0.662078")).toBeVisible();
+    expect(screen.getByText("Rank 1 · cosine 0.7783")).toBeVisible();
+    expect(screen.getByText("Not reported")).toBeVisible();
+    expect(screen.getByText(/Embedding retrieval cost is not included/)).toBeVisible();
   });
 
   it("keeps keyboard focus inside the live confirmation dialog", async () => {

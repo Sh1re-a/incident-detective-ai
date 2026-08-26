@@ -152,6 +152,39 @@ export const liveResult: LiveInvestigationResult = {
       collection_round: 1,
       arguments: { metric_names: ["checkout_failure_ratio"] },
     },
+    {
+      event_id: "live-runbook-event",
+      tool_name: "retrieve_runbooks",
+      safe_summary: "Returned one bounded runbook chunk using pgvector retrieval.",
+      evidence: [],
+      collection_round: 1,
+      arguments: { query: "payment timeout", max_results: 4 },
+      runbook_retrieval: {
+        backend: "pgvector_exact_cosine",
+        corpus_version: "runbook-corpus-v1",
+        embedding_profile: {
+          model_id: "gemini-embedding-2",
+          dimensions: 768,
+          format_version: "search-result-v1",
+          minimum_similarity: 0.6620781500197453,
+        },
+        query_embedding: {
+          local_input_characters: 58,
+          provider_billable_characters: null,
+          provider_input_tokens: null,
+          latency_ms: 312,
+        },
+        matches: [
+          {
+            rank: 1,
+            evidence_id: "runbook-payment-timeout-precedence",
+            cosine_similarity: 0.7782714501721635,
+            content_sha256:
+              "4ab593fed99519615d70d254c57ab8617e5860a922b7890a3838fda80c2ca036",
+          },
+        ],
+      },
+    },
   ],
   model_id: "gemini-3.5-flash-lite",
   prompt_version: "gemini-live-v3",
@@ -189,7 +222,7 @@ export const liveResult: LiveInvestigationResult = {
       latency_ms: 2400,
     },
   ],
-  tool_call_count: 1,
+  tool_call_count: 2,
   model_call_count: 2,
   limitations: ["Synthetic incident data only."],
 };

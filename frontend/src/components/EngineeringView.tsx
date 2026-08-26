@@ -1,4 +1,7 @@
-import type { InvestigationResult } from "../api/types";
+import type {
+  InvestigationResult,
+  RunbookRetrievalMetadata,
+} from "../api/types";
 import {
   formatCost,
   formatDuration,
@@ -127,6 +130,9 @@ export function EngineeringView({
                       <summary>Validated arguments</summary>
                       <pre>{JSON.stringify(event.arguments, null, 2)}</pre>
                     </details>
+                  ) : null}
+                  {"runbook_retrieval" in event && event.runbook_retrieval ? (
+                    <RunbookRetrievalDetails metadata={event.runbook_retrieval} />
                   ) : null}
                   <div className="engineering-evidence-row">
                     {event.evidence.map((evidence) => (
@@ -288,7 +294,7 @@ export function EngineeringView({
             }
           />
           <Metadata
-            label="Paid list-price estimate"
+            label="Investigation model estimate"
             value={formatCost(result.estimated_cost_usd)}
           />
           <Metadata
@@ -305,7 +311,8 @@ export function EngineeringView({
           <>
             <p className="cost-basis">
               Cost basis: {trimSentenceEnd(result.estimated_cost_basis)}. This is an estimate, not
-              a provider invoice; a free-tier run may be billed at $0.
+              a provider invoice; a free-tier run may be billed at $0. Embedding retrieval cost is
+              not included unless the provider reports enough usage data.
             </p>
             <div className="model-call-list">
               <h3>Model calls</h3>
@@ -339,6 +346,81 @@ export function EngineeringView({
   );
 }
 
+function RunbookRetrievalDetails({
+  metadata,
+}: {
+  metadata: RunbookRetrievalMetadata;
+}) {
+  const profile = metadata.embedding_profile;
+  const usage = metadata.query_embedding;
+
+  return (
+    <details className="argument-detail">
+      <summary>Retrieval metadata</summary>
+      <dl className="metadata-grid">
+        <Metadata label="Backend" value={metadata.backend} />
+        <Metadata label="Corpus" value={metadata.corpus_version ?? "Fixture-scoped"} />
+        <Metadata
+          label="Embedding model"
+          value={profile?.model_id ?? "Not used in fixture mode"}
+        />
+        <Metadata
+          label="Vector profile"
+          value={
+            profile
+              ? `${profile.dimensions} dimensions · ${profile.format_version}`
+              : "Not applicable"
+          }
+        />
+        <Metadata
+          label="Minimum similarity"
+          value={profile ? profile.minimum_similarity.toFixed(6) : "Not applicable"}
+        />
+        <Metadata
+          label="Query latency"
+          value={usage ? formatDuration(usage.latency_ms) : "Not applicable"}
+        />
+        <Metadata
+          label="Local input characters"
+          value={
+            usage
+              ? usage.local_input_characters.toLocaleString("en-US")
+              : "Not applicable"
+          }
+        />
+        <Metadata
+          label="Provider input tokens"
+          value={
+            usage?.provider_input_tokens == null
+              ? "Not reported"
+              : usage.provider_input_tokens.toLocaleString("en-US")
+          }
+        />
+      </dl>
+      <div className="model-call-list">
+        <h3>Ranked matches</h3>
+        {metadata.matches.length === 0 ? <p>No match passed the threshold.</p> : null}
+        {metadata.matches.map((match) => (
+          <div key={`${match.rank}-${match.evidence_id}`}>
+            <span>
+              Rank {match.rank} ·{" "}
+              {match.cosine_similarity == null
+                ? "score not applicable"
+                : `cosine ${match.cosine_similarity.toFixed(4)}`}
+            </span>
+            <strong>{match.evidence_id}</strong>
+            <small>
+              {match.content_sha256
+                ? `Content SHA-256 ${match.content_sha256}`
+                : "Content hash not reported in fixture mode"}
+            </small>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function EngineeringEmpty({ onSwitchToStory }: { onSwitchToStory: () => void }) {
   return (
     <section className="engineering-empty panel">
@@ -346,7 +428,8 @@ function EngineeringEmpty({ onSwitchToStory }: { onSwitchToStory: () => void }) 
       <h2>Run a case before inspecting its trace</h2>
       <p>
         This view exposes tool events, evidence IDs, deterministic checks, model
-        metadata, latency, tokens and estimated paid list-price cost.
+        metadata, latency, tokens and the investigation model estimate. Retrieval
+        calls also expose their measured backend and embedding metadata when available.
       </p>
       <div className="empty-architecture">
         <div>

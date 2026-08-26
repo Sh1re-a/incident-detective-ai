@@ -172,9 +172,33 @@ export interface RecordedToolEvent {
   evidence: Evidence[];
 }
 
+export interface RunbookRetrievalMetadata {
+  backend: "deterministic_fixture" | "pgvector_exact_cosine";
+  corpus_version?: string | null;
+  embedding_profile?: {
+    model_id: string;
+    dimensions: number;
+    format_version: string;
+    minimum_similarity: number;
+  } | null;
+  query_embedding?: {
+    local_input_characters: number;
+    provider_billable_characters?: number | null;
+    provider_input_tokens?: number | null;
+    latency_ms: number;
+  } | null;
+  matches: Array<{
+    rank: number;
+    evidence_id: string;
+    cosine_similarity?: number | null;
+    content_sha256?: string | null;
+  }>;
+}
+
 export interface LiveToolEvent extends RecordedToolEvent {
   collection_round: number;
   arguments: Record<string, unknown>;
+  runbook_retrieval?: RunbookRetrievalMetadata | null;
 }
 
 interface CommonRunResult {
