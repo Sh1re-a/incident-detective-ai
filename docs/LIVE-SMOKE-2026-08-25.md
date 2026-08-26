@@ -102,6 +102,28 @@ Två payment-försök med `gemini-3.5-flash-lite` nådde collection-timeout efte
 
 Payment-körningen bevisar att en full liveutredning kan välja runbookverktyget och få resultat från den importerade PostgreSQL/pgvector-korpusen. Inventory-körningen bevisar att modellen inte tvingas använda RAG när en trace är mer relevant. Båda använde tre modellanrop och fyra read-only tool calls. Faktisk free-tier-debitering kan vara 0 USD. Två lyckade körningar är fortfarande inte accuracy, p95 eller stabilitet.
 
+## UI-smoke efter claim coverage – 26 augusti
+
+Efter att verifieraren fått ett separat coverage-mått kördes payment-scenariot från den riktiga React-vyn på commit `3e9db00`. Körningen använde RAG-profilen, `gemini-3.1-flash-lite` och prompt `gemini-live-v6`.
+
+- root cause: `PAYMENT_TIMEOUT_CONFIG` – korrekt mot dolt facit
+- affected service: `PAYMENT_ADAPTER` – korrekt mot dolt facit
+- diagnosis schema: godkänt
+- citation ID validity: 100 procent
+- evidence precision: 4 av 5 direkta claim-evidence-länkar, alltså 80 procent
+- claim coverage: 5 av 5 förväntade claimnycklar, alltså 100 procent
+- säker toolsekvens: `get_metrics`, `search_logs`, `search_logs`, `retrieve_runbooks`
+- model calls: 3
+- tool calls: 4
+- tokens: 5 881
+- latency: 5 700 ms
+- uppskattat betalt standardlistpris: cirka 0,0026 USD
+- faktisk debitering: inte avläst; kan vara 0 USD på free tier
+
+Runbookverktyget använde `pgvector_exact_cosine` över `runbook-corpus-v1`. Den enda matchen var `runbook-payment-provider-degradation` med cosine similarity 0,7733 och 346 ms query-latency. Modellen använde inte runbooken som stöd i slutdiagnosen.
+
+Detta är den avsedda skillnaden mellan coverage och precision: modellen tog upp alla fem referensclaims, men stödet för `affected_service` var releasehändelsen i stället för direkt tjänsteevidens. UI:t visade därför **“Diagnosis matched · verification incomplete”**, 5/5 coverage och 4/5 evidence precision i stället för att kalla körningen fullständigt verifierad. Det är ett enda utvecklings-smoke och inte ett accuracy-, p95- eller säkerhetsresultat.
+
 ## Reproducerbart opt-in-kommando
 
 Den vanliga testsuiten gör inga nätverksanrop. Ett live-smoketest måste aktiveras uttryckligen:
