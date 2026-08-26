@@ -40,7 +40,8 @@ class PgvectorRunbookRetrievalStrategyTest {
                 corpus,
                 store,
                 embeddings,
-                PROFILE
+                PROFILE,
+                readiness(corpus, store)
         );
 
         var result = strategy.retrieve(
@@ -66,13 +67,15 @@ class PgvectorRunbookRetrievalStrategyTest {
         ClasspathRunbookCorpus corpus = corpus();
         FakeStore store = new FakeStore(corpus);
         store.indexedChunks = corpus.entries().size() - 1;
+        store.staleEvidenceId = corpus.entries().getFirst().evidenceId();
         CapturingEmbeddings embeddings = new CapturingEmbeddings();
         PgvectorRunbookRetrievalStrategy strategy = new PgvectorRunbookRetrievalStrategy(
                 scenarios(),
                 corpus,
                 store,
                 embeddings,
-                PROFILE
+                PROFILE,
+                readiness(corpus, store)
         );
 
         RunbookIndexNotReadyException exception = assertThrows(
@@ -84,6 +87,36 @@ class PgvectorRunbookRetrievalStrategyTest {
         );
 
         assertEquals(11, exception.indexedChunks());
+        assertEquals(11, exception.currentChunks());
+        assertEquals(12, exception.expectedChunks());
+        assertTrue(embeddings.queries.isEmpty());
+    }
+
+    @Test
+    void refusesPaidQueryEmbeddingWhenAStoredChunkHashIsStale() {
+        ClasspathRunbookCorpus corpus = corpus();
+        FakeStore store = new FakeStore(corpus);
+        store.staleEvidenceId = corpus.entries().getFirst().evidenceId();
+        CapturingEmbeddings embeddings = new CapturingEmbeddings();
+        PgvectorRunbookRetrievalStrategy strategy = new PgvectorRunbookRetrievalStrategy(
+                scenarios(),
+                corpus,
+                store,
+                embeddings,
+                PROFILE,
+                readiness(corpus, store)
+        );
+
+        RunbookIndexNotReadyException exception = assertThrows(
+                RunbookIndexNotReadyException.class,
+                () -> strategy.retrieve(
+                        SCENARIO_ID,
+                        new RetrieveRunbooksArguments("payment timeout", 2)
+                )
+        );
+
+        assertEquals(12, exception.indexedChunks());
+        assertEquals(11, exception.currentChunks());
         assertEquals(12, exception.expectedChunks());
         assertTrue(embeddings.queries.isEmpty());
     }
@@ -97,7 +130,8 @@ class PgvectorRunbookRetrievalStrategyTest {
                 corpus,
                 store,
                 new CapturingEmbeddings(),
-                PROFILE
+                PROFILE,
+                readiness(corpus, store)
         );
 
         assertThrows(
@@ -108,6 +142,14 @@ class PgvectorRunbookRetrievalStrategyTest {
                 )
         );
         assertEquals(0, store.countCalls);
+        assertEquals(0, store.containsCurrentCalls);
+    }
+
+    private RunbookIndexReadiness readiness(
+            ClasspathRunbookCorpus corpus,
+            RunbookVectorStore store
+    ) {
+        return new RunbookIndexReadiness(corpus, store, PROFILE);
     }
 
     private ClasspathRunbookCorpus corpus() {
@@ -181,6 +223,8 @@ class PgvectorRunbookRetrievalStrategyTest {
         private final ClasspathRunbookCorpus corpus;
         private long indexedChunks;
         private int countCalls;
+        private int containsCurrentCalls;
+        private String staleEvidenceId;
         private double minimumSimilarity;
 
         private FakeStore(ClasspathRunbookCorpus corpus) {
@@ -194,7 +238,8 @@ class PgvectorRunbookRetrievalStrategyTest {
                 RunbookCorpusEntry entry,
                 RagProperties profile
         ) {
-            throw new UnsupportedOperationException();
+            containsCurrentCalls++;
+            return !entry.evidenceId().equals(staleEvidenceId);
         }
 
         @Override

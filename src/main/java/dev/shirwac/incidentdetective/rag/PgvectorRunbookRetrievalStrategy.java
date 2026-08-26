@@ -21,19 +21,22 @@ public final class PgvectorRunbookRetrievalStrategy
     private final RunbookVectorStore store;
     private final EmbeddingGateway embeddings;
     private final RagProperties properties;
+    private final RunbookIndexReadiness indexReadiness;
 
     public PgvectorRunbookRetrievalStrategy(
             InvestigationScenarioCatalog scenarios,
             ClasspathRunbookCorpus corpus,
             RunbookVectorStore store,
             EmbeddingGateway embeddings,
-            RagProperties properties
+            RagProperties properties,
+            RunbookIndexReadiness indexReadiness
     ) {
         this.scenarios = scenarios;
         this.corpus = corpus;
         this.store = store;
         this.embeddings = embeddings;
         this.properties = properties;
+        this.indexReadiness = indexReadiness;
     }
 
     @Override
@@ -42,13 +45,7 @@ public final class PgvectorRunbookRetrievalStrategy
             RetrieveRunbooksArguments arguments
     ) {
         requireScenario(scenarioId);
-        long indexedChunks = store.count(corpus.version(), properties);
-        if (indexedChunks != corpus.entries().size()) {
-            throw new RunbookIndexNotReadyException(
-                    indexedChunks,
-                    corpus.entries().size()
-            );
-        }
+        RunbookIndexStatus indexStatus = indexReadiness.requireReady();
 
         EmbeddingResult queryEmbedding = embeddings.embedQuery(arguments.query());
         List<RunbookSearchHit> hits = store.search(
@@ -66,7 +63,7 @@ public final class PgvectorRunbookRetrievalStrategy
                 evidence,
                 evidence.size(),
                 evidence.size() == arguments.maxResults()
-                        && indexedChunks > evidence.size()
+                        && indexStatus.indexedChunks() > evidence.size()
         );
     }
 

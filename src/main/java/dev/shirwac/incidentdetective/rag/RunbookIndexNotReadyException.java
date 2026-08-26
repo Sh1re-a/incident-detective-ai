@@ -2,21 +2,24 @@ package dev.shirwac.incidentdetective.rag;
 
 public final class RunbookIndexNotReadyException extends RuntimeException {
 
-    private final long indexedChunks;
-    private final int expectedChunks;
+    private final RunbookIndexStatus status;
 
-    public RunbookIndexNotReadyException(long indexedChunks, int expectedChunks) {
-        super("Runbook index is not ready: indexed " + indexedChunks
-                + " of " + expectedChunks + " chunks");
-        this.indexedChunks = indexedChunks;
-        this.expectedChunks = expectedChunks;
+    public RunbookIndexNotReadyException(RunbookIndexStatus status) {
+        super("Runbook index is not ready: indexed " + status.indexedChunks()
+                + ", current " + status.currentChunks()
+                + ", expected " + status.expectedChunks() + " chunks");
+        this.status = status;
     }
 
     public long indexedChunks() {
-        return indexedChunks;
+        return status.indexedChunks();
+    }
+
+    public long currentChunks() {
+        return status.currentChunks();
     }
 
     public int expectedChunks() {
-        return expectedChunks;
+        return status.expectedChunks();
     }
 }
