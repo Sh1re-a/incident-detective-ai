@@ -44,9 +44,13 @@ class RagProfileApplicationIT {
     @Autowired
     private RunbookRetrievalStrategy retrieval;
 
+    @Autowired
+    private RagProperties ragProperties;
+
     @Test
     void startsOnlyTheExplicitRagStackAndMigratesPgvector() {
         assertInstanceOf(PgvectorRunbookRetrievalStrategy.class, retrieval);
+        assertEquals(0.6620781500197453, ragProperties.minimumSimilarity());
         JdbcClient jdbc = JdbcClient.create(dataSource);
         assertEquals("0.8.6", jdbc.sql("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
                 .query(String.class)
