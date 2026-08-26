@@ -24,7 +24,7 @@ Maven används i stället för Gradle i sprinten. Det finns redan på datorn, fu
 | Nu | Java records, Jakarta Validation och Jackson | Typade kontrakt, JSON och tydliga valideringsfel. |
 | Nu | JUnit och Spring Boot Test | Deterministiska tester av regler och applikationsstart. |
 | Nu | Google Gen AI SDK för Java 1.67.0 | Verklig function calling och structured output bakom en liten intern gateway. |
-| Vecka 2 | PostgreSQL och pgvector | Retrieval endast över 10–15 runbooks. |
+| Nu | PostgreSQL och pgvector | Retrieval endast över den fristående syntetiska runbookkorpusen. |
 | Vecka 2–3 | Strukturerade JSON-loggar och OpenTelemetry | Förklara körningar, fel och latency. |
 | Nu | React 19, TypeScript och Vite | Story View, Engineering View och beteendetester mot API-kontraktet. |
 | Vecka 4 | Docker och Google Cloud CLI | Containerkontroll och separat godkänd Cloud Run-deploy. |
@@ -35,12 +35,12 @@ Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i s
 
 - Java 21.0.10 LTS, `javac` 21.0.10 och Maven 3.9.12 finns.
 - Projektet använder Spring Boot 4.1.1 och Maven Wrapper 3.3.4 med Maven 3.9.16.
-- IntelliJ IDEA 2025.3.3 och Google Cloud CLI finns. Docker CLI finns, men Docker-daemonen var inte igång vid kontrollen 26 augusti.
-- Hela den nätverksfria Maven-testsuiten har 156 gröna tester. Frontend har 10 gröna beteendetester och en godkänd produktionsbuild.
-- Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och `gemini-live-v5`.
-- Den senaste v5-smoken gav rätt inventory-diagnos, 100 procent giltiga citation IDs och 5/5 direkta evidenskopplingar på 4,96 sekunder. Den gjordes efter att en v4-regression gav 3/5. Historiken innehåller sämre evidensprecision och provider-timeouts; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
+- IntelliJ IDEA 2025.3.3, Google Cloud CLI och Docker finns. Den lokala PostgreSQL/pgvector-containern var healthy vid kontrollen 26 augusti.
+- Hela den nätverksfria Maven-testsuiten har 187 gröna tester. Tre pgvector-integrationstester passerar separat. Frontend har 10 gröna beteendetester och en godkänd produktionsbuild.
+- Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.1-flash-lite` med `MINIMAL` thinking och `gemini-live-v6`.
+- De senaste två v6-smokesen i RAG-profilen gav rätt diagnos och giltiga citationer på 6,06 respektive 5,51 sekunder. Payment-körningen valde riktig pgvector-retrieval; inventory-körningen valde en trace. Historiken innehåller sämre evidensprecision och provider-timeouts; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
 - Livevägen har ett första kostnadsskydd: en samtidig körning och fem starter per rullande tio minuter per backendinstans. Cloud Run-instansgräns och budgetlarm är ännu inte konfigurerade.
-- PostgreSQL-klienten finns inte globalt. Det blockerar inte dag 1 och installeras inte innan retrievalsteget behöver den.
+- Korpusen innehåller 10 dokument/12 chunks. Retrieval v1 gav development 5/5 och held-out 4/5 Hit@4; den missade frågan behålls som failure case.
 
 API-nyckeln finns endast i en Git-ignorerad lokal fil och ska senare ligga som server-side secret. Värdet får aldrig skrivas i repo, dokumentation, frontendkod eller loggar.
 
@@ -84,7 +84,7 @@ Läs:
 
 Byggresultat: en fristående, versionshanterad korpus med 10–15 syntetiska runbooks. Med `gemini-embedding-2` formateras dokument som `title: … | text: …` och frågor som `task: search result | query: …`, utan separat `taskType`, och båda bäddas in i 768 dimensioner. PostgreSQL/pgvector gör exakt cosine-sökning och returnerar top-k ≤ 4 med dokument-, chunk-, versions-, rank- och similaritymetadata. Metrics, logs och traces läggs inte i vector store.
 
-Övning: förklara varför dagens scenarioförvalda keyword matching inte är RAG, varför exakt sökning räcker för en så liten korpus och varför embeddingmodell och korpusversion måste sparas.
+Övning: jämför recorded-fixturens deterministiska runbookresultat med `rag`-profilens provider-backed retrieval. Förklara varför exakt sökning räcker för en så liten korpus och varför embeddingmodell och korpusversion måste sparas.
 
 ### Pass 5 – evals och verifiering
 
@@ -112,7 +112,7 @@ Byggresultat: en lokalt testad container och därefter en separat godkänd deplo
 
 ## Nuvarande kodgrund
 
-Nu finns React Story/Engineering View, säker scenario-lista, klickbar evidens, ärlig replay/live-fallback, Spring Boot replay/live-API, separat dold `GroundTruth`, deterministisk verifierare, två fixturepaket, Swagger/OpenAPI, fyra typade tools, Gemini-gateway, strict structured output och kostnadsestimat. Runbook-toolset använder ännu scenarioförvald keyword matching. En fristående korpus, PostgreSQL/pgvector, evalharness, observability, container och deploy saknas fortfarande.
+Nu finns React Story/Engineering View, säker scenario-lista, klickbar evidens, ärlig replay/live-fallback, Spring Boot replay/live-API, separat dold `GroundTruth`, deterministisk verifierare, två fixturepaket, Swagger/OpenAPI, fyra typade tools, Gemini-gateway, strict structured output och kostnadsestimat. En fristående runbookkorpus, PostgreSQL/pgvector, idempotent import och retrieval-eval är byggda. Full diagnos-eval, observability, applikationscontainer och deploy saknas fortfarande.
 
 ## Två implementerade startscenarier
 

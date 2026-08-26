@@ -59,7 +59,7 @@ Endast `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks` exponer
 
 **Status:** Accepted, 25 augusti 2026
 
-Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. Den implementerade gränsen är högst två collection-rundor, åtta tool calls totalt, två per verktygstyp, tre tool calls per runda, högst tre modellanrop och 45 sekunders hard timeout. Första collection kan få upp till 28 sekunder, en andra collection högst 8 sekunder och synthesis får återstående reserverad tid. Slutlig synthesis använder inga tools och följs endast av deterministisk verifiering.
+Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. Den globala hard capen är åtta tool calls, men striktare per-tool-gränser ger i nuläget högst sex: ett metrics-anrop, två loggsökningar, två traces och en runbookhämtning. Varje collection-runda får den återstående budgeten och endast fortfarande tillåtna tools exponeras. Högst två collection-rundor, tre tool calls per runda, tre modellanrop och 45 sekunders hard timeout tillåts. Första collection kan få upp till 28 sekunder, en andra collection högst 8 sekunder och synthesis får återstående reserverad tid. Slutlig synthesis använder inga tools och följs endast av deterministisk verifiering.
 
 **Varför:** Beteende, latency och kostnad ska vara möjliga att förstå och mäta.
 
@@ -69,11 +69,11 @@ Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. D
 
 **Status:** Accepted for the current slice, updated 26 augusti 2026
 
-Det aktuella liveflödet använder Gemini Developer API genom den officiella Java SDK:n, pinnad till `google-genai` 1.67.0. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och kontraktet `gemini-live-v5`. Endast en modellleverantör används i sprintens kärna.
+Det aktuella liveflödet använder Gemini Developer API genom den officiella Java SDK:n, pinnad till `google-genai` 1.67.0. Standardprofilen är `gemini-3.1-flash-lite` med `MINIMAL` thinking och kontraktet `gemini-live-v6`. Endast en modellleverantör används i sprintens kärna.
 
 **Varför:** Meritvärdet ligger i arkitektur, evals och omdöme, inte i leverantörens namn. Gratis lokal utveckling minskar startkostnaden utan att låtsas att den publika demon blir kostnadsfri.
 
-**Konsekvens:** Modellanrop isoleras bakom en liten intern gateway, men inget multi-provider-lager eller modellval byggs i gränssnittet. `COLLECT` använder custom function tools, `SYNTHESIZE` görs separat utan tools med ett strikt schema och `VERIFY` är deterministisk Java-kod. v5 behåller den kanoniska claim-taxonomin från v4 och kräver tydligare direkt stöd för trigger, påverkad tjänst och felmekanism. Ändringen gjordes efter en korrekt v4-inventorydiagnos med bara 3/5 stödda länkar; GroundTruth och verifieraren lättades inte. En efterföljande v5-UI-smoke gav rätt rotorsak och tjänst samt 5/5 stödda länkar på 4,96 sekunder. Historiska provider-timeouts och sämre evidensprecision finns kvar i smoke-loggen. Profilen är därför ett mätt startval, inte ett bevis på stabilitet eller kvalitet; evalsen får avgöra om den behålls.
+**Konsekvens:** Modellanrop isoleras bakom en liten intern gateway, men inget multi-provider-lager eller modellval byggs i gränssnittet. `COLLECT` använder custom function tools, `SYNTHESIZE` görs separat utan tools med ett strikt schema och `VERIFY` är deterministisk Java-kod. v6 behåller v5:s direkta evidenskrav och filtrerar tool-deklarationerna efter återstående serverbudget. Två v6-försök med `gemini-3.5-flash-lite` nådde timeout; två efterföljande RAG-smokes med standardprofilen slutfördes korrekt på 6 057 respektive 5 505 ms. Det är ett motiverat utvecklingsval, inte ett stabilitets- eller accuracybevis; evalsen får avgöra om profilen behålls.
 
 ## DEC-008 – RAG endast för runbooks
 

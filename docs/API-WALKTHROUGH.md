@@ -132,9 +132,9 @@ Alla fyra är scenarioavgränsade och kan bara läsa syntetisk data. Modellen f�
 
 ### Vad `retrieve_runbooks` är just nu
 
-Tool-kontraktet, metadata och citationerna är verkliga, men retrievalalgoritmen är ännu en lokal keyword-sökning i runbooks som redan ligger i respektive scenariofixture. Det är en fungerande övergång och ett bra kontraktstest, men inte ett trovärdigt RAG-bevis.
+I standardprofilen för recorded replay används den deterministiska scenariofixturen, så demon fungerar utan databas eller provider. I den uttryckliga `rag`-profilen söker samma tool i en fristående korpus med 10 syntetiska dokument och 12 chunks. Gemini skapar 768-dimensionella embeddings och PostgreSQL/pgvector rankar högst fyra chunks med exakt cosine-sökning.
 
-Nästa slice flyttar runbooks till en fristående korpus med realistiska distraktorer. Gemini skapar 768-dimensionella embeddings och PostgreSQL/pgvector rankar högst fyra chunks med exakt cosine-sökning. Engineering View och evalrapporten ska då visa dokument, chunk, version, rank, similarity, embeddingmodell och korpusversion. Metrics, logs och traces stannar bakom sina typade tools.
+Engineering View visar dokument, chunk, version, rank, similarity, embeddingmodell, innehållshash, korpusversion och retrieval-backend när modellen väljer runbookverktyget. Metrics, logs och traces stannar bakom sina typade tools. Retrieval v1 är mätt till development 5/5 och held-out 4/5 Hit@4; det missade held-out-fallet och den osäkra topprankade runbooken är öppna kvalitetsproblem.
 
 ## Vad verifieraren kontrollerar
 
@@ -267,7 +267,7 @@ För officiellt läsmaterial och korta övningar, använd [lärspåret](./LEARNI
 ## Ännu inte färdigt
 
 - Kvalitet över 18 evalfall och held-out data är inte mätt.
-- Runbook-retrieval använder ännu scenarioförvald lokal keyword matching, inte en fristående PostgreSQL/pgvector-korpus.
+- Full diagnoskvalitet över 18 evalfall, inklusive abstention och adversarial synthesis, är ännu inte mätt.
 - Git SHA sparas ännu inte i körresultatet.
 - Strukturerade JSON-loggar och OpenTelemetry återstår.
 - Rate limit är minnesbaserad per applikationsinstans.

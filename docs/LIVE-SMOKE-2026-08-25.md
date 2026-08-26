@@ -89,6 +89,19 @@ En enda efterföljande v5-körning gjordes genom det riktiga UI:t för inventory
 
 Detta visar att den observerade felkopplingen kan undvikas med v5 i ett fall. Det visar inte generell kvalitet. Körningen valde inte `retrieve_runbooks` och är därför inte ett RAG- eller retrievalbevis. Nästa relevanta mätning är en fristående runbookkorpus med pgvector och en versionshanterad Hit@4-eval, inte fler handplockade liveanrop.
 
+## Budget-aware v6 och RAG-smokes – 26 augusti
+
+v6 skickar den återstående serverbudgeten till varje collection-runda och exponerar bara tools som fortfarande får användas. Backend förhandsgranskar hela modellens tool-batch innan ett enda tool körs. Ett metrics-anrop samlar alla relevanta serier; två separata loggsökningar är fortfarande tillåtna för trigger och felmekanism.
+
+Två payment-försök med `gemini-3.5-flash-lite` nådde collection-timeout efter cirka 9,8 respektive 28,7 sekunder. Felkontraktet sparar ännu inte vilket collection-varv som timeoutade, så det ska inte antas i efterhand. `gemini-3.1-flash-lite` testades därefter eftersom Googles officiella modellkort beskriver den som en stabil låg-latensmodell med function calling och structured outputs. Den blev utvecklingsstandard efter lyckade smokes, inte efter en full benchmark.
+
+| Scenario | Profil | Resultat | Säker toolsekvens | Latency | Tokens | Betalt listprisestimat |
+|---|---|---|---|---:|---:|---:|
+| Checkout orders at risk | RAG + v6 | Rätt rotorsak/tjänst, giltiga citationer | `get_metrics`, `search_logs`, `search_logs`, `retrieve_runbooks` | 6 057 ms | 5 919 | 0,002656 USD |
+| Cart segment failures | RAG + v6 | Rätt rotorsak/tjänst, giltiga citationer | `search_logs`, `search_logs`, `get_metrics`, `get_trace` | 5 505 ms | 6 590 | 0,00283625 USD |
+
+Payment-körningen bevisar att en full liveutredning kan välja runbookverktyget och få resultat från den importerade PostgreSQL/pgvector-korpusen. Inventory-körningen bevisar att modellen inte tvingas använda RAG när en trace är mer relevant. Båda använde tre modellanrop och fyra read-only tool calls. Faktisk free-tier-debitering kan vara 0 USD. Två lyckade körningar är fortfarande inte accuracy, p95 eller stabilitet.
+
 ## Reproducerbart opt-in-kommando
 
 Den vanliga testsuiten gör inga nätverksanrop. Ett live-smoketest måste aktiveras uttryckligen:

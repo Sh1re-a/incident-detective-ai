@@ -47,11 +47,11 @@ Modellen kan endast välja mellan `get_metrics`, `search_logs`, `get_trace` och 
 | R-02 | En runbook innehåller indirekt prompt injection | Runbooks behandlas som data, tools är read-only och modellen saknar åtgärdsbehörighet | Tvinga in den redan hämtade adversarial chunken i synthesis och kontrollera output/approval |
 | R-03 | Retrieval returnerar relevant-looking men fel text | Development-only tröskel, exact cosine, rank/similarity/hash och no-match-test | Förbättra corpus/query-kontrakt i en ny benchmarkversion utan held-out-tuning |
 | R-04 | Indexet är gammalt eller ofullständigt | Retrieval kontrollerar både antal och innehållshash före query-embedding | Behåll stale/missing-index-tester i CI |
-| R-05 | Modellen använder för många eller okända verktyg | Tillåtelselista, per-tool-gränser, totalbudget och hard timeout | Behåll negativa kontraktstester i CI |
+| R-05 | Modellen använder för många eller okända verktyg | Dynamisk tillåtelselista från återstående budget, atomisk preflight, per-tool-gränser, totalbudget och hard timeout | Behåll negativa kontraktstester i CI |
 | R-06 | Schema, citation eller facit underkänns men presenteras som korrekt | Deterministisk verifiering och separat `verification_failed` | Mäta hela evalmängden och visa failure cases |
 | R-07 | Publik användning orsakar kostnad eller överbelastning | Replay som standard, explicit livebekräftelse, lokal concurrency/rate limit och timeout | Cloud Run max-instances, persistent global gräns och budgetlarm före deploy |
 | R-08 | Hemligheter eller onödiga data hamnar i telemetry | Nyckelfilen ignoreras av Git; publika payloads utesluter `GroundTruth` | Implementera och testa en allowlist för JSON-loggar/OpenTelemetry |
-| R-09 | Leverantören är långsam eller otillgänglig | Sanerade providerfel, kontrollerad timeout och ingen tyst replay | Mäta stabilitet; ett inventory-livefall gav `MODEL_PROVIDER_TIMEOUT` den 26 augusti |
+| R-09 | Leverantören är långsam eller otillgänglig | Sanerade providerfel, kontrollerad timeout, mätt låg-latensstandard och ingen tyst replay | Mäta stabilitet; historiken innehåller timeout även om de två senaste RAG-smokesen slutfördes |
 | R-10 | Evalresultat överanpassas | Development och held-out hålls isär; tröskeln fryses före held-out | Versionshantera framtida dataset och ändra aldrig v1 efter resultatet |
 
 ## Säkra felutfall
