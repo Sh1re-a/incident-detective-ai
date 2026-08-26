@@ -137,6 +137,7 @@ describe("Incident Detective experience", () => {
     });
 
     await user.click(screen.getByRole("tab", { name: "Engineering View" }));
+    expect(screen.getByText("Affected service")).toBeVisible();
     expect(screen.getByText("gemini-3.5-flash-lite")).toBeVisible();
     expect(screen.getByText("$0.0032")).toBeVisible();
     expect(screen.getByText(/estimate, not a provider invoice/)).toBeVisible();

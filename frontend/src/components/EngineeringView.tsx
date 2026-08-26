@@ -228,6 +228,21 @@ export function EngineeringView({
               }
               detail="Compared after synthesis against hidden synthetic truth"
             />
+            <VerificationCard
+              label="Affected service"
+              value={
+                result.diagnosis.status === "insufficient_evidence"
+                  ? "Not applicable"
+                  : affectedServiceCorrect
+                    ? "Matched"
+                    : "Did not match"
+              }
+              passed={
+                result.diagnosis.status === "insufficient_evidence" ||
+                affectedServiceCorrect
+              }
+              detail="Scored separately from root-cause correctness"
+            />
           </div>
 
           <div className="actual-expected">
