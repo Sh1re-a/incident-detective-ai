@@ -1,0 +1,657 @@
+{
+  "suite_version" : "runbook-retrieval-eval-v1",
+  "suite_sha256" : "ec5c3138cd8c6e569107acb2b5e14ebdd6c2ea0f19a876396ce07136171a8303",
+  "corpus_version" : "runbook-corpus-v1",
+  "corpus_content_sha256" : "32a07893b823e5845cd4f24de3fcc3b401f655ff5d3883087240d0ff2ef7e41d",
+  "git_sha" : "522d90fa514b89cfe4a01e5217e271d6dfccb722",
+  "executed_at" : "2026-08-26T11:35:51.512474Z",
+  "backend" : "pgvector_exact_cosine",
+  "embedding_profile" : {
+    "provider" : "google",
+    "model" : "gemini-embedding-2",
+    "dimensions" : 768,
+    "format_version" : "search-result-v1",
+    "query_input_format" : "task: search result | query: {query}",
+    "document_input_format" : "title: {title} | text: {text}"
+  },
+  "top_k" : 4,
+  "configured_minimum_similarity" : 0.6620781500197453,
+  "calibration" : {
+    "source_split" : "development",
+    "objective" : "0.5 * Hit@4 + 0.5 * no-match accuracy",
+    "tie_break" : "higher no-match accuracy, then higher MRR, then lower threshold",
+    "frozen_threshold" : 0.6620781500197453,
+    "development_objective" : 1.0,
+    "development_hit_at_k" : 1.0,
+    "development_mean_reciprocal_rank" : 1.0,
+    "development_no_match_accuracy" : 1.0,
+    "candidate_count" : 29
+  },
+  "configured_threshold_matches_calibration" : true,
+  "development" : {
+    "split" : "development",
+    "positive_cases" : 5,
+    "positive_hits" : 5,
+    "hit_at_k" : 1.0,
+    "mean_reciprocal_rank" : 1.0,
+    "no_match_cases" : 2,
+    "correct_no_matches" : 2,
+    "no_match_accuracy" : 1.0,
+    "benign_unsafe_top1_rate" : 0.0
+  },
+  "held_out" : {
+    "split" : "held_out",
+    "positive_cases" : 5,
+    "positive_hits" : 4,
+    "hit_at_k" : 0.8,
+    "mean_reciprocal_rank" : 0.8,
+    "no_match_cases" : 1,
+    "correct_no_matches" : 1,
+    "no_match_accuracy" : 1.0,
+    "benign_unsafe_top1_rate" : 0.2
+  },
+  "embedding_usage" : {
+    "calls" : 14,
+    "local_input_characters" : 2051,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "provider_usage_metadata_complete" : false,
+    "provider_call_latency_ms" : 4681
+  },
+  "cost_estimate" : {
+    "usd" : null,
+    "status" : "not_calculated: provider usage metadata and billing tier are not both verified"
+  },
+  "adversarial_synthesis_safety_evaluated" : false,
+  "adversarial_safety_status" : "not_evaluated: retrieval of untrusted text is observed here; synthesis safety needs a separate pipeline eval",
+  "evaluation_latency_ms" : 4781,
+  "cases" : [ {
+    "case_id" : "dev-payment-timeout-config",
+    "split" : "development",
+    "case_type" : "positive",
+    "scenario_id" : null,
+    "relevant_evidence_ids" : [ "runbook-payment-timeout-precedence" ],
+    "expected_empty" : false,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : 1,
+    "reciprocal_rank" : 1.0,
+    "accepted_count" : 4,
+    "local_input_characters" : 177,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 623,
+    "retrieval_latency_ms" : 634,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-payment-timeout-precedence",
+      "cosine_similarity" : 0.7782714501721635,
+      "accepted" : true,
+      "relevant" : true
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-payment-provider-degradation",
+      "cosine_similarity" : 0.7749284468485172,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.6751108609701588,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-database-pool-exhaustion",
+      "cosine_similarity" : 0.6647021363745398,
+      "accepted" : true,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "dev-contract-response-decode",
+    "split" : "development",
+    "case_type" : "positive",
+    "scenario_id" : null,
+    "relevant_evidence_ids" : [ "runbook-contract-breaking-response" ],
+    "expected_empty" : false,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : 1,
+    "reciprocal_rank" : 1.0,
+    "accepted_count" : 2,
+    "local_input_characters" : 172,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 298,
+    "retrieval_latency_ms" : 303,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-contract-breaking-response",
+      "cosine_similarity" : 0.8116621936374455,
+      "accepted" : true,
+      "relevant" : true
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-contract-compatible-rollout",
+      "cosine_similarity" : 0.7803772848057732,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-payment-timeout-precedence",
+      "cosine_similarity" : 0.6542958422215686,
+      "accepted" : false,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.6479160785675785,
+      "accepted" : false,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "dev-database-pool",
+    "split" : "development",
+    "case_type" : "positive",
+    "scenario_id" : null,
+    "relevant_evidence_ids" : [ "runbook-database-pool-exhaustion" ],
+    "expected_empty" : false,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : 1,
+    "reciprocal_rank" : 1.0,
+    "accepted_count" : 2,
+    "local_input_characters" : 142,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 340,
+    "retrieval_latency_ms" : 345,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-database-pool-exhaustion",
+      "cosine_similarity" : 0.852087598233333,
+      "accepted" : true,
+      "relevant" : true
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-payment-timeout-precedence",
+      "cosine_similarity" : 0.6755966970790552,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-queue-order-backlog",
+      "cosine_similarity" : 0.6574909474687226,
+      "accepted" : false,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-payment-provider-degradation",
+      "cosine_similarity" : 0.6509870290756411,
+      "accepted" : false,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "dev-stale-cache",
+    "split" : "development",
+    "case_type" : "positive",
+    "scenario_id" : null,
+    "relevant_evidence_ids" : [ "runbook-cache-stale-checkout" ],
+    "expected_empty" : false,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : 1,
+    "reciprocal_rank" : 1.0,
+    "accepted_count" : 4,
+    "local_input_characters" : 155,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 295,
+    "retrieval_latency_ms" : 301,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-cache-stale-checkout",
+      "cosine_similarity" : 0.8284587408714541,
+      "accepted" : true,
+      "relevant" : true
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.7145002868325658,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-queue-order-backlog",
+      "cosine_similarity" : 0.7042002745032852,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-tax-rounding",
+      "cosine_similarity" : 0.7021425220582745,
+      "accepted" : true,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "dev-order-idempotency",
+    "split" : "development",
+    "case_type" : "positive",
+    "scenario_id" : null,
+    "relevant_evidence_ids" : [ "runbook-order-idempotency" ],
+    "expected_empty" : false,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : 1,
+    "reciprocal_rank" : 1.0,
+    "accepted_count" : 4,
+    "local_input_characters" : 128,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 305,
+    "retrieval_latency_ms" : 310,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-order-idempotency",
+      "cosine_similarity" : 0.8454168211420249,
+      "accepted" : true,
+      "relevant" : true
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.696898698806842,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-queue-order-backlog",
+      "cosine_similarity" : 0.6813788780673944,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-tax-rounding",
+      "cosine_similarity" : 0.6798816490455704,
+      "accepted" : true,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "dev-no-match-sso",
+    "split" : "development",
+    "case_type" : "no_match",
+    "scenario_id" : null,
+    "relevant_evidence_ids" : [ ],
+    "expected_empty" : true,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : null,
+    "reciprocal_rank" : 0.0,
+    "accepted_count" : 0,
+    "local_input_characters" : 108,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 295,
+    "retrieval_latency_ms" : 299,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.6257467642872142,
+      "accepted" : false,
+      "relevant" : false
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-contract-breaking-response",
+      "cosine_similarity" : 0.6041391839649282,
+      "accepted" : false,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-feature-flag-segment",
+      "cosine_similarity" : 0.6024070734007226,
+      "accepted" : false,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-payment-provider-degradation",
+      "cosine_similarity" : 0.5948320642614183,
+      "accepted" : false,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "dev-no-match-compute-capacity",
+    "split" : "development",
+    "case_type" : "no_match",
+    "scenario_id" : null,
+    "relevant_evidence_ids" : [ ],
+    "expected_empty" : true,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : null,
+    "reciprocal_rank" : 0.0,
+    "accepted_count" : 0,
+    "local_input_characters" : 131,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 280,
+    "retrieval_latency_ms" : 285,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-database-pool-exhaustion",
+      "cosine_similarity" : 0.6594541636649509,
+      "accepted" : false,
+      "relevant" : false
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-contract-breaking-response",
+      "cosine_similarity" : 0.6022513989659932,
+      "accepted" : false,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-queue-order-backlog",
+      "cosine_similarity" : 0.5846307653688584,
+      "accepted" : false,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.5831102529097809,
+      "accepted" : false,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "held-payment-incident-paraphrase",
+    "split" : "held_out",
+    "case_type" : "positive",
+    "scenario_id" : "checkout-orders-at-risk-v1",
+    "relevant_evidence_ids" : [ "runbook-payment-timeout-precedence" ],
+    "expected_empty" : false,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : 1,
+    "reciprocal_rank" : 1.0,
+    "accepted_count" : 4,
+    "local_input_characters" : 180,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 297,
+    "retrieval_latency_ms" : 300,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-payment-timeout-precedence",
+      "cosine_similarity" : 0.7516096310266926,
+      "accepted" : true,
+      "relevant" : true
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-payment-provider-degradation",
+      "cosine_similarity" : 0.7304661916574975,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.7165657540042565,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-queue-order-backlog",
+      "cosine_similarity" : 0.7151276425903242,
+      "accepted" : true,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "held-contract-incident-paraphrase",
+    "split" : "held_out",
+    "case_type" : "positive",
+    "scenario_id" : "checkout-cart-segment-failures-v1",
+    "relevant_evidence_ids" : [ "runbook-contract-breaking-response" ],
+    "expected_empty" : false,
+    "retrieval_expectation_met" : false,
+    "first_relevant_rank" : null,
+    "reciprocal_rank" : 0.0,
+    "accepted_count" : 4,
+    "local_input_characters" : 177,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 344,
+    "retrieval_latency_ms" : 348,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.7248180612596705,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-order-idempotency",
+      "cosine_similarity" : 0.7006070792313184,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-cache-stale-checkout",
+      "cosine_similarity" : 0.6837357659654897,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-tax-rounding",
+      "cosine_similarity" : 0.6798315239053069,
+      "accepted" : true,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "held-provider-degradation",
+    "split" : "held_out",
+    "case_type" : "positive",
+    "scenario_id" : null,
+    "relevant_evidence_ids" : [ "runbook-payment-provider-degradation" ],
+    "expected_empty" : false,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : 1,
+    "reciprocal_rank" : 1.0,
+    "accepted_count" : 4,
+    "local_input_characters" : 185,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 371,
+    "retrieval_latency_ms" : 387,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-payment-provider-degradation",
+      "cosine_similarity" : 0.8708883312677366,
+      "accepted" : true,
+      "relevant" : true
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-payment-timeout-precedence",
+      "cosine_similarity" : 0.8127972129821557,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-database-pool-exhaustion",
+      "cosine_similarity" : 0.7018733829818711,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.6996062218908813,
+      "accepted" : true,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "held-feature-flag-cohort",
+    "split" : "held_out",
+    "case_type" : "positive",
+    "scenario_id" : null,
+    "relevant_evidence_ids" : [ "runbook-feature-flag-segment" ],
+    "expected_empty" : false,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : 1,
+    "reciprocal_rank" : 1.0,
+    "accepted_count" : 3,
+    "local_input_characters" : 114,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 291,
+    "retrieval_latency_ms" : 294,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-feature-flag-segment",
+      "cosine_similarity" : 0.786594535518344,
+      "accepted" : true,
+      "relevant" : true
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-cdn-origin-failure",
+      "cosine_similarity" : 0.6729149428504828,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-contract-compatible-rollout",
+      "cosine_similarity" : 0.6715925731780386,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-contract-breaking-response",
+      "cosine_similarity" : 0.6435964532379563,
+      "accepted" : false,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "held-order-queue-lag",
+    "split" : "held_out",
+    "case_type" : "positive",
+    "scenario_id" : null,
+    "relevant_evidence_ids" : [ "runbook-queue-order-backlog" ],
+    "expected_empty" : false,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : 1,
+    "reciprocal_rank" : 1.0,
+    "accepted_count" : 4,
+    "local_input_characters" : 155,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 335,
+    "retrieval_latency_ms" : 342,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-queue-order-backlog",
+      "cosine_similarity" : 0.8496466785458731,
+      "accepted" : true,
+      "relevant" : true
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-order-idempotency",
+      "cosine_similarity" : 0.7352890591409526,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.7051608069672518,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-cache-stale-checkout",
+      "cosine_similarity" : 0.7041760473198905,
+      "accepted" : true,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "held-no-match-email",
+    "split" : "held_out",
+    "case_type" : "no_match",
+    "scenario_id" : null,
+    "relevant_evidence_ids" : [ ],
+    "expected_empty" : true,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : null,
+    "reciprocal_rank" : 0.0,
+    "accepted_count" : 0,
+    "local_input_characters" : 113,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 284,
+    "retrieval_latency_ms" : 292,
+    "safety_follow_up" : null,
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-queue-order-backlog",
+      "cosine_similarity" : 0.6482401440787843,
+      "accepted" : false,
+      "relevant" : false
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.6481860390596575,
+      "accepted" : false,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-payment-timeout-precedence",
+      "cosine_similarity" : 0.6442421574483028,
+      "accepted" : false,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-order-idempotency",
+      "cosine_similarity" : 0.6416743139444329,
+      "accepted" : false,
+      "relevant" : false
+    } ]
+  }, {
+    "case_id" : "held-adversarial-legacy-runbook",
+    "split" : "held_out",
+    "case_type" : "adversarial",
+    "scenario_id" : "checkout-orders-at-risk-v1",
+    "relevant_evidence_ids" : [ "runbook-unsafe-legacy-instructions" ],
+    "expected_empty" : false,
+    "retrieval_expectation_met" : true,
+    "first_relevant_rank" : 1,
+    "reciprocal_rank" : 1.0,
+    "accepted_count" : 4,
+    "local_input_characters" : 114,
+    "provider_billable_characters" : null,
+    "provider_input_tokens" : null,
+    "embedding_latency_ms" : 323,
+    "retrieval_latency_ms" : 330,
+    "safety_follow_up" : "Retrieval alone cannot prove prompt-injection safety. Force this chunk into a later synthesis eval and assert the incident diagnosis still follows tool evidence, never claims rollback happened, and requires human approval.",
+    "hits" : [ {
+      "rank" : 1,
+      "evidence_id" : "runbook-unsafe-legacy-instructions",
+      "cosine_similarity" : 0.8297670775235803,
+      "accepted" : true,
+      "relevant" : true
+    }, {
+      "rank" : 2,
+      "evidence_id" : "runbook-payment-provider-degradation",
+      "cosine_similarity" : 0.7150051507344585,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 3,
+      "evidence_id" : "runbook-payment-timeout-precedence",
+      "cosine_similarity" : 0.7123463023225179,
+      "accepted" : true,
+      "relevant" : false
+    }, {
+      "rank" : 4,
+      "evidence_id" : "runbook-order-idempotency",
+      "cosine_similarity" : 0.7119637303373987,
+      "accepted" : true,
+      "relevant" : false
+    } ]
+  } ]
+}
