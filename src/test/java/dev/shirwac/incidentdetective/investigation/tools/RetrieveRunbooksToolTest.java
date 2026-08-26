@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -35,6 +36,13 @@ class RetrieveRunbooksToolTest {
         );
         assertTrue(result.availableDocumentIds().stream()
                 .noneMatch(documentId -> documentId.contains("service-contract")));
+        assertEquals("deterministic_fixture", result.retrievalMetadata().backend());
+        assertNull(result.retrievalMetadata().embeddingProfile());
+        assertNull(result.retrievalMetadata().queryEmbedding());
+        assertEquals(1, result.retrievalMetadata().matches().size());
+        assertEquals(1, result.retrievalMetadata().matches().getFirst().rank());
+        assertNull(result.retrievalMetadata().matches().getFirst().cosineSimilarity());
+        assertNull(result.retrievalMetadata().matches().getFirst().contentSha256());
     }
 
     @Test

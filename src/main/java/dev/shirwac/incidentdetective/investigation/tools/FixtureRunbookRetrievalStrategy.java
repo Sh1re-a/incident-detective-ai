@@ -56,7 +56,16 @@ public final class FixtureRunbookRetrievalStrategy
                         .toList(),
                 evidence,
                 evidence.size(),
-                matches.size() > evidence.size()
+                matches.size() > evidence.size(),
+                RunbookRetrievalMetadata.fixture(java.util.stream.IntStream
+                        .range(0, evidence.size())
+                        .mapToObj(index -> new RunbookRetrievalMetadata.Match(
+                                index + 1,
+                                evidence.get(index).evidenceId(),
+                                null,
+                                null
+                        ))
+                        .toList())
         );
     }
 

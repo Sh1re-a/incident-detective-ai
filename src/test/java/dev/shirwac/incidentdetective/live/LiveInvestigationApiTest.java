@@ -138,6 +138,19 @@ class LiveInvestigationApiTest {
                         .value("search_logs"))
                 .andExpect(jsonPath("$.tool_events[2].tool_name")
                         .value("retrieve_runbooks"))
+                .andExpect(jsonPath("$.tool_events[2].runbook_retrieval.backend")
+                        .value("deterministic_fixture"))
+                .andExpect(jsonPath(
+                        "$.tool_events[2].runbook_retrieval.matches[0].rank"
+                ).value(1))
+                .andExpect(jsonPath(
+                        "$.tool_events[2].runbook_retrieval.matches[0].cosine_similarity"
+                ).doesNotExist())
+                .andExpect(jsonPath(
+                        "$.tool_events[2].runbook_retrieval.embedding_profile"
+                ).doesNotExist())
+                .andExpect(jsonPath("$.tool_events[0].runbook_retrieval")
+                        .doesNotExist())
                 .andExpect(jsonPath("$.tool_events[3].collection_round").value(2))
                 .andExpect(jsonPath("$.tool_events[3].tool_name")
                         .value("get_trace"))

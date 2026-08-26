@@ -11,7 +11,8 @@ public record ToolExecution(
         ToolName toolName,
         Map<String, Object> arguments,
         String safeSummary,
-        List<Evidence> evidence
+        List<Evidence> evidence,
+        RunbookRetrievalMetadata runbookRetrieval
 ) {
     public ToolExecution {
         Objects.requireNonNull(callId, "callId must not be null");

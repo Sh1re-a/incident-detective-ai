@@ -11,7 +11,8 @@ public record RetrieveRunbooksResult(
         @NotNull List<String> availableDocumentIds,
         @NotNull List<@Valid RunbookEvidence> evidence,
         @Min(0) int returnedCount,
-        boolean truncated
+        boolean truncated,
+        @NotNull @Valid RunbookRetrievalMetadata retrievalMetadata
 ) {
     public RetrieveRunbooksResult {
         availableDocumentIds = availableDocumentIds == null

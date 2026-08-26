@@ -5,6 +5,7 @@ import dev.shirwac.incidentdetective.investigation.InvestigationScenarioCatalog;
 import dev.shirwac.incidentdetective.investigation.InvestigationScenarioNotFoundException;
 import dev.shirwac.incidentdetective.investigation.tools.RetrieveRunbooksArguments;
 import dev.shirwac.incidentdetective.investigation.tools.RetrieveRunbooksResult;
+import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalMetadata;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalStrategy;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -63,7 +64,33 @@ public final class PgvectorRunbookRetrievalStrategy
                 evidence,
                 evidence.size(),
                 evidence.size() == arguments.maxResults()
-                        && indexStatus.indexedChunks() > evidence.size()
+                        && indexStatus.indexedChunks() > evidence.size(),
+                RunbookRetrievalMetadata.pgvector(
+                        corpus.version(),
+                        new RunbookRetrievalMetadata.EmbeddingProfile(
+                                properties.embeddingModel(),
+                                properties.embeddingDimensions(),
+                                properties.embeddingFormatVersion(),
+                                properties.minimumSimilarity()
+                        ),
+                        new RunbookRetrievalMetadata.QueryEmbeddingUsage(
+                                queryEmbedding.inputCharacters(),
+                                queryEmbedding.providerBillableCharacters(),
+                                queryEmbedding.providerInputTokens(),
+                                queryEmbedding.latencyMs()
+                        ),
+                        java.util.stream.IntStream.range(0, hits.size())
+                                .mapToObj(index -> {
+                                    RunbookSearchHit hit = hits.get(index);
+                                    return new RunbookRetrievalMetadata.Match(
+                                            index + 1,
+                                            hit.entry().evidenceId(),
+                                            hit.cosineSimilarity(),
+                                            hit.entry().contentSha256()
+                                    );
+                                })
+                                .toList()
+                )
         );
     }
 

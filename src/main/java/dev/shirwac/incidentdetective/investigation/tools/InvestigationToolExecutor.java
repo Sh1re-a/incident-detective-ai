@@ -113,7 +113,8 @@ public final class InvestigationToolExecutor {
                 "Returned " + result.returnedCount()
                         + " bounded runbook chunk(s) using "
                         + retrieveRunbooks.safeModeDescription() + ".",
-                List.copyOf(result.evidence())
+                List.copyOf(result.evidence()),
+                result.retrievalMetadata()
         );
     }
 
@@ -126,12 +127,22 @@ public final class InvestigationToolExecutor {
             String safeSummary,
             List<Evidence> evidence
     ) {
+        return execution(call, safeSummary, evidence, null);
+    }
+
+    private ToolExecution execution(
+            CollectionToolCall call,
+            String safeSummary,
+            List<Evidence> evidence,
+            RunbookRetrievalMetadata runbookRetrieval
+    ) {
         return new ToolExecution(
                 call.callId(),
                 call.toolName(),
                 call.arguments(),
                 safeSummary,
-                evidence
+                evidence,
+                runbookRetrieval
         );
     }
 

@@ -52,6 +52,34 @@ class PgvectorRunbookRetrievalStrategyTest {
         assertEquals(List.of("payment timeout"), embeddings.queries);
         assertEquals(0.42, store.minimumSimilarity);
         assertEquals(2, result.returnedCount());
+        assertEquals("pgvector_exact_cosine", result.retrievalMetadata().backend());
+        assertEquals(corpus.version(), result.retrievalMetadata().corpusVersion());
+        assertEquals(
+                "gemini-embedding-2",
+                result.retrievalMetadata().embeddingProfile().modelId()
+        );
+        assertEquals(768, result.retrievalMetadata().embeddingProfile().dimensions());
+        assertEquals(0.42, result.retrievalMetadata()
+                .embeddingProfile()
+                .minimumSimilarity());
+        assertEquals(15, result.retrievalMetadata()
+                .queryEmbedding()
+                .localInputCharacters());
+        assertEquals(10, result.retrievalMetadata()
+                .queryEmbedding()
+                .providerBillableCharacters());
+        assertEquals(3.0, result.retrievalMetadata()
+                .queryEmbedding()
+                .providerInputTokens());
+        assertEquals(0.91, result.retrievalMetadata()
+                .matches()
+                .getFirst()
+                .cosineSimilarity());
+        assertTrue(result.retrievalMetadata()
+                .matches()
+                .getFirst()
+                .contentSha256()
+                .matches("[0-9a-f]{64}"));
         assertTrue(result.evidence().stream().allMatch(evidence ->
                 SCENARIO_ID.equals(evidence.scenarioId())
         ));

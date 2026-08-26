@@ -1,6 +1,7 @@
 package dev.shirwac.incidentdetective.live;
 
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
+import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalMetadata;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
 
 import java.util.List;
@@ -13,7 +14,8 @@ public record LiveToolEvent(
         ToolName toolName,
         Map<String, Object> arguments,
         String safeSummary,
-        List<Evidence> evidence
+        List<Evidence> evidence,
+        RunbookRetrievalMetadata runbookRetrieval
 ) {
     public LiveToolEvent {
         Objects.requireNonNull(eventId, "eventId must not be null");

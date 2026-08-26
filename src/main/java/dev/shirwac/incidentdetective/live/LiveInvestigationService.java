@@ -147,7 +147,8 @@ public final class LiveInvestigationService {
                         execution.toolName(),
                         execution.arguments(),
                         execution.safeSummary(),
-                        execution.evidence()
+                        execution.evidence(),
+                        execution.runbookRetrieval()
                 ));
             }
         }

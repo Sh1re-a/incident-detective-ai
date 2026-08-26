@@ -10,6 +10,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 class InvestigationToolExecutorTest {
@@ -74,6 +75,12 @@ class InvestigationToolExecutorTest {
                         .flatMap(execution -> execution.evidence().stream())
                         .map(evidence -> evidence.evidenceId())
                         .toList()
+        );
+        assertTrue(executions.subList(0, 3).stream()
+                .allMatch(execution -> execution.runbookRetrieval() == null));
+        assertEquals(
+                "deterministic_fixture",
+                executions.get(3).runbookRetrieval().backend()
         );
     }
 
