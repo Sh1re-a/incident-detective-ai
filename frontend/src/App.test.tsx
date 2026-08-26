@@ -135,6 +135,30 @@ describe("Incident Detective experience", () => {
     expect(screen.getByText(/Embedding retrieval cost is not included/)).toBeVisible();
   });
 
+  it("does not present a missing live estimate as no model call", async () => {
+    const liveWithoutEstimate: LiveInvestigationResult = {
+      ...liveResult,
+      estimated_cost_usd: null,
+      estimated_cost_basis: "No paid list-price estimate is configured for this model.",
+    };
+    installApiMock({ liveResponse: liveWithoutEstimate });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Run live AI" }));
+    await user.click(screen.getByRole("button", { name: "Confirm live run" }));
+    await screen.findByText("Simulated incident — real AI investigation.", {
+      exact: true,
+    });
+    await user.click(screen.getByRole("tab", { name: "Engineering View" }));
+
+    expect(screen.getByText("Estimate unavailable")).toBeVisible();
+    expect(
+      screen.getByText(/This does not mean the run cost \$0/),
+    ).toBeVisible();
+    expect(screen.queryByText("No model called")).not.toBeInTheDocument();
+  });
+
   it("keeps keyboard focus inside the live confirmation dialog", async () => {
     installApiMock();
     const user = userEvent.setup();

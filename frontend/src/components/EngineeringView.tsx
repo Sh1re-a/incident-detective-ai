@@ -313,7 +313,13 @@ export function EngineeringView({
           />
           <Metadata
             label="Investigation model estimate"
-            value={formatCost(result.estimated_cost_usd)}
+            value={
+              result.estimated_cost_usd === null
+                ? isLive
+                  ? "Estimate unavailable"
+                  : "No model called"
+                : formatCost(result.estimated_cost_usd)
+            }
           />
           <Metadata
             label="Model calls"
@@ -327,11 +333,18 @@ export function EngineeringView({
 
         {isLive ? (
           <>
-            <p className="cost-basis">
-              Cost basis: {trimSentenceEnd(result.estimated_cost_basis)}. This is an estimate, not
-              a provider invoice; a free-tier run may be billed at $0. Embedding retrieval cost is
-              not included unless the provider reports enough usage data.
-            </p>
+            {result.estimated_cost_usd === null ? (
+              <p className="cost-basis">
+                A cost estimate was unavailable for this live run. This does not mean the run cost
+                $0. Cost basis: {trimSentenceEnd(result.estimated_cost_basis)}.
+              </p>
+            ) : (
+              <p className="cost-basis">
+                Cost basis: {trimSentenceEnd(result.estimated_cost_basis)}. This is an estimate,
+                not a provider invoice; a free-tier run may be billed at $0. Embedding retrieval
+                cost is not included unless the provider reports enough usage data.
+              </p>
+            )}
             <div className="model-call-list">
               <h3>Model calls</h3>
               {result.model_calls.map((call) => (
