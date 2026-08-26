@@ -196,12 +196,30 @@ export const liveResult: LiveInvestigationResult = {
   prompt_version: "gemini-live-v3",
   token_usage: {
     input_tokens: 3967,
+    cached_input_tokens: 800,
+    uncached_input_tokens: 3167,
+    candidate_output_tokens: 700,
+    thinking_output_tokens: 108,
     output_tokens: 808,
+    tool_use_prompt_tokens: 0,
     total_tokens: 4775,
   },
-  estimated_cost_usd: 0.0032,
+  estimated_cost_usd: 0.0029941,
   estimated_cost_basis:
-    "Gemini paid standard list price checked 2026-08-25; actual free-tier charge may be USD 0.",
+    "Gemini paid Standard list prices checked 2026-08-26; this is not a provider invoice and the API does not report whether the run was free-tier billed. Provider-reported cached input tokens were priced at the context-caching rate; remaining input tokens used the normal rate. No explicit cache or storage cost was used.",
+  prompt_cache: {
+    strategy: "provider_implicit",
+    provider_reported_model_calls: 2,
+    model_call_count: 2,
+    cached_input_tokens: 800,
+    cache_hit_observed: true,
+  },
+  model_cost_breakdown: {
+    uncached_input_usd: 0.0009501,
+    cached_input_usd: 0.000024,
+    output_usd: 0.00202,
+    observed_cache_savings_usd: 0.000216,
+  },
   model_calls: [
     {
       phase: "collect",
@@ -210,7 +228,12 @@ export const liveResult: LiveInvestigationResult = {
       model_version: "gemini-3.5-flash-lite",
       token_usage: {
         input_tokens: 2000,
+        cached_input_tokens: 500,
+        uncached_input_tokens: 1500,
+        candidate_output_tokens: 180,
+        thinking_output_tokens: 20,
         output_tokens: 200,
+        tool_use_prompt_tokens: 0,
         total_tokens: 2200,
       },
       latency_ms: 1700,
@@ -222,7 +245,12 @@ export const liveResult: LiveInvestigationResult = {
       model_version: "gemini-3.5-flash-lite",
       token_usage: {
         input_tokens: 1967,
+        cached_input_tokens: 300,
+        uncached_input_tokens: 1667,
+        candidate_output_tokens: 520,
+        thinking_output_tokens: 88,
         output_tokens: 608,
+        tool_use_prompt_tokens: 0,
         total_tokens: 2575,
       },
       latency_ms: 2400,

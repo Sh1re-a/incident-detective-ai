@@ -139,9 +139,14 @@ describe("Incident Detective experience", () => {
     await user.click(screen.getByRole("tab", { name: "Engineering View" }));
     expect(screen.getByText("Affected service")).toBeVisible();
     expect(screen.getByText("gemini-3.5-flash-lite")).toBeVisible();
-    expect(screen.getByText("$0.0032")).toBeVisible();
+    expect(screen.getByText("$0.002994")).toBeVisible();
     expect(screen.getByText(/estimate, not a provider invoice/)).toBeVisible();
     expect(screen.getByText("Investigation model estimate")).toBeVisible();
+    expect(screen.getByText("800 cached tokens")).toBeVisible();
+    expect(screen.getByText("$0.000216")).toBeVisible();
+    expect(screen.getByText("2 / 3 max")).toBeVisible();
+    expect(screen.getByText("2 / 8 max")).toBeVisible();
+    expect(screen.getByText(/20.2% of prompt input/)).toBeVisible();
     await user.click(screen.getByText("Retrieval metadata"));
     expect(screen.getByText("pgvector_exact_cosine")).toBeVisible();
     expect(screen.getByText("gemini-embedding-2")).toBeVisible();
@@ -155,6 +160,7 @@ describe("Incident Detective experience", () => {
     const liveWithoutEstimate: LiveInvestigationResult = {
       ...liveResult,
       estimated_cost_usd: null,
+      model_cost_breakdown: null,
       estimated_cost_basis: "No paid list-price estimate is configured for this model.",
     };
     installApiMock({ liveResponse: liveWithoutEstimate });
@@ -173,6 +179,59 @@ describe("Incident Detective experience", () => {
       screen.getByText(/This does not mean the run cost \$0/),
     ).toBeVisible();
     expect(screen.queryByText("No model called")).not.toBeInTheDocument();
+  });
+
+  it("does not turn missing provider cache metadata into zero", async () => {
+    const liveWithoutCacheReport: LiveInvestigationResult = {
+      ...liveResult,
+      token_usage: liveResult.token_usage
+        ? {
+            ...liveResult.token_usage,
+            cached_input_tokens: null,
+            uncached_input_tokens: null,
+          }
+        : null,
+      prompt_cache: {
+        strategy: "provider_implicit",
+        provider_reported_model_calls: 0,
+        model_call_count: liveResult.model_call_count,
+        cached_input_tokens: null,
+        cache_hit_observed: false,
+      },
+      model_cost_breakdown: liveResult.model_cost_breakdown
+        ? {
+            ...liveResult.model_cost_breakdown,
+            cached_input_usd: null,
+            observed_cache_savings_usd: null,
+          }
+        : null,
+      model_calls: liveResult.model_calls.map((call) => ({
+        ...call,
+        token_usage: call.token_usage
+          ? {
+              ...call.token_usage,
+              cached_input_tokens: null,
+              uncached_input_tokens: null,
+            }
+          : null,
+      })),
+    };
+    installApiMock({ liveResponse: liveWithoutCacheReport });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Run live AI" }));
+    await user.click(screen.getByRole("button", { name: "Confirm live run" }));
+    await user.click(await screen.findByRole("tab", { name: "Engineering View" }));
+
+    expect(screen.getByText("No provider-reported hit")).toBeVisible();
+    expect(screen.getByText(/missing cache data is not shown as zero/)).toBeVisible();
+    expect(screen.queryByText(/0 cached tokens/)).not.toBeInTheDocument();
+    const costBreakdown = screen
+      .getByRole("heading", { name: "Paid-list cost breakdown" })
+      .parentElement;
+    expect(costBreakdown).not.toBeNull();
+    expect(within(costBreakdown!).getAllByText("Not reported")).toHaveLength(2);
   });
 
   it("keeps keyboard focus inside the live confirmation dialog", async () => {

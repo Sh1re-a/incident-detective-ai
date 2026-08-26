@@ -1,5 +1,7 @@
 import type {
   InvestigationResult,
+  LiveInvestigationResult,
+  ModelTokenUsage,
   RunbookRetrievalMetadata,
 } from "../api/types";
 import {
@@ -320,11 +322,7 @@ export function EngineeringView({
           <Metadata label="Prompt" value={result.prompt_version ?? "No prompt used"} />
           <Metadata
             label="Tokens"
-            value={
-              result.token_usage
-                ? `${result.token_usage.total_tokens.toLocaleString("en-US")} total`
-                : "No model called"
-            }
+            value={formatRunTokens(result.token_usage, isLive)}
           />
           <Metadata
             label="Investigation model estimate"
@@ -338,12 +336,22 @@ export function EngineeringView({
           />
           <Metadata
             label="Model calls"
-            value={isLive ? String(result.model_call_count) : "0"}
+            value={isLive ? `${result.model_call_count} / 3 max` : "0"}
           />
           <Metadata
             label={isLive ? "Tool calls" : "Recorded events"}
-            value={isLive ? String(result.tool_call_count) : String(result.tool_events.length)}
+            value={
+              isLive
+                ? `${result.tool_call_count} / 8 max`
+                : String(result.tool_events.length)
+            }
           />
+          {isLive ? (
+            <Metadata
+              label="Prompt cache"
+              value={formatPromptCache(result)}
+            />
+          ) : null}
         </dl>
 
         {isLive ? (
@@ -356,17 +364,41 @@ export function EngineeringView({
             ) : (
               <p className="cost-basis">
                 Cost basis: {trimSentenceEnd(result.estimated_cost_basis)}. This is an estimate,
-                not a provider invoice; a free-tier run may be billed at $0. Embedding retrieval
-                cost is not included unless the provider reports enough usage data.
+                not a provider invoice. Embedding retrieval cost is not included unless the
+                provider reports enough usage data.
               </p>
             )}
+            <p className="cost-basis">
+              {cacheExplanation(result)}
+            </p>
+            {result.model_cost_breakdown ? (
+              <div className="model-call-list">
+                <h3>Paid-list cost breakdown</h3>
+                <CostLine
+                  label="Uncached input"
+                  value={result.model_cost_breakdown.uncached_input_usd}
+                />
+                <CostLine
+                  label="Provider-reported cached input"
+                  value={result.model_cost_breakdown.cached_input_usd}
+                />
+                <CostLine
+                  label="Output + thinking"
+                  value={result.model_cost_breakdown.output_usd}
+                />
+                <CostLine
+                  label="Observed cache saving"
+                  value={result.model_cost_breakdown.observed_cache_savings_usd}
+                />
+              </div>
+            ) : null}
             <div className="model-call-list">
               <h3>Model calls</h3>
               {result.model_calls.map((call) => (
                 <div key={`${call.phase}-${call.round}`}>
                   <span>{humanizeCode(call.phase)} · round {call.round}</span>
                   <strong>{formatDuration(call.latency_ms)}</strong>
-                  <small>{call.token_usage.total_tokens.toLocaleString("en-US")} tokens</small>
+                  <small>{formatModelCallTokens(call.token_usage)}</small>
                 </div>
               ))}
             </div>
@@ -388,6 +420,71 @@ export function EngineeringView({
           </p>
         )}
       </section>
+    </div>
+  );
+}
+
+function formatRunTokens(
+  usage: ModelTokenUsage | null,
+  isLive: boolean,
+): string {
+  if (!usage) {
+    return isLive ? "Provider did not report" : "No model called";
+  }
+  if (usage.total_tokens === null) {
+    return "Total not reported";
+  }
+  return `${usage.total_tokens.toLocaleString("en-US")} total`;
+}
+
+function formatPromptCache(result: LiveInvestigationResult): string {
+  const cache = result.prompt_cache;
+  if (!cache.cache_hit_observed || cache.cached_input_tokens === null) {
+    return "No provider-reported hit";
+  }
+  return `${cache.cached_input_tokens.toLocaleString("en-US")} cached tokens`;
+}
+
+function cacheExplanation(result: LiveInvestigationResult): string {
+  const cache = result.prompt_cache;
+  const reportCoverage = `${cache.provider_reported_model_calls}/${cache.model_call_count} model calls`;
+  if (!cache.cache_hit_observed || cache.cached_input_tokens === null) {
+    return `Gemini implicit caching is provider-managed. No cache hit was reported for this run (${reportCoverage}); missing cache data is not shown as zero.`;
+  }
+  const ratio = result.token_usage?.input_tokens
+    ? ` (${((cache.cached_input_tokens / result.token_usage.input_tokens) * 100).toFixed(1)}% of prompt input)`
+    : "";
+  const saving = result.model_cost_breakdown?.observed_cache_savings_usd;
+  const savingText = saving === null || saving === undefined
+    ? ""
+    : ` Estimated paid-list saving: ${formatCost(saving)}.`;
+  return `Gemini reported ${cache.cached_input_tokens.toLocaleString("en-US")} cached input tokens across ${reportCoverage}${ratio}.${savingText}`;
+}
+
+function formatModelCallTokens(usage: ModelTokenUsage | null): string {
+  if (!usage) {
+    return "Provider usage not reported";
+  }
+  const input = formatTokenPart(usage.input_tokens, "input");
+  const cached = usage.cached_input_tokens === null
+    ? "cache not reported"
+    : `${usage.cached_input_tokens.toLocaleString("en-US")} cached`;
+  const output = formatTokenPart(usage.output_tokens, "output");
+  return `${input} · ${cached} · ${output}`;
+}
+
+function formatTokenPart(value: number | null, label: string): string {
+  return value === null
+    ? `${label} not reported`
+    : `${value.toLocaleString("en-US")} ${label}`;
+}
+
+function CostLine({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value === null ? "Not reported" : formatCost(value)}</strong>
+      <small>USD estimate</small>
     </div>
   );
 }

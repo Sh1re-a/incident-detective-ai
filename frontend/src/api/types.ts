@@ -166,9 +166,29 @@ export interface ReplayComparison {
 }
 
 export interface ModelTokenUsage {
-  input_tokens: number;
-  output_tokens: number;
-  total_tokens: number;
+  input_tokens: number | null;
+  cached_input_tokens: number | null;
+  uncached_input_tokens: number | null;
+  candidate_output_tokens: number | null;
+  thinking_output_tokens: number | null;
+  output_tokens: number | null;
+  tool_use_prompt_tokens: number | null;
+  total_tokens: number | null;
+}
+
+export interface PromptCacheTelemetry {
+  strategy: "provider_implicit";
+  provider_reported_model_calls: number;
+  model_call_count: number;
+  cached_input_tokens: number | null;
+  cache_hit_observed: boolean;
+}
+
+export interface ModelCostBreakdown {
+  uncached_input_usd: number | null;
+  cached_input_usd: number | null;
+  output_usd: number | null;
+  observed_cache_savings_usd: number | null;
 }
 
 export interface RecordedToolEvent {
@@ -239,9 +259,11 @@ export interface LiveInvestigationResult extends CommonRunResult {
     round: number;
     provider_response_id: string | null;
     model_version: string;
-    token_usage: ModelTokenUsage;
+    token_usage: ModelTokenUsage | null;
     latency_ms: number;
   }>;
+  prompt_cache: PromptCacheTelemetry;
+  model_cost_breakdown: ModelCostBreakdown | null;
   estimated_cost_basis: string;
   tool_call_count: number;
   model_call_count: number;

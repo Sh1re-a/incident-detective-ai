@@ -67,7 +67,12 @@ export function formatCost(value: number | null): string {
     return "No model called";
   }
 
-  return `$${value.toFixed(4)}`;
+  const precision = Math.abs(value) < 0.01 ? 6 : 4;
+  const formatted = value
+    .toFixed(precision)
+    .replace(/0+$/, "")
+    .replace(/\.$/, "");
+  return `$${formatted}`;
 }
 
 export function evidenceTypeLabel(evidence: Evidence): string {
