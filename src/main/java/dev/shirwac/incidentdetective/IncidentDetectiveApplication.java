@@ -9,6 +9,10 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 public class IncidentDetectiveApplication {
 
     public static void main(String[] args) {
+        if (RunbookCorpusImportCommand.requested(args)) {
+            RunbookCorpusImportCommand.run(args);
+            return;
+        }
         SpringApplication.run(IncidentDetectiveApplication.class, args);
     }
 }
