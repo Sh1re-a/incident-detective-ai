@@ -138,13 +138,14 @@ Engineering View visar dokument, chunk, version, rank, similarity, embeddingmode
 
 ## Vad verifieraren kontrollerar
 
-Verifiering är vanlig deterministisk Java-kod, inte ett andra AI-svar. Den ställer tre olika frågor:
+Verifiering är vanlig deterministisk Java-kod, inte ett andra AI-svar. Den håller fyra frågor isär:
 
 1. **Citation validity:** Finns varje citerat evidence-ID bland evidensen modellen faktiskt såg?
 2. **Evidence precision/support:** Stöder just den evidensen just det påståendet enligt det definierade facitstödet?
-3. **Diagnosis correctness:** Matchar rotorsak och påverkad tjänst facit, eller avstod modellen korrekt när evidensen inte räckte?
+3. **Claim coverage:** Innehåller svaret de förväntade claimnycklarna, även när ett kortare svar skulle kunna få perfekt precision på det lilla det faktiskt sade?
+4. **Diagnosis correctness:** Matchar rotorsak och påverkad tjänst facit, eller avstod modellen korrekt när evidensen inte räckte?
 
-De måste hållas isär. En modell kan gissa rätt rotorsak men använda dåliga bevis. Den kan också citera ett riktigt ID som inte stöder påståendet.
+De måste hållas isär. En modell kan gissa rätt rotorsak men använda dåliga bevis. Den kan citera ett riktigt ID som inte stöder påståendet eller utelämna trigger och kundpåverkan trots att de finns i referensen. API:t visar bara coverage-antal och score; det läcker inte vilka dolda claims som saknas.
 
 ### Två statusnivåer som inte ska blandas ihop
 

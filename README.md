@@ -33,7 +33,7 @@ När en sparad körning visas ska den märkas **“Simulated incident — record
 | Del | Nuläge | Vad som ska bli verifierbart |
 |---|---|---|
 | Tool calling och orchestrering | Verkligt och testat | Gemini väljer bland fyra strikt typade read-only tools i en begränsad state machine. |
-| Structured output och verifiering | Verkligt och testat | Schema, Java-regler, citation validity, evidence support och dolt facit kontrolleras separat. |
+| Structured output och verifiering | Verkligt och testat | Schema, citation validity, evidence precision, claim coverage och diagnos mot dolt facit kontrolleras separat. |
 | RAG | Byggt och mätt, målet är inte stabilt uppnått | 10 dokument/12 chunks, explicit idempotent import, Gemini embeddings, exakt pgvector cosine, dev-kalibrerad tröskel och rank/similarity/hash i Engineering View. Positiv Hit@4 blev totalt 9/10 men held-out 4/5. |
 | Evals och säkerhetsfall | Retrieval-slicen är byggd | 14 retrievalfall ger JSON/Markdown, development/held-out, no-match och ett faktiskt hämtat adversarial runbookfall. 18 fulla diagnosfall, baseline och synthesis-säkerhet återstår. |
 | Observability | Inte byggt | Sanerade JSON-loggar och OpenTelemetry-spans från API till tool, synthesis och verifiering. |
@@ -44,10 +44,10 @@ Det som saknas är alltså inte fler visuella features. Nästa tekniska slice ä
 ## Status 26 augusti 2026
 
 - Sprintplan, prioriterad backlog, tekniska beslut och dag‑1‑kontrakt finns.
-- `Scenario`, `Evidence`, `Diagnosis`, separat `GroundTruth` och tre oberoende verifieringsresultat är implementerade i Java.
+- `Scenario`, `Evidence`, `Diagnosis`, separat `GroundTruth` och fyra oberoende verifieringsdimensioner är implementerade i Java.
 - Två seedade scenarier finns: ett payment-timeoutfall och ett inventory-kontraktsfall. Båda innehåller metrics, logs, trace, runbook och avsiktligt brus.
 - Frontendens scenario-väljare läser säkra sammanfattningar från `GET /api/v1/scenarios`. Den får inte facit, recorded diagnosis eller ett dolt evidence inventory.
-- Story View visar affärspåverkan, en ärligt märkt replay/live-körning, säker tool-tidslinje, klickbar evidens, diagnos och manuellt nästa steg. Engineering View visar state machine, tool events, verifiering, modell/prompt, latency, tokens, calls, kostnadsgrund och limitations.
+- Story View visar affärspåverkan, en ärligt märkt replay/live-körning, säker tool-tidslinje, klickbar evidens, diagnos, answer coverage och manuellt nästa steg. Ett fokusbart “View diagnosis”-hopp gör resultatet nåbart efter körningen även på smal skärm. Engineering View visar state machine, tool events, citation validity, evidence precision, claim coverage, separat tjänstekorrekthet, modell/prompt, latency, tokens, calls, kostnadsgrund och limitations.
 - Livefel ersätts aldrig tyst av replay. Besökaren får själv välja den kostnadsfria recorded-körningen och får då ett nytt replay-resultat med korrekt truth label.
 - RAG-profilen använder en Docker-baserad PostgreSQL 17/pgvector 0.8.6-databas. Den versionshanterade korpusen innehåller 10 syntetiska dokument och 12 chunks. Importen är explicit och idempotent; vanlig start gör inga embedding-anrop.
 - Retrieval-eval v1 kör 10 positiva frågor, tre no-match-frågor och ett adversarial fall. Tröskeln `0.6620781500197453` valdes endast på development och frystes före held-out. Development gav 5/5 Hit@4 och 2/2 no-match. Held-out gav 4/5 Hit@4 och 1/1 no-match. Den missade kontraktsfrågan rankade den osäkra legacy-runbooken först, vilket är en dokumenterad failure case och inte bortfiltrerad i efterhand.
@@ -63,7 +63,7 @@ Det som saknas är alltså inte fler visuella features. Nästa tekniska slice ä
 - Inventory-scenariot valde i stället en trace och gav rätt rotorsak/tjänst samt giltiga citationer på 5 505 ms med 3 modellanrop, 4 tool calls, 6 590 tokens och cirka 0,00283625 USD i betalt listprisestimat. Faktisk free-tier-debitering kan vara 0 USD.
 - Dessa enskilda live-smokes är **inte** ett accuracy-, stabilitets- eller p95-resultat. Historiken innehåller 40–100 procents evidence precision och provider-timeouts. Retrievalkvaliteten mäts separat från en full AI-utredning.
 - Retrieval är separat verifierad genom evalharnessen; en lyckad retrieval-eval är inte samma sak som en lyckad full AI-utredning.
-- Backendens vanliga testsuite har 187 gröna tester. Dessutom passerar tre databas-/pgvector-integrationstester; ett separat nätverksbaserat Gemini-smoketest är medvetet avstängt i den automatiska sviten. Frontend har 10 gröna beteendetester och en verifierad produktionsbuild.
+- Backendens vanliga testsuite har 198 gröna tester. Dessutom passerar tre databas-/pgvector-integrationstester; ett separat nätverksbaserat Gemini-smoketest är medvetet avstängt i den automatiska sviten. Frontend har 15 gröna beteendetester och en verifierad produktionsbuild.
 - Projektgrunden är publicerad på GitHub utan open-source-licens. Ingen demo är deployad.
 
 ## Kör den interaktiva demon lokalt

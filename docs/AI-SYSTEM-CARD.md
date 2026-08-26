@@ -43,7 +43,7 @@ Modellen kan endast välja mellan `get_metrics`, `search_logs`, `get_trace` och 
 
 | ID | Risk | Nuvarande skydd | Nästa verifiering |
 |---|---|---|---|
-| R-01 | Modellen ger en felaktig eller dåligt stödd diagnos | Structured output, evidence IDs, separat citation/support/correctness och `insufficient_evidence` | 18 fulla evalfall med held-out-data |
+| R-01 | Modellen ger en felaktig, ofullständig eller dåligt stödd diagnos | Structured output, evidence IDs, separat citation/support/coverage/correctness och `insufficient_evidence` | 18 fulla evalfall med held-out-data |
 | R-02 | En runbook innehåller indirekt prompt injection | Runbooks behandlas som data, tools är read-only och modellen saknar åtgärdsbehörighet | Tvinga in den redan hämtade adversarial chunken i synthesis och kontrollera output/approval |
 | R-03 | Retrieval returnerar relevant-looking men fel text | Development-only tröskel, exact cosine, rank/similarity/hash och no-match-test | Förbättra corpus/query-kontrakt i en ny benchmarkversion utan held-out-tuning |
 | R-04 | Indexet är gammalt eller ofullständigt | Retrieval kontrollerar både antal och innehållshash före query-embedding | Behåll stale/missing-index-tester i CI |

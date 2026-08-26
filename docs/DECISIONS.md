@@ -85,19 +85,20 @@ PostgreSQL/pgvector används för en fristående korpus med 10 ostrukturerade ru
 
 **Konsekvens:** Import är ett explicit och idempotent kommando; vanlig uppstart gör inga embedding-anrop. RAG-profilen vägrar retrieval om antal eller innehållshash inte matchar aktuell korpus och faller aldrig tyst tillbaka till keyword matching. Runbookresultat visar dokument-, chunk- och versionsmetadata samt rank, similarity, embeddingmodell, innehållshash, korpusversion och retrieval-backend. Tröskeln kalibreras endast på development. Retrieval v1 gav 5/5 development och 4/5 held-out Hit@4, medan tre no-match-fall gav 3/3. Den missade held-out-frågan och unsafe top-1 behålls som öppet kvalitetsproblem.
 
-## DEC-009 – Tre olika verifieringsfrågor
+## DEC-009 – Fyra separata verifieringsdimensioner
 
-**Status:** Accepted, 25 augusti 2026
+**Status:** Accepted, updated 26 augusti 2026
 
 Verifieraren mäter separat:
 
 1. citation validity – finns varje citerat ID i evidensen modellen såg,
 2. evidence support/precision – stöder evidensen påståendet och det definierade facitstödet,
-3. diagnosis correctness – matchar `root_cause_code` det dolda facit i diagnosbara fall; i avsedda abstentionfall krävs `insufficient_evidence` och `root_cause_code = null`.
+3. claim coverage – hur många unika förväntade `(claim_code, claim_value_code)` som svaret faktiskt innehåller,
+4. diagnosis correctness – matchar `root_cause_code` det dolda facit i diagnosbara fall; i avsedda abstentionfall krävs `insufficient_evidence` och `root_cause_code = null`.
 
-**Varför:** En korrekt rotorsak kan ha dåliga citat och ett giltigt citat kan ändå vara irrelevant.
+**Varför:** En korrekt rotorsak kan ha dåliga citat, ett giltigt citat kan vara irrelevant och ett kort svar kan annars få 100 procent precision genom att utelämna viktiga fakta.
 
-**Konsekvens:** `affected_service` mäts separat och ett enda sammanslaget “correct”-värde räcker inte.
+**Konsekvens:** Publikt claim-coverage-resultat visar bara antal och score, aldrig vilka facitclaims som saknas. Låg coverage är ett kvalitetsmått, inte ett hårt kontraktsfel. `affected_service` mäts separat och ett enda sammanslaget “correct”-värde räcker inte.
 
 ## DEC-010 – Story View och Engineering View, inte chain-of-thought
 

@@ -36,7 +36,7 @@ Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i s
 - Java 21.0.10 LTS, `javac` 21.0.10 och Maven 3.9.12 finns.
 - Projektet använder Spring Boot 4.1.1 och Maven Wrapper 3.3.4 med Maven 3.9.16.
 - IntelliJ IDEA 2025.3.3, Google Cloud CLI och Docker finns. Den lokala PostgreSQL/pgvector-containern var healthy vid kontrollen 26 augusti.
-- Hela den nätverksfria Maven-testsuiten har 187 gröna tester. Tre pgvector-integrationstester passerar separat. Frontend har 10 gröna beteendetester och en godkänd produktionsbuild.
+- Hela den nätverksfria Maven-testsuiten har 198 gröna tester. Tre pgvector-integrationstester passerar separat. Frontend har 15 gröna beteendetester och en godkänd produktionsbuild.
 - Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.1-flash-lite` med `MINIMAL` thinking och `gemini-live-v6`.
 - De senaste två v6-smokesen i RAG-profilen gav rätt diagnos och giltiga citationer på 6,06 respektive 5,51 sekunder. Payment-körningen valde riktig pgvector-retrieval; inventory-körningen valde en trace. Historiken innehåller sämre evidensprecision och provider-timeouts; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
 - Livevägen har ett första kostnadsskydd: en samtidig körning och fem starter per rullande tio minuter per backendinstans. Cloud Run-instansgräns och budgetlarm är ännu inte konfigurerade.
@@ -90,7 +90,7 @@ Byggresultat: en fristående, versionshanterad korpus med 10–15 syntetiska run
 
 Läs [OpenAI: Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices). Guiden används för allmän evalmetod; själva harnessen är leverantörsoberoende och körs lokalt/CI.
 
-Byggresultat: först 10 positiva retrievalfall och två no-result-fall för Hit@4, därefter en portabel JUnit-/kommandoradsbaserad evalharness över 18 versionshanterade incidentfall och egna deterministiska scorers. Citation validity, evidence precision, diagnosis correctness, abstention och retrieval hålls som separata mått. Ett adversarial runbook måste faktiskt hamna i topp 4 för att säkerhetstestet ska räknas.
+Byggresultat: först 10 positiva retrievalfall och två no-result-fall för Hit@4, därefter en portabel JUnit-/kommandoradsbaserad evalharness över 18 versionshanterade incidentfall och egna deterministiska scorers. Citation validity, evidence precision, claim coverage, diagnosis correctness, abstention och retrieval hålls som separata mått. Ett adversarial runbook måste faktiskt hamna i topp 4 för att säkerhetstestet ska räknas.
 
 ### Pass 6 – logging och tracing
 

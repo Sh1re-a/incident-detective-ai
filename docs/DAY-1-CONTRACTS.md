@@ -135,13 +135,16 @@ Kontraktet nedan är sprintens yttergräns. Den nuvarande liveimplementationen �
 
 ## 8. Verifieringskontrakt
 
-Verifieraren svarar på tre separata frågor:
+Verifieraren svarar på fyra separata frågor:
 
 1. **Citation validity:** existerar varje citerat ID i exakt den evidens som modellen såg?
 2. **Evidence support/precision:** hör evidensen ihop med claimen enligt facitets tillåtna stöd?
-3. **Diagnosis correctness:** matchar `root_cause_code` det dolda facit i diagnosbara fall? I avsedda abstentionfall krävs `status = insufficient_evidence` och `root_cause_code = null`.
+3. **Claim coverage:** hur stor andel av referensens unika `(claim_code, claim_value_code)` finns i modellsvaret?
+4. **Diagnosis correctness:** matchar `root_cause_code` det dolda facit i diagnosbara fall? I avsedda abstentionfall krävs `status = insufficient_evidence` och `root_cause_code = null`.
 
-Evidence precision beräknas per diagnosbart evalfall över unika citerade tripplar av `(claim_code, claim_value_code, evidence_id)`: täljaren är tripplar vars evidence ID är tillåtet för motsvarande claimnyckel i `GroundTruth.allowed_evidence_ids_by_claim_key`, och nämnaren är alla citerade tripplar. Ett schemafel eller diagnostiserat svar utan citat får precision 0 för fallet. Releasevärdet är makromedelvärdet av fallens precision, så varje diagnosbart fall väger lika. Abstentionfall redovisas separat och ingår inte i detta medelvärde. `affected_service` mäts som ett separat diagnosfält och blandas inte in i root-cause-måttet.
+Evidence precision beräknas per diagnosbart evalfall över unika citerade tripplar av `(claim_code, claim_value_code, evidence_id)`: täljaren är tripplar vars evidence ID är tillåtet för motsvarande claimnyckel i `GroundTruth.claim_support`, och nämnaren är alla citerade tripplar. Ett schemafel eller diagnostiserat svar utan citat får precision 0 för fallet. Releasevärdet är makromedelvärdet av fallens precision, så varje diagnosbart fall väger lika. Abstentionfall redovisas separat och ingår inte i detta medelvärde. `affected_service` mäts som ett separat diagnosfält och blandas inte in i root-cause-måttet.
+
+Claim coverage använder GroundTruth som fast nämnare och exakt matchning på både claim code och claim value. Publikt API visar endast matched count, reference count och score. Ett svar med två korrekta, välstödda claims av fem får därför 100 procent evidence precision men 40 procent coverage. Låg coverage är inte ett `hard_error`; måttet ska synliggöra ett ofullständigt men fortfarande inspekterbart svar.
 
 Schemafel, okända evidence IDs och facitläckage är hårda fel. En korrekt `insufficient_evidence` räknas som lyckad abstention i avsedda fall.
 
@@ -154,7 +157,7 @@ Schemafel, okända evidence IDs och facitläckage är hårda fel. En korrekt `in
 - [ ] Är varje tool nödvändigt, skrivskyddat och mätbart?
 - [ ] Är loopens tid, calls och parallellitet entydigt begränsade?
 - [ ] Är live/replay-märkningen omöjlig att misstolka?
-- [ ] Kan verifieringens tre resultat visas och testas var för sig?
+- [ ] Kan verifieringens fyra dimensioner visas och testas var för sig?
 - [ ] Har Shirwac granskat och kan förklara kontrakten innan implementation börjar?
 
 ## 10. Implementerade preciseringar – formell kontraktsgranskning kvarstår

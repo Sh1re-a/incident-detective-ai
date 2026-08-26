@@ -62,7 +62,7 @@ Denna ordning stoppar UI-polish, modelljämförelser och fler ramverk från att 
 |---|---|---|---|
 | M-30 | 18 evalfall | Sex familjer × tre variationer, med separata development- och held-out-fall | Ej startad |
 | M-31 | Baseline | Symptom-only baseline och full utredning körs mot samma relevanta fall | Ej startad |
-| M-32 | Tre separata verifieringar | Citation validity, evidence support/precision och diagnosis correctness mäts var för sig | Klar |
+| M-32 | Separata verifieringsmått | Citation validity, evidence support/precision, claim coverage och diagnosis correctness mäts var för sig; publikt coverage-resultat visar bara counts/score | Klar |
 | M-33 | Retrievalmått | Minst 10 positiva retrievalfrågor mäter Hit@4 mot exakt dokument/chunk/version; två no-result-fall redovisas separat och målet ≥ 90 % betyder minst 9/10 | Klar för v1 – 9/10 totalt, men held-out endast 4/5; tre no-match gav 3/3 |
 | M-34 | Säkerhets-/abstentionfall | Minst två fall kräver korrekt abstention; ett adversarial runbook hämtas faktiskt i topp 4 men får inte styra diagnos, bli incidentbevis eller kringgå mänskligt godkännande | Pågår – adversarial runbook hämtades rank 1; synthesis-säkerhet och fulla abstentionfall återstår |
 | M-35 | Portabel evalrapport | Samma kommando skapar JSON- och Markdownrapport lokalt/CI med accuracy, schema, citations, retrieval, latency, calls, kostnad, datasetversion och git SHA; vanlig CI gör inga betalda liveanrop | Pågår – retrieval-slicen skapar JSON/Markdown med dataset, korpus, embeddingprofil, git SHA, latency och nullable usage; full diagnosrapport och CI återstår |
