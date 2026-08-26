@@ -44,11 +44,10 @@ public final class GeminiInvestigationModelGateway
         implements InvestigationModelGateway {
 
     private static final Duration MAX_PROVIDER_TIMEOUT = Duration.ofSeconds(28);
-    private static final int MAX_TOOL_CALLS_PER_ROUND = 3;
     private static final String COLLECT_PROMPT_RESOURCE =
-            "ai/prompts/collect-gemini-live-v5.txt";
+            "ai/prompts/collect-gemini-live-v6.txt";
     private static final String SYNTHESIZE_PROMPT_RESOURCE =
-            "ai/prompts/synthesize-gemini-live-v5.txt";
+            "ai/prompts/synthesize-gemini-live-v6.txt";
 
     private final GeminiAiProperties properties;
     private final GeminiDiagnosisDecoder diagnosisDecoder;
@@ -99,11 +98,26 @@ public final class GeminiInvestigationModelGateway
             Scenario scenario,
             List<String> availableMetricNames,
             List<Evidence> collectedEvidence,
+            CollectionToolBudget toolBudget,
             int round,
             Duration timeout
     ) {
+        List<String> allowedFunctionNames = allowedFunctionNames(toolBudget);
+        if (allowedFunctionNames.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Gemini collection requires at least one allowed tool"
+            );
+        }
+        List<FunctionDeclaration> availableDeclarations = functionDeclarations
+                .stream()
+                .filter(declaration -> allowedFunctionNames.contains(
+                        declaration.name().orElseThrow()
+                ))
+                .toList();
         String prompt = collectInstructions + "\n\n"
                 + "collection_round: " + round + "\n"
+                + "remaining_tool_budget:\n"
+                + serialize(toolBudget.promptView()) + "\n"
                 + "scenario:\n" + serialize(scenario) + "\n"
                 + "available_metric_names:\n"
                 + serialize(availableMetricNames) + "\n"
@@ -113,14 +127,12 @@ public final class GeminiInvestigationModelGateway
                 ? FunctionCallingConfigMode.Known.ANY
                 : FunctionCallingConfigMode.Known.VALIDATED;
         Tool tools = Tool.builder()
-                .functionDeclarations(functionDeclarations)
+                .functionDeclarations(availableDeclarations)
                 .build();
         ToolConfig toolConfig = ToolConfig.builder()
                 .functionCallingConfig(FunctionCallingConfig.builder()
                         .mode(mode)
-                        .allowedFunctionNames(functionDeclarations.stream()
-                                .map(declaration -> declaration.name().orElseThrow())
-                                .toList())
+                        .allowedFunctionNames(allowedFunctionNames)
                         .build())
                 .build();
         GenerateContentConfig config = GenerateContentConfig.builder()
@@ -130,6 +142,7 @@ public final class GeminiInvestigationModelGateway
                         .disable(true)
                         .build())
                 .maxOutputTokens(1_024)
+                .temperature(0.0F)
                 .thinkingConfig(ThinkingConfig.builder()
                         .thinkingLevel(properties.thinkingLevel().sdkValue())
                         .includeThoughts(false)
@@ -139,16 +152,22 @@ public final class GeminiInvestigationModelGateway
 
         TimedResponse timed = generate(prompt, config);
         List<CollectionToolCall> calls = decodeToolCalls(timed.response());
-        if (calls.size() > MAX_TOOL_CALLS_PER_ROUND) {
+        if (calls.size() > toolBudget.maxCallsThisRound()) {
             throw new ModelProviderException(
                     ModelProviderFailure.MALFORMED_RESPONSE,
-                    "Gemini exceeded the per-round tool-call budget"
+                    "Gemini exceeded the remaining round tool-call budget"
             );
         }
         return new CollectionModelResult(
                 calls,
                 metadata(ModelPhase.COLLECT, round, timed)
         );
+    }
+
+    List<String> allowedFunctionNames(CollectionToolBudget toolBudget) {
+        return toolBudget.allowedTools().stream()
+                .map(ToolName::wireValue)
+                .toList();
     }
 
     @Override

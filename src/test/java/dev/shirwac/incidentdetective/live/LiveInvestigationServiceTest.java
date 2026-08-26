@@ -1,6 +1,7 @@
 package dev.shirwac.incidentdetective.live;
 
 import dev.shirwac.incidentdetective.ai.CollectionModelResult;
+import dev.shirwac.incidentdetective.ai.CollectionToolBudget;
 import dev.shirwac.incidentdetective.ai.InvestigationModelGateway;
 import dev.shirwac.incidentdetective.ai.ModelPhase;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
@@ -19,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.call;
 import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.correctDiagnosis;
@@ -35,6 +37,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -100,6 +103,30 @@ class LiveInvestigationServiceTest {
         assertTrue(evidenceIds.contains("cpt-v1-log-timeout-config"));
         assertTrue(evidenceIds.contains("cpt-v1-trace-failed-checkout"));
         assertFalse(evidenceIds.contains("cpt-v1-log-inventory-noise"));
+
+        ArgumentCaptor<CollectionToolBudget> budgetCaptor = ArgumentCaptor
+                .forClass(CollectionToolBudget.class);
+        verify(model, times(2)).collect(
+                any(),
+                anyList(),
+                anyList(),
+                budgetCaptor.capture(),
+                anyInt(),
+                any()
+        );
+        CollectionToolBudget firstRound = budgetCaptor.getAllValues().get(0);
+        assertFalse(firstRound.allowedTools().contains(ToolName.GET_TRACE));
+        assertEquals(Set.of(), firstRound.discoveredTraceIds());
+
+        CollectionToolBudget secondRound = budgetCaptor.getAllValues().get(1);
+        assertTrue(secondRound.allowedTools().contains(ToolName.GET_TRACE));
+        assertFalse(secondRound.allowedTools().contains(
+                ToolName.RETRIEVE_RUNBOOKS
+        ));
+        assertEquals(
+                Set.of("cpt-trace-4821"),
+                secondRound.discoveredTraceIds()
+        );
     }
 
     @Test
@@ -136,14 +163,16 @@ class LiveInvestigationServiceTest {
         );
 
         verify(model, never()).collect(
-                any(), anyList(), anyList(), anyInt(), any()
+                any(), anyList(), anyList(), any(), anyInt(), any()
         );
         verify(model, never()).synthesize(any(), anyList(), any());
     }
 
     @Test
     void rejectsATraceIdThatWasNotPreviouslyReturnedToTheModel() {
-        when(model.collect(any(), anyList(), anyList(), eq(1), any())).thenReturn(
+        when(model.collect(
+                any(), anyList(), anyList(), any(), eq(1), any()
+        )).thenReturn(
                 new CollectionModelResult(
                         List.of(
                                 call("call-logs", ToolName.SEARCH_LOGS, Map.of(

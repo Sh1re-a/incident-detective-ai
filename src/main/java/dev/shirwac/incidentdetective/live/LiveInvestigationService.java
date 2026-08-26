@@ -2,6 +2,7 @@ package dev.shirwac.incidentdetective.live;
 
 import dev.shirwac.incidentdetective.ai.CollectionModelResult;
 import dev.shirwac.incidentdetective.ai.CollectionToolCall;
+import dev.shirwac.incidentdetective.ai.CollectionToolBudget;
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
 import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.InvestigationModelGateway;
@@ -46,6 +47,7 @@ public final class LiveInvestigationService {
     static final int MAX_COLLECTION_ROUNDS = 2;
     static final int MAX_TOOL_CALLS_TOTAL = 8;
     static final int MAX_TOOL_CALLS_PER_TYPE = 2;
+    static final int MAX_RUNBOOK_CALLS = 1;
     static final int MAX_TOOL_CALLS_PER_ROUND = 3;
     static final Duration HARD_DEADLINE = Duration.ofSeconds(45);
     static final Duration PROVIDER_CALL_CAP = Duration.ofSeconds(28);
@@ -110,6 +112,14 @@ public final class LiveInvestigationService {
             Set<String> traceIdsAvailableToModel = discoveredTraceIds(
                     evidenceById.values()
             );
+            CollectionToolBudget toolBudget = collectionToolBudget(
+                    toolEvents.size(),
+                    callsByType,
+                    traceIdsAvailableToModel
+            );
+            if (toolBudget.allowedTools().isEmpty()) {
+                break;
+            }
             Optional<Duration> timeout = collectionTimeoutFor(
                     elapsedSince(startedAt),
                     round
@@ -124,6 +134,7 @@ public final class LiveInvestigationService {
                     scenario,
                     availableMetricNames,
                     List.copyOf(evidenceById.values()),
+                    toolBudget,
                     round,
                     timeout.orElseThrow()
             );
@@ -132,10 +143,13 @@ public final class LiveInvestigationService {
             if (collection.toolCalls().isEmpty()) {
                 break;
             }
-            enforceRoundBudget(collection.toolCalls());
+            preflightToolCalls(
+                    collection.toolCalls(),
+                    toolBudget,
+                    callsByType,
+                    callIds
+            );
             for (CollectionToolCall call : collection.toolCalls()) {
-                enforceToolBudget(call, toolEvents.size(), callsByType, callIds);
-                enforceTraceDiscovery(call, traceIdsAvailableToModel);
                 ToolExecution execution = tools.execute(scenarioId, call);
                 ensureScenarioIsolation(scenarioId, execution.evidence());
                 execution.evidence().forEach(evidence ->
@@ -238,29 +252,42 @@ public final class LiveInvestigationService {
         }
     }
 
-    private void enforceRoundBudget(List<CollectionToolCall> calls) {
-        if (calls.size() > MAX_TOOL_CALLS_PER_ROUND) {
-            throw malformed("Model exceeded the per-round tool-call budget");
-        }
-    }
-
-    private void enforceToolBudget(
-            CollectionToolCall call,
-            int completedCalls,
+    private void preflightToolCalls(
+            List<CollectionToolCall> calls,
+            CollectionToolBudget budget,
             Map<ToolName, Integer> callsByType,
             Set<String> callIds
     ) {
-        if (!callIds.add(call.callId())) {
-            throw malformed("Model repeated a function-call ID");
+        if (calls.size() > budget.maxCallsThisRound()) {
+            throw malformed("Model exceeded the remaining round tool-call budget");
         }
-        if (completedCalls >= MAX_TOOL_CALLS_TOTAL) {
+        Set<ToolName> allowedTools = Set.copyOf(budget.allowedTools());
+        EnumMap<ToolName, Integer> nextCounts = new EnumMap<>(callsByType);
+        Set<String> nextCallIds = new HashSet<>(callIds);
+
+        for (CollectionToolCall call : calls) {
+            if (!allowedTools.contains(call.toolName())) {
+                throw malformed("Model requested a tool outside the remaining budget");
+            }
+            if (!nextCallIds.add(call.callId())) {
+                throw malformed("Model repeated a function-call ID");
+            }
+            int nextCount = nextCounts.getOrDefault(call.toolName(), 0) + 1;
+            int limit = perInvestigationLimit(call.toolName());
+            if (nextCount > limit) {
+                throw malformed("Model exceeded the per-tool call budget");
+            }
+            enforceTraceDiscovery(call, budget.discoveredTraceIds());
+            nextCounts.put(call.toolName(), nextCount);
+        }
+
+        if (nextCallIds.size() > MAX_TOOL_CALLS_TOTAL) {
             throw malformed("Model exceeded the total tool-call budget");
         }
-        int nextCount = callsByType.getOrDefault(call.toolName(), 0) + 1;
-        if (nextCount > MAX_TOOL_CALLS_PER_TYPE) {
-            throw malformed("Model exceeded the per-tool call budget");
-        }
-        callsByType.put(call.toolName(), nextCount);
+        callsByType.clear();
+        callsByType.putAll(nextCounts);
+        callIds.clear();
+        callIds.addAll(nextCallIds);
     }
 
     private void enforceTraceDiscovery(
@@ -293,6 +320,32 @@ public final class LiveInvestigationService {
             }
         }
         return Set.copyOf(traceIds);
+    }
+
+    private CollectionToolBudget collectionToolBudget(
+            int completedCalls,
+            Map<ToolName, Integer> callsByType,
+            Set<String> discoveredTraceIds
+    ) {
+        int remainingTotal = Math.max(0, MAX_TOOL_CALLS_TOTAL - completedCalls);
+        EnumMap<ToolName, Integer> remainingByTool = new EnumMap<>(ToolName.class);
+        for (ToolName toolName : ToolName.values()) {
+            int remaining = perInvestigationLimit(toolName)
+                    - callsByType.getOrDefault(toolName, 0);
+            remainingByTool.put(toolName, Math.max(0, remaining));
+        }
+        return new CollectionToolBudget(
+                remainingTotal,
+                Math.min(MAX_TOOL_CALLS_PER_ROUND, remainingTotal),
+                remainingByTool,
+                discoveredTraceIds
+        );
+    }
+
+    private int perInvestigationLimit(ToolName toolName) {
+        return toolName == ToolName.RETRIEVE_RUNBOOKS
+                ? MAX_RUNBOOK_CALLS
+                : MAX_TOOL_CALLS_PER_TYPE;
     }
 
     private void ensureScenarioIsolation(

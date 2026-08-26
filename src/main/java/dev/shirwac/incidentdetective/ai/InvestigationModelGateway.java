@@ -12,6 +12,7 @@ public interface InvestigationModelGateway {
             Scenario scenario,
             List<String> availableMetricNames,
             List<Evidence> collectedEvidence,
+            CollectionToolBudget toolBudget,
             int round,
             Duration timeout
     );

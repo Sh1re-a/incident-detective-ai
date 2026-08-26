@@ -27,7 +27,9 @@ final class LiveInvestigationTestFixtures {
     }
 
     static void stubCheckoutCollections(InvestigationModelGateway model) {
-        when(model.collect(any(), anyList(), anyList(), eq(1), any())).thenReturn(
+        when(model.collect(
+                any(), anyList(), anyList(), any(), eq(1), any()
+        )).thenReturn(
                 new CollectionModelResult(
                         List.of(
                                 call("call-metrics", ToolName.GET_METRICS, Map.of(
@@ -58,7 +60,9 @@ final class LiveInvestigationTestFixtures {
                         metadata(ModelPhase.COLLECT, 1, 600, 100)
                 )
         );
-        when(model.collect(any(), anyList(), anyList(), eq(2), any())).thenReturn(
+        when(model.collect(
+                any(), anyList(), anyList(), any(), eq(2), any()
+        )).thenReturn(
                 new CollectionModelResult(
                         List.of(call("call-trace", ToolName.GET_TRACE, Map.of(
                                 "trace_id", "cpt-trace-4821"

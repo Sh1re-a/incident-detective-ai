@@ -53,7 +53,9 @@ class GeminiSchemaResourceTest {
                 "ai/prompts/collect-gemini-live-v4.txt",
                 "ai/prompts/synthesize-gemini-live-v4.txt",
                 "ai/prompts/collect-gemini-live-v5.txt",
-                "ai/prompts/synthesize-gemini-live-v5.txt"
+                "ai/prompts/synthesize-gemini-live-v5.txt",
+                "ai/prompts/collect-gemini-live-v6.txt",
+                "ai/prompts/synthesize-gemini-live-v6.txt"
         )) {
             String prompt = new ClassPathResource(resourcePath)
                     .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
@@ -83,6 +85,19 @@ class GeminiSchemaResourceTest {
         assertTrue(prompt.contains("two distinct search_logs calls plus get_metrics"));
         assertTrue(prompt.contains("Do not infer the trigger from scenario wording alone"));
         assertTrue(prompt.contains("Do not retrieve a runbook while a concrete trigger"));
+    }
+
+    @Test
+    void collectionPromptV6TreatsTheRuntimeBudgetAsAuthoritative()
+            throws Exception {
+        String prompt = new ClassPathResource(
+                "ai/prompts/collect-gemini-live-v6.txt"
+        ).getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+
+        assertTrue(prompt.contains("remaining_tool_budget is authoritative"));
+        assertTrue(prompt.contains("never exceed max_calls_this_round"));
+        assertTrue(prompt.contains("discovered_trace_ids"));
+        assertTrue(prompt.contains("remaining count is zero"));
     }
 
     @Test

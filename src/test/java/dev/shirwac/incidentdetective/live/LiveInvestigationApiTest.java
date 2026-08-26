@@ -73,7 +73,9 @@ class LiveInvestigationApiTest {
 
     @Test
     void returnsATruthfulLiveResponseWithoutGroundTruthLeakage() throws Exception {
-        when(model.collect(any(), anyList(), anyList(), eq(1), any())).thenReturn(
+        when(model.collect(
+                any(), anyList(), anyList(), any(), eq(1), any()
+        )).thenReturn(
                 new CollectionModelResult(
                         List.of(),
                         metadata(ModelPhase.COLLECT, 1)
@@ -230,7 +232,7 @@ class LiveInvestigationApiTest {
                         .value("LIVE_AI_CONFIRMATION_REQUIRED"));
 
         verify(model, never()).collect(
-                any(), anyList(), anyList(), anyInt(), any()
+                any(), anyList(), anyList(), any(), anyInt(), any()
         );
         verify(model, never()).synthesize(any(), anyList(), any());
     }
@@ -251,14 +253,16 @@ class LiveInvestigationApiTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST_BODY"));
 
         verify(model, never()).collect(
-                any(), anyList(), anyList(), anyInt(), any()
+                any(), anyList(), anyList(), any(), anyInt(), any()
         );
         verify(model, never()).synthesize(any(), anyList(), any());
     }
 
     @Test
     void mapsProviderContractAndTimeoutFailuresWithoutRawDetails() throws Exception {
-        when(model.collect(any(), anyList(), anyList(), eq(1), any()))
+        when(model.collect(
+                any(), anyList(), anyList(), any(), eq(1), any()
+        ))
                 .thenThrow(new ModelProviderException(
                         ModelProviderFailure.MALFORMED_RESPONSE,
                         "raw provider response must stay private"
@@ -275,7 +279,9 @@ class LiveInvestigationApiTest {
                 .contains("raw provider response"));
 
         reset(model);
-        when(model.collect(any(), anyList(), anyList(), eq(1), any()))
+        when(model.collect(
+                any(), anyList(), anyList(), any(), eq(1), any()
+        ))
                 .thenThrow(new ModelProviderException(
                         ModelProviderFailure.TIMEOUT,
                         "private timeout details"
@@ -290,7 +296,9 @@ class LiveInvestigationApiTest {
 
     @Test
     void rejectsAnInvalidDiagnosisWithoutReturningModelContent() throws Exception {
-        when(model.collect(any(), anyList(), anyList(), eq(1), any())).thenReturn(
+        when(model.collect(
+                any(), anyList(), anyList(), any(), eq(1), any()
+        )).thenReturn(
                 new CollectionModelResult(
                         List.of(),
                         metadata(ModelPhase.COLLECT, 1)
@@ -336,7 +344,7 @@ class LiveInvestigationApiTest {
                 .andExpect(jsonPath("$.code").value("SCENARIO_NOT_FOUND"));
 
         verify(model, never()).collect(
-                any(), anyList(), anyList(), anyInt(), any()
+                any(), anyList(), anyList(), any(), anyInt(), any()
         );
     }
 
