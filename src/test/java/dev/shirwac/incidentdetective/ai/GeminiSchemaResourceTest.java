@@ -51,7 +51,9 @@ class GeminiSchemaResourceTest {
                 "ai/prompts/collect-gemini-live-v3.txt",
                 "ai/prompts/synthesize-gemini-live-v3.txt",
                 "ai/prompts/collect-gemini-live-v4.txt",
-                "ai/prompts/synthesize-gemini-live-v4.txt"
+                "ai/prompts/synthesize-gemini-live-v4.txt",
+                "ai/prompts/collect-gemini-live-v5.txt",
+                "ai/prompts/synthesize-gemini-live-v5.txt"
         )) {
             String prompt = new ClassPathResource(resourcePath)
                     .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
@@ -69,6 +71,35 @@ class GeminiSchemaResourceTest {
         assertTrue(prompt.contains("use an empty levels array"));
         assertTrue(prompt.contains("Retrieve runbooks at most once"));
         assertTrue(prompt.contains("already_collected_evidence contains a runbook"));
+    }
+
+    @Test
+    void collectionPromptV5PrioritizesDirectIncidentCoverage() throws Exception {
+        String prompt = new ClassPathResource(
+                "ai/prompts/collect-gemini-live-v5.txt"
+        ).getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+
+        assertTrue(prompt.contains("search separately for the change event"));
+        assertTrue(prompt.contains("two distinct search_logs calls plus get_metrics"));
+        assertTrue(prompt.contains("Do not infer the trigger from scenario wording alone"));
+        assertTrue(prompt.contains("Do not retrieve a runbook while a concrete trigger"));
+    }
+
+    @Test
+    void synthesisPromptV5DefinesDirectSupportByClaimType() throws Exception {
+        String prompt = new ClassPathResource(
+                "ai/prompts/synthesize-gemini-live-v5.txt"
+        ).getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+
+        assertTrue(prompt.contains("root_cause: cite a log or trace"));
+        assertTrue(prompt.contains("A metric label alone is insufficient"));
+        assertTrue(prompt.contains("explicitly records the release"));
+        assertTrue(prompt.contains("scored independently"));
+        assertTrue(prompt.contains("may be reused across claims"));
+        assertTrue(prompt.contains("Audit every claim_value_code and evidence_id pair"));
+        assertTrue(prompt.contains("return insufficient_evidence instead of guessing"));
+        assertFalse(prompt.contains("cic-v1"));
+        assertFalse(prompt.contains("INVENTORY_SCHEMA_MISMATCH"));
     }
 
     @Test
