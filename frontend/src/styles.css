@@ -705,6 +705,11 @@ p {
   text-shadow: 0 0 10px var(--lime);
 }
 
+.truth-strip .text-button {
+  display: block;
+  margin-top: 7px;
+}
+
 .status-spinner {
   width: 21px;
   height: 21px;
@@ -1010,6 +1015,11 @@ p {
 
 .diagnosis-panel {
   animation: reveal-up 420ms ease both;
+}
+
+.diagnosis-panel:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 3px;
 }
 
 .diagnosis-panel.rejected {

@@ -37,6 +37,21 @@ describe("Incident Detective experience", () => {
     expect(screen.getByText("Matched")).toBeVisible();
   });
 
+  it("moves focus to the completed diagnosis on request", async () => {
+    installApiMock();
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Play free recorded investigation",
+      }),
+    );
+    await user.click(await screen.findByRole("button", { name: "View diagnosis" }));
+
+    expect(document.getElementById("investigation-result")).toHaveFocus();
+  });
+
   it("opens returned evidence and closes it with Escape", async () => {
     installApiMock();
     const user = userEvent.setup();

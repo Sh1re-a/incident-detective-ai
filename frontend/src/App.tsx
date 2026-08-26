@@ -238,6 +238,12 @@ export function App() {
     setPhase("success");
   }, [result]);
 
+  const focusDiagnosis = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      document.getElementById("investigation-result")?.focus();
+    });
+  }, []);
+
   const selectViewAndFocus = useCallback((nextView: AppView) => {
     setView(nextView);
     window.requestAnimationFrame(() => {
@@ -380,6 +386,7 @@ export function App() {
                   onRequestLive={requestLive}
                   onSkipReplay={skipReplay}
                   onOpenEvidence={openEvidence}
+                  onViewDiagnosis={focusDiagnosis}
                 />
               ) : (
                 <EngineeringView

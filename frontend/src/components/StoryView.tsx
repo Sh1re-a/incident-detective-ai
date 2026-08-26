@@ -28,6 +28,7 @@ interface StoryViewProps {
   onRequestLive: () => void;
   onSkipReplay: () => void;
   onOpenEvidence: (evidenceId: string) => void;
+  onViewDiagnosis: () => void;
 }
 
 export function StoryView({
@@ -41,6 +42,7 @@ export function StoryView({
   onRequestLive,
   onSkipReplay,
   onOpenEvidence,
+  onViewDiagnosis,
 }: StoryViewProps) {
   const busy = phase === "running" || phase === "revealing";
   const visibleEvents = result
@@ -135,6 +137,7 @@ export function StoryView({
             result={result}
             errorMessage={errorMessage}
             onRunReplay={onRunReplay}
+            onViewDiagnosis={onViewDiagnosis}
           />
         </section>
 
@@ -212,12 +215,14 @@ function RunStatus({
   result,
   errorMessage,
   onRunReplay,
+  onViewDiagnosis,
 }: {
   phase: RunPhase;
   pendingMode: RunMode | null;
   result: InvestigationResult | null;
   errorMessage: string | null;
   onRunReplay: () => void;
+  onViewDiagnosis: () => void;
 }) {
   if (phase === "idle") {
     return null;
@@ -276,7 +281,12 @@ function RunStatus({
   return result ? (
     <div className={`truth-strip ${result.mode}`} role="status" aria-live="polite">
       <span aria-hidden="true">●</span>
-      <strong>{result.truth_label}</strong>
+      <div>
+        <strong>{result.truth_label}</strong>
+        <button className="text-button" type="button" onClick={onViewDiagnosis}>
+          View diagnosis
+        </button>
+      </div>
     </div>
   ) : null;
 }
@@ -374,7 +384,12 @@ function DiagnosisPanel({
       : "verified";
 
   return (
-    <section className={`diagnosis-panel panel${rejected ? " rejected" : ""}`}>
+    <section
+      id="investigation-result"
+      className={`diagnosis-panel panel${rejected ? " rejected" : ""}`}
+      aria-labelledby="diagnosis-title"
+      tabIndex={-1}
+    >
       <div className="diagnosis-topline">
         <span className={`verdict-badge ${verdictTone}`}>
           {rejected
@@ -393,7 +408,7 @@ function DiagnosisPanel({
       </div>
 
       <p className="section-kicker">What happened</p>
-      <h2>{diagnosis.business_summary}</h2>
+      <h2 id="diagnosis-title">{diagnosis.business_summary}</h2>
 
       <div className="root-cause-grid">
         <div>
