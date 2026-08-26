@@ -3,6 +3,8 @@ package dev.shirwac.incidentdetective.ai;
 import com.google.genai.types.Candidate;
 import com.google.genai.types.FinishReason;
 import com.google.genai.types.GenerateContentResponse;
+import com.google.genai.types.GenerateContentResponseUsageMetadata;
+import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
 import jakarta.validation.Validation;
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -104,6 +107,35 @@ class GeminiInvestigationModelGatewayTest {
         );
 
         assertFalse(gateway().allowedFunctionNames(budget).contains("get_trace"));
+    }
+
+    @Test
+    void preservesTheProviderTokenAndCacheBreakdown() {
+        GenerateContentResponseUsageMetadata usage =
+                GenerateContentResponseUsageMetadata.builder()
+                        .promptTokenCount(1_000)
+                        .cachedContentTokenCount(400)
+                        .candidatesTokenCount(100)
+                        .thoughtsTokenCount(50)
+                        .toolUsePromptTokenCount(75)
+                        .totalTokenCount(1_225)
+                        .build();
+
+        ModelTokenUsage decoded = gateway().decodeUsage(usage);
+
+        assertEquals(1_000, decoded.inputTokens());
+        assertEquals(400, decoded.cachedInputTokens());
+        assertEquals(600, decoded.uncachedInputTokens());
+        assertEquals(100, decoded.candidateOutputTokens());
+        assertEquals(50, decoded.thinkingOutputTokens());
+        assertEquals(150, decoded.outputTokens());
+        assertEquals(75, decoded.toolUsePromptTokens());
+        assertEquals(1_225, decoded.totalTokens());
+    }
+
+    @Test
+    void keepsMissingProviderUsageUnavailable() {
+        assertNull(gateway().decodeUsage(null));
     }
 
     private GeminiInvestigationModelGateway gateway() {

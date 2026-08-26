@@ -56,8 +56,14 @@ public record LiveInvestigationResult(
         String promptVersion,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         List<ModelCallMetadata> modelCalls,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                nullable = true,
+                description = "Null when no model call returned usable provider token metadata."
+        )
         ModelTokenUsage tokenUsage,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        PromptCacheTelemetry promptCache,
         @Schema(
                 requiredMode = Schema.RequiredMode.REQUIRED,
                 nullable = true,

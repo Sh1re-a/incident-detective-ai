@@ -216,6 +216,7 @@ public final class LiveInvestigationService {
                 properties.promptVersion(),
                 modelCalls,
                 usage,
+                aggregatePromptCache(modelCalls),
                 cost.estimatedUsd(),
                 cost.basis(),
                 toolEvents.size(),
@@ -426,19 +427,69 @@ public final class LiveInvestigationService {
     }
 
     private ModelTokenUsage aggregateUsage(List<ModelCallMetadata> calls) {
-        int input = calls.stream()
+        List<ModelTokenUsage> usages = calls.stream()
                 .map(ModelCallMetadata::tokenUsage)
-                .mapToInt(ModelTokenUsage::inputTokens)
-                .sum();
-        int output = calls.stream()
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        if (usages.isEmpty()) {
+            return null;
+        }
+        return new ModelTokenUsage(
+                sumWhenComplete(calls, usages, ModelTokenUsage::inputTokens),
+                sumWhenReported(usages, ModelTokenUsage::cachedInputTokens),
+                sumWhenComplete(calls, usages, ModelTokenUsage::uncachedInputTokens),
+                sumWhenComplete(calls, usages, ModelTokenUsage::candidateOutputTokens),
+                sumWhenComplete(calls, usages, ModelTokenUsage::thinkingOutputTokens),
+                sumWhenComplete(calls, usages, ModelTokenUsage::outputTokens),
+                sumWhenComplete(calls, usages, ModelTokenUsage::toolUsePromptTokens),
+                sumWhenComplete(calls, usages, ModelTokenUsage::totalTokens)
+        );
+    }
+
+    private PromptCacheTelemetry aggregatePromptCache(
+            List<ModelCallMetadata> calls
+    ) {
+        List<Integer> reported = calls.stream()
                 .map(ModelCallMetadata::tokenUsage)
-                .mapToInt(ModelTokenUsage::outputTokens)
-                .sum();
-        int total = calls.stream()
-                .map(ModelCallMetadata::tokenUsage)
-                .mapToInt(ModelTokenUsage::totalTokens)
-                .sum();
-        return new ModelTokenUsage(input, output, total);
+                .filter(java.util.Objects::nonNull)
+                .map(ModelTokenUsage::cachedInputTokens)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        Integer cachedInputTokens = reported.isEmpty()
+                ? null
+                : reported.stream().mapToInt(Integer::intValue).sum();
+        return new PromptCacheTelemetry(
+                PromptCacheStrategy.PROVIDER_IMPLICIT,
+                reported.size(),
+                calls.size(),
+                cachedInputTokens,
+                reported.stream().anyMatch(tokens -> tokens > 0)
+        );
+    }
+
+    private Integer sumWhenComplete(
+            List<ModelCallMetadata> calls,
+            List<ModelTokenUsage> usages,
+            java.util.function.Function<ModelTokenUsage, Integer> value
+    ) {
+        if (usages.size() != calls.size()
+                || usages.stream().map(value).anyMatch(java.util.Objects::isNull)) {
+            return null;
+        }
+        return usages.stream().map(value).mapToInt(Integer::intValue).sum();
+    }
+
+    private Integer sumWhenReported(
+            List<ModelTokenUsage> usages,
+            java.util.function.Function<ModelTokenUsage, Integer> value
+    ) {
+        List<Integer> reported = usages.stream()
+                .map(value)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        return reported.isEmpty()
+                ? null
+                : reported.stream().mapToInt(Integer::intValue).sum();
     }
 
     private ModelProviderException malformed(String message) {

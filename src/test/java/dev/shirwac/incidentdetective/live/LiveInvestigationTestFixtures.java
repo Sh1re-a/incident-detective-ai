@@ -86,12 +86,22 @@ final class LiveInvestigationTestFixtures {
             int input,
             int output
     ) {
+        int cachedInput = Math.min(100, input);
         return new ModelCallMetadata(
                 phase,
                 round,
                 "response-" + phase.wireValue() + "-" + round,
                 "gemini-test-version",
-                new ModelTokenUsage(input, output, input + output),
+                new ModelTokenUsage(
+                        input,
+                        cachedInput,
+                        input - cachedInput,
+                        output,
+                        0,
+                        output,
+                        0,
+                        input + output
+                ),
                 25
         );
     }

@@ -85,6 +85,18 @@ class LiveInvestigationServiceTest {
         assertEquals(4, result.toolCallCount());
         assertEquals(3, result.modelCallCount());
         assertEquals(2_300, result.tokenUsage().totalTokens());
+        assertEquals(1_800, result.tokenUsage().inputTokens());
+        assertEquals(300, result.tokenUsage().cachedInputTokens());
+        assertEquals(1_500, result.tokenUsage().uncachedInputTokens());
+        assertEquals(500, result.tokenUsage().candidateOutputTokens());
+        assertEquals(0, result.tokenUsage().thinkingOutputTokens());
+        assertEquals(500, result.tokenUsage().outputTokens());
+        assertEquals(0, result.tokenUsage().toolUsePromptTokens());
+        assertEquals(PromptCacheStrategy.PROVIDER_IMPLICIT,
+                result.promptCache().strategy());
+        assertEquals(3, result.promptCache().providerReportedModelCalls());
+        assertEquals(300, result.promptCache().cachedInputTokens());
+        assertTrue(result.promptCache().cacheHitObserved());
         assertTrue(result.estimatedCostUsd().signum() > 0);
         assertTrue(result.estimatedCostBasis().contains(
                 "actual free-tier charge may be USD 0"

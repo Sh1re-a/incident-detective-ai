@@ -28,7 +28,10 @@ public final class GeminiCostEstimator {
             ModelTokenUsage usage
     ) {
         Pricing pricing = PRICES.get(modelId);
-        if (pricing == null) {
+        if (pricing == null
+                || usage == null
+                || usage.inputTokens() == null
+                || usage.outputTokens() == null) {
             return new ModelCostEstimate(null, UNKNOWN_PRICE_BASIS);
         }
         BigDecimal inputCost = BigDecimal.valueOf(usage.inputTokens())

@@ -288,20 +288,43 @@ public final class GeminiInvestigationModelGateway
         GenerateContentResponse response = timed.response();
         GenerateContentResponseUsageMetadata usage = response.usageMetadata()
                 .orElse(null);
-        int inputTokens = usage == null ? 0 : usage.promptTokenCount().orElse(0);
-        int outputTokens = usage == null ? 0
-                : usage.candidatesTokenCount().orElse(0)
-                + usage.thoughtsTokenCount().orElse(0);
-        int totalTokens = usage == null
-                ? inputTokens + outputTokens
-                : usage.totalTokenCount().orElse(inputTokens + outputTokens);
         return new ModelCallMetadata(
                 phase,
                 round,
                 response.responseId().orElse(null),
                 response.modelVersion().orElse(properties.modelId()),
-                new ModelTokenUsage(inputTokens, outputTokens, totalTokens),
+                decodeUsage(usage),
                 timed.latencyMs()
+        );
+    }
+
+    ModelTokenUsage decodeUsage(
+            GenerateContentResponseUsageMetadata usage
+    ) {
+        if (usage == null) {
+            return null;
+        }
+        Integer inputTokens = usage.promptTokenCount().orElse(null);
+        Integer cachedInputTokens = usage.cachedContentTokenCount().orElse(null);
+        Integer uncachedInputTokens = inputTokens == null
+                || cachedInputTokens == null
+                ? null
+                : inputTokens - cachedInputTokens;
+        Integer candidateOutputTokens = usage.candidatesTokenCount().orElse(null);
+        Integer thinkingOutputTokens = usage.thoughtsTokenCount().orElse(null);
+        Integer outputTokens = candidateOutputTokens == null
+                ? null
+                : candidateOutputTokens
+                + (thinkingOutputTokens == null ? 0 : thinkingOutputTokens);
+        return new ModelTokenUsage(
+                inputTokens,
+                cachedInputTokens,
+                uncachedInputTokens,
+                candidateOutputTokens,
+                thinkingOutputTokens,
+                outputTokens,
+                usage.toolUsePromptTokenCount().orElse(null),
+                usage.totalTokenCount().orElse(null)
         );
     }
 

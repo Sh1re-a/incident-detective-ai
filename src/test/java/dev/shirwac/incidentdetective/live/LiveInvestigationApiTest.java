@@ -198,6 +198,17 @@ class LiveInvestigationApiTest {
                 .andExpect(jsonPath("$.model_calls[2].phase")
                         .value("synthesize"))
                 .andExpect(jsonPath("$.token_usage.total_tokens").value(1_315))
+                .andExpect(jsonPath("$.token_usage.input_tokens").value(1_110))
+                .andExpect(jsonPath("$.token_usage.cached_input_tokens").value(210))
+                .andExpect(jsonPath("$.token_usage.uncached_input_tokens").value(900))
+                .andExpect(jsonPath("$.token_usage.candidate_output_tokens").value(205))
+                .andExpect(jsonPath("$.token_usage.thinking_output_tokens").value(0))
+                .andExpect(jsonPath("$.prompt_cache.strategy")
+                        .value("provider_implicit"))
+                .andExpect(jsonPath("$.prompt_cache.provider_reported_model_calls")
+                        .value(3))
+                .andExpect(jsonPath("$.prompt_cache.cached_input_tokens").value(210))
+                .andExpect(jsonPath("$.prompt_cache.cache_hit_observed").value(true))
                 .andExpect(jsonPath("$.tool_call_count").value(4))
                 .andExpect(jsonPath("$.model_call_count").value(3))
                 .andExpect(jsonPath("$.limitations.length()").value(3))
@@ -367,12 +378,24 @@ class LiveInvestigationApiTest {
     }
 
     private ModelCallMetadata metadata(ModelPhase phase, int round) {
+        int input = 10;
+        int output = 5;
+        int cachedInput = 10;
         return new ModelCallMetadata(
                 phase,
                 round,
                 "test-response-id",
                 "gemini-test-version",
-                new ModelTokenUsage(10, 5, 15),
+                new ModelTokenUsage(
+                        input,
+                        cachedInput,
+                        input - cachedInput,
+                        output,
+                        0,
+                        output,
+                        0,
+                        input + output
+                ),
                 1
         );
     }
