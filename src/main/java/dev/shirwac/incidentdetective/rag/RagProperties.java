@@ -9,12 +9,20 @@ import org.springframework.validation.annotation.Validated;
 public record RagProperties(
         @NotBlank String embeddingModel,
         int embeddingDimensions,
-        @NotBlank String embeddingFormatVersion
+        @NotBlank String embeddingFormatVersion,
+        double minimumSimilarity
 ) {
     public RagProperties {
         if (embeddingDimensions != 768) {
             throw new IllegalArgumentException(
                     "this sprint's pgvector schema requires 768 dimensions"
+            );
+        }
+        if (!Double.isFinite(minimumSimilarity)
+                || minimumSimilarity < -1
+                || minimumSimilarity > 1) {
+            throw new IllegalArgumentException(
+                    "minimum similarity must be finite and between -1 and 1"
             );
         }
     }

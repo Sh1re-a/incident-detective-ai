@@ -27,7 +27,8 @@ class JdbcRunbookVectorStoreIT {
     private static final RagProperties PROFILE = new RagProperties(
             "gemini-embedding-2",
             768,
-            "search-result-v1"
+            "search-result-v1",
+            0.0
     );
 
     @Container

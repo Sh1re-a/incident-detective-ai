@@ -94,7 +94,8 @@ class GeminiEmbeddingGatewayTest {
                 new RagProperties(
                         "gemini-embedding-2",
                         DIMENSIONS,
-                        "search-result-v1"
+                        "search-result-v1",
+                        0.0
                 )
         );
     }
