@@ -1,0 +1,24 @@
+name: incident-detective
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-incident_detective}
+      POSTGRES_USER: ${POSTGRES_USER:-incident_detective}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-incident_detective_local}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - incident_detective_pgdata:/var/lib/postgresql/data
+    restart: "no"
+
+volumes:
+  incident_detective_pgdata:
