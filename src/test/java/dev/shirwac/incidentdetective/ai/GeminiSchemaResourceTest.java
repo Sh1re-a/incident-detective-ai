@@ -98,6 +98,7 @@ class GeminiSchemaResourceTest {
         assertTrue(prompt.contains("never exceed max_calls_this_round"));
         assertTrue(prompt.contains("discovered_trace_ids"));
         assertTrue(prompt.contains("remaining count is zero"));
+        assertTrue(prompt.contains("all relevant metric names together"));
     }
 
     @Test

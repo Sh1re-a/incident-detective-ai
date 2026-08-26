@@ -120,6 +120,7 @@ class LiveInvestigationServiceTest {
 
         CollectionToolBudget secondRound = budgetCaptor.getAllValues().get(1);
         assertTrue(secondRound.allowedTools().contains(ToolName.GET_TRACE));
+        assertFalse(secondRound.allowedTools().contains(ToolName.GET_METRICS));
         assertFalse(secondRound.allowedTools().contains(
                 ToolName.RETRIEVE_RUNBOOKS
         ));
@@ -199,6 +200,46 @@ class LiveInvestigationServiceTest {
         );
 
         assertEquals(ModelProviderFailure.MALFORMED_RESPONSE, exception.failure());
+        verify(model, never()).synthesize(any(), anyList(), any());
+    }
+
+    @Test
+    void rejectsRepeatedMetricCollectionBeforeSynthesis() {
+        Map<String, Object> metricArguments = Map.of(
+                "metric_names", List.of("checkout_failure_ratio"),
+                "start", "2026-08-25T09:55:00Z",
+                "end", "2026-08-25T10:15:00Z"
+        );
+        when(model.collect(
+                any(), anyList(), anyList(), any(), eq(1), any()
+        )).thenReturn(new CollectionModelResult(
+                List.of(
+                        call(
+                                "call-metrics-1",
+                                ToolName.GET_METRICS,
+                                metricArguments
+                        ),
+                        call(
+                                "call-metrics-2",
+                                ToolName.GET_METRICS,
+                                metricArguments
+                        )
+                ),
+                metadata(ModelPhase.COLLECT, 1, 600, 100)
+        ));
+
+        ModelProviderException exception = assertThrows(
+                ModelProviderException.class,
+                () -> service.investigate(
+                        SCENARIO_ID,
+                        new LiveInvestigationRequest(true)
+                )
+        );
+
+        assertEquals(
+                ModelProviderFailure.MALFORMED_RESPONSE,
+                exception.failure()
+        );
         verify(model, never()).synthesize(any(), anyList(), any());
     }
 

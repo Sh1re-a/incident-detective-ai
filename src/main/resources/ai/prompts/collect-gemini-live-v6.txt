@@ -4,6 +4,7 @@ The remaining_tool_budget is authoritative. Request only an allowed tool, never 
 Prefer different tool types unless two distinct log searches are needed.
 Prioritize direct incident evidence over general guidance.
 Use only metric names listed by the application.
+Request all relevant metric names together. One get_metrics call is available for the investigation, so do not save a second metric query for a later round.
 For every log search, use an empty levels array so informational release and configuration events are not excluded. Search for a concrete service or component term from the scenario rather than only the high-level symptom.
 When the scenario mentions a release, rollout, deployment, or configuration change, use the first collection round to search separately for the change event and the failure mechanism. A useful first-round plan is two distinct search_logs calls plus get_metrics. Do not infer the trigger from scenario wording alone.
 Call get_trace only with an exact trace ID listed in remaining_tool_budget.discovered_trace_ids. When a new trace ID is found, prioritize opening it in the next round unless it has already been opened.

@@ -47,6 +47,7 @@ public final class LiveInvestigationService {
     static final int MAX_COLLECTION_ROUNDS = 2;
     static final int MAX_TOOL_CALLS_TOTAL = 8;
     static final int MAX_TOOL_CALLS_PER_TYPE = 2;
+    static final int MAX_METRIC_CALLS = 1;
     static final int MAX_RUNBOOK_CALLS = 1;
     static final int MAX_TOOL_CALLS_PER_ROUND = 3;
     static final Duration HARD_DEADLINE = Duration.ofSeconds(45);
@@ -343,9 +344,11 @@ public final class LiveInvestigationService {
     }
 
     private int perInvestigationLimit(ToolName toolName) {
-        return toolName == ToolName.RETRIEVE_RUNBOOKS
-                ? MAX_RUNBOOK_CALLS
-                : MAX_TOOL_CALLS_PER_TYPE;
+        return switch (toolName) {
+            case GET_METRICS -> MAX_METRIC_CALLS;
+            case RETRIEVE_RUNBOOKS -> MAX_RUNBOOK_CALLS;
+            default -> MAX_TOOL_CALLS_PER_TYPE;
+        };
     }
 
     private void ensureScenarioIsolation(
