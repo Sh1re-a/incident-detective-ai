@@ -349,6 +349,114 @@ describe("Incident Detective experience", () => {
     expect(screen.getByText("4/5 hidden-reference claims matched")).toBeVisible();
   });
 
+  it("clears the old result and runs the selected second scenario", async () => {
+    const fetchMock = installApiMock();
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Play free recorded investigation",
+      }),
+    );
+    expect(await screen.findByText("Verified for this run")).toBeVisible();
+
+    await user.click(
+      screen.getByRole("button", { name: /Some carts fail before payment/ }),
+    );
+
+    expect(screen.queryByText("Verified for this run")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Some carts fail before payment" }),
+    ).toBeVisible();
+    expect(screen.getByText("Diagnosis not opened")).toBeVisible();
+
+    await user.click(
+      screen.getByRole("button", { name: "Play free recorded investigation" }),
+    );
+    expect(await screen.findByText("Verified for this run")).toBeVisible();
+
+    const replayCalls = callsEndingWith(fetchMock, "/runs/recorded-replay");
+    expect(replayCalls).toHaveLength(2);
+    expect(String(replayCalls[1]?.[0])).toContain(
+      "/api/v1/scenarios/checkout-cart-segment-failures-v1/runs/recorded-replay",
+    );
+  });
+
+  it("presents insufficient evidence as a safe abstention", async () => {
+    const abstentionResult: LiveInvestigationResult = {
+      ...liveResult,
+      diagnosis: {
+        status: "insufficient_evidence",
+        root_cause_code: null,
+        affected_service: null,
+        business_summary:
+          "Checkout failures are visible, but the available evidence does not prove one cause.",
+        technical_summary:
+          "A provider response is still required to distinguish between plausible causes.",
+        claims: [
+          {
+            claim_code: "missing_evidence",
+            claim_value_code: "PAYMENT_PROVIDER_RESPONSE",
+            display_text: "The payment provider response is missing.",
+            evidence_ids: [],
+          },
+        ],
+        safe_next_step: {
+          summary: "Collect the missing provider response before approving any change.",
+          requires_human_approval: true,
+        },
+      },
+      verification: {
+        ...liveResult.verification,
+        evidence_precision: {
+          applicable: false,
+          supported_triples: 0,
+          total_triples: 0,
+          score: null,
+          citation_support: [],
+        },
+        claim_coverage: {
+          applicable: false,
+          matched_claim_count: 0,
+          reference_claim_count: 0,
+          score: null,
+        },
+        diagnosis_correctness: {
+          evaluated: true,
+          diagnosis_applicable: false,
+          root_cause_correct: false,
+          affected_service_correct: false,
+          abstention_correct: true,
+        },
+      },
+      comparison: {
+        expected_status: "insufficient_evidence",
+        expected_root_cause_code: null,
+        expected_affected_service: null,
+        root_cause_correct: false,
+        affected_service_correct: false,
+        abstention_correct: true,
+      },
+    };
+    installApiMock({ liveResponse: abstentionResult });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Run live AI" }));
+    await user.click(screen.getByRole("button", { name: "Confirm live run" }));
+
+    expect(await screen.findByText("Safe abstention")).toBeVisible();
+    expect(screen.queryByText("Verified for this run")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Collect the missing provider response before approving any change."),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "Engineering View" }));
+    expect(screen.getByText("Correct abstention")).toBeVisible();
+    expect(screen.getAllByText("Not applicable").length).toBeGreaterThanOrEqual(2);
+  });
+
   it("explains the learning project and supports keyboard view navigation", async () => {
     installApiMock();
     const user = userEvent.setup();
@@ -388,6 +496,13 @@ function installApiMock(options: ApiMockOptions = {}) {
       return jsonResponse({ scenarios: [scenario, secondScenario] });
     }
     if (url.endsWith("/runs/recorded-replay")) {
+      if (url.includes(secondScenario.scenario_id)) {
+        return jsonResponse({
+          ...recordedResult,
+          scenario_id: secondScenario.scenario_id,
+          scenario: secondScenario,
+        });
+      }
       return jsonResponse(recordedResult);
     }
     if (url.endsWith("/runs/live-ai")) {
