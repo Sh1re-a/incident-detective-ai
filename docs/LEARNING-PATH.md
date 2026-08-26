@@ -1,7 +1,7 @@
 # Lärspår och verktyg
 
 - **Status:** Story/Engineering View, replay/live-API, fyra typade read-only tools och riktiga Gemini-körningar är verifierade
-- **Senast verifierad:** 25 augusti 2026
+- **Senast verifierad:** 26 augusti 2026
 
 Målet är inte att läsa allt innan jag bygger. Jag följer samma korta loop:
 
@@ -35,10 +35,10 @@ Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i s
 
 - Java 21.0.10 LTS, `javac` 21.0.10 och Maven 3.9.12 finns.
 - Projektet använder Spring Boot 4.1.1 och Maven Wrapper 3.3.4 med Maven 3.9.16.
-- IntelliJ IDEA 2025.3.3, Docker och Google Cloud CLI finns.
-- Hela den nätverksfria Maven-testsuiten har 153 gröna tester. Frontend har 10 gröna beteendetester och en godkänd produktionsbuild.
-- Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och `gemini-live-v4`.
-- Två aktuella v4-smokes, ett per scenario, gav rätt diagnos, 100 procent giltiga citation IDs och 5/5 direkta evidenskopplingar på 4,55–5,50 sekunder. Äldre körningar innehåller sämre evidensprecision och provider-timeouts; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
+- IntelliJ IDEA 2025.3.3 och Google Cloud CLI finns. Docker CLI finns, men Docker-daemonen var inte igång vid kontrollen 26 augusti.
+- Hela den nätverksfria Maven-testsuiten har 156 gröna tester. Frontend har 10 gröna beteendetester och en godkänd produktionsbuild.
+- Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och `gemini-live-v5`.
+- Den senaste v5-smoken gav rätt inventory-diagnos, 100 procent giltiga citation IDs och 5/5 direkta evidenskopplingar på 4,96 sekunder. Den gjordes efter att en v4-regression gav 3/5. Historiken innehåller sämre evidensprecision och provider-timeouts; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
 - Livevägen har ett första kostnadsskydd: en samtidig körning och fem starter per rullande tio minuter per backendinstans. Cloud Run-instansgräns och budgetlarm är ännu inte konfigurerade.
 - PostgreSQL-klienten finns inte globalt. Det blockerar inte dag 1 och installeras inte innan retrievalsteget behöver den.
 
@@ -74,21 +74,23 @@ Läs den officiella dokumentation som implementationen bygger på:
 
 Byggresultat: alla fyra tools är typade och skrivskyddade. Gemini väljer tools i högst två collection-rundor, synthesis saknar tools och svaret valideras mot schema och Java-regler innan det jämförs med dolt facit. Nästa övning är att kunna följa en request från Swagger genom gateway, tool executor och verifierare.
 
-### Pass 4 – evals och verifiering
-
-Läs [OpenAI: Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices).
-
-Byggresultat: en portabel JUnit-/kommandoradsbaserad evalharness över versionshanterade fixtures och egna deterministiska scorers. Citation validity, evidence precision och diagnosis correctness hålls som tre olika mått.
-
-### Pass 5 – runbook-retrieval
+### Pass 4 – runbook-retrieval
 
 Läs:
 
-1. [pgvector: officiellt projekt](https://github.com/pgvector/pgvector)
-2. [pgvector-java](https://github.com/pgvector/pgvector-java)
-3. [OpenAI: Vector embeddings](https://developers.openai.com/api/docs/guides/embeddings)
+1. [Gemini API: Embeddings](https://ai.google.dev/gemini-api/docs/embeddings)
+2. [pgvector: officiellt projekt](https://github.com/pgvector/pgvector)
+3. [pgvector-java](https://github.com/pgvector/pgvector-java)
 
-Byggresultat: sökning i kuraterade runbooks med dokument-, chunk- och versionsmetadata. Metrics, logs och traces läggs inte i vector store.
+Byggresultat: en fristående, versionshanterad korpus med 10–15 syntetiska runbooks. Med `gemini-embedding-2` formateras dokument som `title: … | text: …` och frågor som `task: search result | query: …`, utan separat `taskType`, och båda bäddas in i 768 dimensioner. PostgreSQL/pgvector gör exakt cosine-sökning och returnerar top-k ≤ 4 med dokument-, chunk-, versions-, rank- och similaritymetadata. Metrics, logs och traces läggs inte i vector store.
+
+Övning: förklara varför dagens scenarioförvalda keyword matching inte är RAG, varför exakt sökning räcker för en så liten korpus och varför embeddingmodell och korpusversion måste sparas.
+
+### Pass 5 – evals och verifiering
+
+Läs [OpenAI: Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices). Guiden används för allmän evalmetod; själva harnessen är leverantörsoberoende och körs lokalt/CI.
+
+Byggresultat: först 10 positiva retrievalfall och två no-result-fall för Hit@4, därefter en portabel JUnit-/kommandoradsbaserad evalharness över 18 versionshanterade incidentfall och egna deterministiska scorers. Citation validity, evidence precision, diagnosis correctness, abstention och retrieval hålls som separata mått. Ett adversarial runbook måste faktiskt hamna i topp 4 för att säkerhetstestet ska räknas.
 
 ### Pass 6 – logging och tracing
 
@@ -110,7 +112,7 @@ Byggresultat: en lokalt testad container och därefter en separat godkänd deplo
 
 ## Nuvarande kodgrund
 
-Nu finns React Story/Engineering View, säker scenario-lista, klickbar evidens, ärlig replay/live-fallback, Spring Boot replay/live-API, separat dold `GroundTruth`, deterministisk verifierare, två fixturepaket, Swagger/OpenAPI, fyra typade tools, Gemini-gateway, strict structured output och kostnadsestimat. PostgreSQL/pgvector, evalharness, observability, container och deploy saknas fortfarande.
+Nu finns React Story/Engineering View, säker scenario-lista, klickbar evidens, ärlig replay/live-fallback, Spring Boot replay/live-API, separat dold `GroundTruth`, deterministisk verifierare, två fixturepaket, Swagger/OpenAPI, fyra typade tools, Gemini-gateway, strict structured output och kostnadsestimat. Runbook-toolset använder ännu scenarioförvald keyword matching. En fristående korpus, PostgreSQL/pgvector, evalharness, observability, container och deploy saknas fortfarande.
 
 ## Två implementerade startscenarier
 

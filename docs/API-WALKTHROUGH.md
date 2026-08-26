@@ -130,6 +130,12 @@ Live-svaret har samma grundberättelse som replay, men innehåller verklig körm
 
 Alla fyra är scenarioavgränsade och kan bara läsa syntetisk data. Modellen får aldrig terminalåtkomst, deployverktyg eller ett rollback-tool.
 
+### Vad `retrieve_runbooks` är just nu
+
+Tool-kontraktet, metadata och citationerna är verkliga, men retrievalalgoritmen är ännu en lokal keyword-sökning i runbooks som redan ligger i respektive scenariofixture. Det är en fungerande övergång och ett bra kontraktstest, men inte ett trovärdigt RAG-bevis.
+
+Nästa slice flyttar runbooks till en fristående korpus med realistiska distraktorer. Gemini skapar 768-dimensionella embeddings och PostgreSQL/pgvector rankar högst fyra chunks med exakt cosine-sökning. Engineering View och evalrapporten ska då visa dokument, chunk, version, rank, similarity, embeddingmodell och korpusversion. Metrics, logs och traces stannar bakom sina typade tools.
+
 ## Vad verifieraren kontrollerar
 
 Verifiering är vanlig deterministisk Java-kod, inte ett andra AI-svar. Den ställer tre olika frågor:
@@ -176,7 +182,7 @@ Ett fel triggar aldrig en dold automatisk live-retry och märks aldrig om till e
 
 - Båda recorded-scenarierna returnerar rätt verktygsordning, klickbara evidence IDs, diagnos och verifiering.
 - Scenario-listan läcker inte facit eller evidens.
-- Ett komplett liveflöde returnerar fyra tool events, fyra evidenstyper, tre model calls, tokens och verifieringsresultat.
+- Ett komplett stubbat liveflöde returnerar fyra tool events, fyra evidenstyper, tre model calls, tokens och verifieringsresultat. Ett verkligt liveflöde får välja färre tools och testas därför mot bounds och kontrakt i stället för en påhittad fast sekvens.
 - `insufficient_evidence` fungerar som ett giltigt avstående.
 - Ett påhittat evidence-ID blir `verification_failed`.
 - Modellnyckel, råa providersvar, GroundTruth och evidens som modellen inte såg hålls borta från publika svar.
@@ -222,7 +228,7 @@ Förklara `COLLECT → SYNTHESIZE → VERIFY`: Gemini väljer read-only tools, l
 
 ### 6:15–7:00 – ärlig avslutning
 
-“Två v4-smokes lyckades, men det är inte ett accuracyresultat. Nästa bevis är evalharnessen med development- och held-out-fall. pgvector, observability, container och Cloud Run återstår.”
+“Den senaste v5-smoken gav rätt inventory-diagnos och 5/5 stödda evidenslänkar efter att verifieraren hittat en 3/5-regression i v4. Det är inte ett accuracyresultat. Nästa bevis är riktig pgvector-retrieval med Hit@4, därefter fulla development- och held-out-evals. Observability, container och Cloud Run återstår.”
 
 ## Om publiken är icke-teknisk
 
@@ -261,7 +267,7 @@ För officiellt läsmaterial och korta övningar, använd [lärspåret](./LEARNI
 ## Ännu inte färdigt
 
 - Kvalitet över 18 evalfall och held-out data är inte mätt.
-- Runbook-retrieval använder ännu lokal keyword matching, inte PostgreSQL/pgvector.
+- Runbook-retrieval använder ännu scenarioförvald lokal keyword matching, inte en fristående PostgreSQL/pgvector-korpus.
 - Git SHA sparas ännu inte i körresultatet.
 - Strukturerade JSON-loggar och OpenTelemetry återstår.
 - Rate limit är minnesbaserad per applikationsinstans.

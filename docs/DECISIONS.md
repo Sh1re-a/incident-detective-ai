@@ -1,7 +1,7 @@
 # Tekniska beslut
 
 - **Status:** levande beslutslogg; varje beslut har egen status
-- **Senast uppdaterad:** 25 augusti 2026
+- **Senast uppdaterad:** 26 augusti 2026
 
 Besluten ska hålla Incident Detective litet, förklarbart och mätbart. En föreslagen riktning blir accepterad när den är granskad eller implementerad. Därefter ändras den bara när ny evidens eller ett verkligt blockerande problem motiverar det, och ändringen dokumenteras här i stället för att döljas i implementationen.
 
@@ -67,23 +67,23 @@ Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. D
 
 ## DEC-007 – En leverantör, function calling och structured output
 
-**Status:** Accepted for the current slice, 25 augusti 2026
+**Status:** Accepted for the current slice, updated 26 augusti 2026
 
-Det aktuella liveflödet använder Gemini Developer API genom den officiella Java SDK:n, pinnad till `google-genai` 1.67.0. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och kontraktet `gemini-live-v4`. Endast en modellleverantör används i sprintens kärna.
+Det aktuella liveflödet använder Gemini Developer API genom den officiella Java SDK:n, pinnad till `google-genai` 1.67.0. Standardprofilen är `gemini-3.5-flash-lite` med `MINIMAL` thinking och kontraktet `gemini-live-v5`. Endast en modellleverantör används i sprintens kärna.
 
 **Varför:** Meritvärdet ligger i arkitektur, evals och omdöme, inte i leverantörens namn. Gratis lokal utveckling minskar startkostnaden utan att låtsas att den publika demon blir kostnadsfri.
 
-**Konsekvens:** Modellanrop isoleras bakom en liten intern gateway, men inget multi-provider-lager eller modellval byggs i gränssnittet. `COLLECT` använder custom function tools, `SYNTHESIZE` görs separat utan tools med ett strikt schema och `VERIFY` är deterministisk Java-kod. v4 delar en kanonisk claim-taxonomi mellan schema, Java-validering och synthesis samt ber den första loggsökningen att inte filtrera bort INFO-händelser. Två opt-in UI-smokes, ett per scenario, gav rätt rotorsak och 5/5 direkt stödda claim-evidence-länkar på 4,55–5,50 sekunder. Historiska provider-timeouts och sämre evidensprecision finns kvar i smoke-loggen. Profilen är därför ett mätt startval, inte ett bevis på stabilitet eller kvalitet; evalsen får avgöra om den behålls.
+**Konsekvens:** Modellanrop isoleras bakom en liten intern gateway, men inget multi-provider-lager eller modellval byggs i gränssnittet. `COLLECT` använder custom function tools, `SYNTHESIZE` görs separat utan tools med ett strikt schema och `VERIFY` är deterministisk Java-kod. v5 behåller den kanoniska claim-taxonomin från v4 och kräver tydligare direkt stöd för trigger, påverkad tjänst och felmekanism. Ändringen gjordes efter en korrekt v4-inventorydiagnos med bara 3/5 stödda länkar; GroundTruth och verifieraren lättades inte. En efterföljande v5-UI-smoke gav rätt rotorsak och tjänst samt 5/5 stödda länkar på 4,96 sekunder. Historiska provider-timeouts och sämre evidensprecision finns kvar i smoke-loggen. Profilen är därför ett mätt startval, inte ett bevis på stabilitet eller kvalitet; evalsen får avgöra om den behålls.
 
 ## DEC-008 – RAG endast för runbooks
 
-**Status:** Accepted, 25 augusti 2026
+**Status:** Accepted design, not implemented, updated 26 augusti 2026
 
-PostgreSQL/pgvector används för 10–15 ostrukturerade runbooks. Metrics, logs och traces nås genom sina typade tools och läggs inte i vector store.
+PostgreSQL/pgvector ska användas för en fristående korpus med 10–15 ostrukturerade runbooks. Metrics, logs och traces nås genom sina typade tools och läggs inte i vector store. Korpusen bäddas in med `gemini-embedding-2` i 768 dimensioner och söks med exakt cosine distance; ett approximate index behövs inte för denna lilla datamängd.
 
 **Varför:** Retrieval löser ett verkligt textproblem utan att göra all telemetri otydlig eller svår att verifiera.
 
-**Konsekvens:** Runbookresultat måste ha dokument-, chunk- och versionsmetadata och kunna mätas med Hit@4.
+**Konsekvens:** Runbookresultat måste ha dokument-, chunk- och versionsmetadata samt rank, similarity, embeddingmodell, innehållshash, korpusversion och retrieval-backend. Ett märkt live-RAG-flöde får inte tyst falla tillbaka till keyword matching. Hit@4 mäts på minst 10 positiva frågor; två no-result-frågor redovisas separat. Dagens scenarioförvalda keyword-sökning är endast en övergång och får inte beskrivas som RAG.
 
 ## DEC-009 – Tre olika verifieringsfrågor
 
@@ -109,23 +109,23 @@ Story View prioriterar affärspåverkan, tidslinje, rotorsak, bevis och nästa s
 
 ## DEC-011 – Portabel evalharness
 
-**Status:** Proposed
+**Status:** Accepted design, not implemented, updated 26 augusti 2026
 
 Evals ska kunna köras med lokala/CI-kommandon över versionshanterade fixtures och deterministiska scorers.
 
 **Varför:** Utvärderingen ska överleva leverantörsförändringar och vara reproducerbar för en teknisk granskare.
 
-**Konsekvens:** Ingen avvecklad provider-hostad Evals API-funktion får vara kritisk väg.
+**Konsekvens:** Ingen avvecklad provider-hostad Evals API-funktion får vara kritisk väg. Samma versionshanterade fall ska kunna ge JSON- och Markdownrapport. Vanlig CI kör deterministiska scorers och retrievaltest utan betalda generativa anrop; en live-eval kräver explicit opt-in och redovisar modell, prompt, embeddingmodell, datasetversion och git SHA.
 
 ## DEC-012 – JSON-loggar och OpenTelemetry först
 
-**Status:** Proposed
+**Status:** Accepted design, not implemented, updated 26 augusti 2026
 
 Systemet använder strukturerade JSON-loggar och OpenTelemetry för API-, tool- och verifieringsspår. Langfuse läggs bara till om ett konkret gap finns efter kärnflödet.
 
 **Varför:** Observability ska förklara beteende utan att bli ett eget projekt.
 
-**Konsekvens:** Hemligheter, rå promptdata med känsligt innehåll och privat chain-of-thought loggas inte.
+**Konsekvens:** Hemligheter, rå promptdata med känsligt innehåll och privat chain-of-thought loggas inte. Trace-strukturen ska minst kunna följas som API → collect → tool → synthesize → verify, och test ska visa att saneringen gäller.
 
 ## DEC-013 – Cloud Run med server-side secrets
 

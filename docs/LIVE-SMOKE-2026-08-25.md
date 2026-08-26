@@ -66,6 +66,29 @@ Efter failure-signalen ovan infördes en delad claim-taxonomi för de fem diagno
 
 Båda körningarna använde tre modellanrop och fem read-only tool calls. Den faktiska debiteringen lästes inte av och kan vara 0 USD på free tier. De är två utvecklingssmokes över två fasta scenariofixtures, inte 100 procent accuracy, warm p95 eller ett stabilitetsbevis. Det återstår dessutom att minska upprepade metric-anrop och att köra en versionshanterad evalmängd med variationer och abstentionfall.
 
+## Regression och prompt v5 – 26 augusti
+
+Efter att API-kontrakten testats igen kördes båda scenarierna med prompt v4. Payment-fallet var korrekt med 5/5 direkt stödda länkar på 24 198 ms, 5 400 tokens och cirka 0,003556 USD i betalt listprisestimat. Inventory-fallet hittade också rätt rotorsak och tjänst, men verifieraren godkände bara 3/5 länkar. Det tog 36 102 ms, använde 5 585 tokens och hade cirka 0,0035345 USD i listprisestimat.
+
+De två underkända inventory-länkarna kopplade ett metric-symptom till `affected_service` och ett senare schemafel till `trigger`. Det var giltiga evidence IDs men inte direkt stöd för just de påståendena. GroundTruth och verifieraren ändrades därför inte. Prompt v5 skärpte i stället kravet på att releasehändelse, påverkad tjänst och felmekanism måste styrkas var för sig.
+
+En enda efterföljande v5-körning gjordes genom det riktiga UI:t för inventory-scenariot. Run ID var `584d12d2-a6a1-49ad-bd5c-6aef6a04698d`.
+
+- root cause: `INVENTORY_SCHEMA_MISMATCH` – korrekt mot dolt facit
+- affected service: `INVENTORY_SERVICE` – korrekt mot dolt facit
+- diagnosis schema: godkänt
+- citation ID validity: 100 procent
+- evidence precision: 5 av 5 direkta länkar
+- säker toolsekvens: `search_logs`, `search_logs`, `get_metrics`, `get_trace`
+- model calls: 3
+- tool calls: 4
+- tokens: 6 502
+- latency: 4 960 ms
+- uppskattat betalt standardlistpris: cirka 0,0040 USD
+- faktisk debitering: inte avläst; kan vara 0 USD på free tier
+
+Detta visar att den observerade felkopplingen kan undvikas med v5 i ett fall. Det visar inte generell kvalitet. Körningen valde inte `retrieve_runbooks` och är därför inte ett RAG- eller retrievalbevis. Nästa relevanta mätning är en fristående runbookkorpus med pgvector och en versionshanterad Hit@4-eval, inte fler handplockade liveanrop.
+
 ## Reproducerbart opt-in-kommando
 
 Den vanliga testsuiten gör inga nätverksanrop. Ett live-smoketest måste aktiveras uttryckligen:
