@@ -15,7 +15,7 @@ public record RagProperties(
     public RagProperties {
         if (embeddingDimensions != 768) {
             throw new IllegalArgumentException(
-                    "this sprint's pgvector schema requires 768 dimensions"
+                    "the current pgvector schema requires 768 dimensions"
             );
         }
         if (!Double.isFinite(minimumSimilarity)
