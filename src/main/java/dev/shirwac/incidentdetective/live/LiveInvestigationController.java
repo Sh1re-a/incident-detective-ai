@@ -103,7 +103,7 @@ public final class LiveInvestigationController {
             ),
             @ApiResponse(
                     responseCode = "429",
-                    description = "Application admission, global daily allowance, or Gemini "
+                    description = "Application admission, configured daily allowance, or Gemini "
                             + "provider rate limit reached. Application limits include Retry-After; "
                             + "the provider SDK does not expose a trustworthy value.",
                     content = @Content(
