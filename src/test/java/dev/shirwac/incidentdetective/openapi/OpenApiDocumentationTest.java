@@ -163,6 +163,31 @@ class OpenApiDocumentationTest {
                         "$.components.schemas.ApiProblemResponse.properties.code"
                 ).exists())
                 .andExpect(jsonPath(
+                        "$.components.schemas.ApiProblemResponse.properties.code.enum"
+                ).value(containsInAnyOrder(
+                        "INVALID_REQUEST_BODY",
+                        "UNSUPPORTED_MEDIA_TYPE",
+                        "METHOD_NOT_ALLOWED",
+                        "ROUTE_NOT_FOUND",
+                        "LIVE_AI_RATE_LIMITED",
+                        "LIVE_AI_DAILY_LIMIT_REACHED",
+                        "LIVE_AI_CONFIRMATION_REQUIRED",
+                        "LIVE_AI_DISABLED",
+                        "LIVE_AI_NOT_CONFIGURED",
+                        "LIVE_INVESTIGATION_TIMEOUT",
+                        "MODEL_PROVIDER_TIMEOUT",
+                        "MODEL_PROVIDER_RATE_LIMITED",
+                        "MODEL_PROVIDER_ERROR",
+                        "MALFORMED_MODEL_RESPONSE",
+                        "INVALID_MODEL_TOOL_ARGUMENTS",
+                        "RAG_INDEX_NOT_READY",
+                        "RAG_EMBEDDING_NOT_CONFIGURED",
+                        "RAG_EMBEDDING_PROVIDER_ERROR",
+                        "RAG_EMBEDDING_RESPONSE_INVALID",
+                        "RAG_DATABASE_UNAVAILABLE",
+                        "SCENARIO_NOT_FOUND"
+                )))
+                .andExpect(jsonPath(
                         "$.components.schemas.ApiProblemResponse.properties.status.example"
                 ).doesNotExist())
                 .andExpect(jsonPath(
@@ -171,7 +196,7 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.ApiProblemResponse.properties.code.example"
                 ).doesNotExist())
-                .andExpect(jsonPath("$.paths.length()").value(3))
+                .andExpect(jsonPath("$.paths.length()").value(6))
                 .andExpect(jsonPath(LIVE_POST + ".responses['400']").exists())
                 .andExpect(jsonPath(LIVE_POST + ".responses['404']").exists())
                 .andExpect(jsonPath(LIVE_POST + ".responses['415']").exists())
@@ -192,17 +217,51 @@ class OpenApiDocumentationTest {
                                 + ".code"
                 ).value("UNSUPPORTED_MEDIA_TYPE"))
                 .andExpect(jsonPath(
-                        LIVE_POST + ".responses['429']" + PROBLEM_JSON_EXAMPLE
+                        LIVE_POST + ".responses['429'].content"
+                                + "['application/problem+json'].examples"
+                                + ".application_admission_limit.value"
                                 + ".code"
                 ).value("LIVE_AI_RATE_LIMITED"))
                 .andExpect(jsonPath(
-                        LIVE_POST + ".responses['502']" + PROBLEM_JSON_EXAMPLE
-                                + ".code"
+                        LIVE_POST + ".responses['429'].content"
+                                + "['application/problem+json'].examples"
+                                + ".provider_rate_limit.value.code"
+                ).value("MODEL_PROVIDER_RATE_LIMITED"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['502'].content"
+                                + "['application/problem+json'].examples"
+                                + ".model_provider_error.value.code"
                 ).value("MODEL_PROVIDER_ERROR"))
                 .andExpect(jsonPath(
-                        LIVE_POST + ".responses['503']" + PROBLEM_JSON_EXAMPLE
-                                + ".code"
+                        LIVE_POST + ".responses['502'].content"
+                                + "['application/problem+json'].examples"
+                                + ".rag_embedding_provider_error.value.code"
+                ).value("RAG_EMBEDDING_PROVIDER_ERROR"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['502'].content"
+                                + "['application/problem+json'].examples"
+                                + ".rag_embedding_response_invalid.value.code"
+                ).value("RAG_EMBEDDING_RESPONSE_INVALID"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['503'].content"
+                                + "['application/problem+json'].examples"
+                                + ".live_ai_disabled.value.code"
                 ).value("LIVE_AI_DISABLED"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['503'].content"
+                                + "['application/problem+json'].examples"
+                                + ".rag_index_not_ready.value.code"
+                ).value("RAG_INDEX_NOT_READY"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['503'].content"
+                                + "['application/problem+json'].examples"
+                                + ".rag_embedding_not_configured.value.code"
+                ).value("RAG_EMBEDDING_NOT_CONFIGURED"))
+                .andExpect(jsonPath(
+                        LIVE_POST + ".responses['503'].content"
+                                + "['application/problem+json'].examples"
+                                + ".rag_database_unavailable.value.code"
+                ).value("RAG_DATABASE_UNAVAILABLE"))
                 .andExpect(jsonPath(
                         LIVE_POST + ".responses['504']" + PROBLEM_JSON_EXAMPLE
                                 + ".code"
