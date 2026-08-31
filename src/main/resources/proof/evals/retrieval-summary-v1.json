@@ -1,0 +1,63 @@
+{
+  "summary_version": "retrieval-proof-summary-v1",
+  "status": "measured",
+  "provenance": {
+    "historical_frozen_run": true,
+    "suite_version": "runbook-retrieval-eval-v1",
+    "suite_sha256": "ec5c3138cd8c6e569107acb2b5e14ebdd6c2ea0f19a876396ce07136171a8303",
+    "corpus_version": "runbook-corpus-v1",
+    "corpus_content_sha256": "32a07893b823e5845cd4f24de3fcc3b401f655ff5d3883087240d0ff2ef7e41d",
+    "git_sha": "522d90fa514b89cfe4a01e5217e271d6dfccb722",
+    "executed_at": "2026-08-26T11:35:51.512474Z"
+  },
+  "retrieval": {
+    "backend": "pgvector_exact_cosine",
+    "embedding_provider": "google",
+    "embedding_model": "gemini-embedding-2",
+    "embedding_dimensions": 768,
+    "embedding_format_version": "search-result-v1",
+    "corpus_document_count": 10,
+    "corpus_chunk_count": 12,
+    "top_k": 4,
+    "minimum_similarity": 0.6620781500197453,
+    "threshold_calibrated_on_development": true,
+    "configured_threshold_matches_calibration": true
+  },
+  "development": {
+    "split": "development",
+    "positive_cases": 5,
+    "positive_hits": 5,
+    "hit_at_k": 1.0,
+    "mean_reciprocal_rank": 1.0,
+    "no_match_cases": 2,
+    "correct_no_matches": 2,
+    "no_match_accuracy": 1.0,
+    "benign_unsafe_top1_rate": 0.0
+  },
+  "held_out": {
+    "split": "held_out",
+    "positive_cases": 5,
+    "positive_hits": 4,
+    "hit_at_k": 0.8,
+    "mean_reciprocal_rank": 0.8,
+    "no_match_cases": 1,
+    "correct_no_matches": 1,
+    "no_match_accuracy": 1.0,
+    "benign_unsafe_top1_rate": 0.2
+  },
+  "provider_usage": {
+    "embedding_calls": 14,
+    "local_input_characters": 2051,
+    "provider_billable_characters": null,
+    "provider_input_tokens": null,
+    "provider_usage_metadata_complete": false,
+    "provider_call_latency_ms": 4681,
+    "evaluation_latency_ms": 4781,
+    "estimated_list_price_cost_usd": null,
+    "cost_status": "not_calculated: provider usage metadata and billing tier are not both verified"
+  },
+  "safety_boundary": {
+    "adversarial_synthesis_safety_evaluated": false,
+    "status": "not_evaluated: retrieval of untrusted text is observed here; synthesis safety needs a separate pipeline eval"
+  }
+}
