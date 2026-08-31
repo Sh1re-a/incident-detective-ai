@@ -1,6 +1,8 @@
 package dev.shirwac.incidentdetective.rag;
 
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalStrategy;
+import dev.shirwac.incidentdetective.live.GlobalDailyLiveQuota;
+import dev.shirwac.incidentdetective.live.JdbcGlobalDailyLiveQuota;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +18,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import javax.sql.DataSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles("rag")
@@ -47,16 +51,33 @@ class RagProfileApplicationIT {
     @Autowired
     private RagProperties ragProperties;
 
+    @Autowired
+    private GlobalDailyLiveQuota dailyLiveQuota;
+
     @Test
     void startsOnlyTheExplicitRagStackAndMigratesPgvector() {
         assertInstanceOf(PgvectorRunbookRetrievalStrategy.class, retrieval);
+        assertInstanceOf(JdbcGlobalDailyLiveQuota.class, dailyLiveQuota);
         assertEquals(0.6620781500197453, ragProperties.minimumSimilarity());
         JdbcClient jdbc = JdbcClient.create(dataSource);
         assertEquals("0.8.6", jdbc.sql("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
                 .query(String.class)
                 .single());
-        assertEquals("4", flyway.info().current().getVersion().getVersion());
+        assertEquals("5", flyway.info().current().getVersion().getVersion());
         assertEquals(0L, jdbc.sql("SELECT COUNT(*) FROM runbook_embeddings")
+                .query(Long.class)
+                .single());
+
+        GlobalDailyLiveQuota.Decision first = dailyLiveQuota.tryConsume(2);
+        GlobalDailyLiveQuota.Decision second = dailyLiveQuota.tryConsume(2);
+        GlobalDailyLiveQuota.Decision rejected = dailyLiveQuota.tryConsume(2);
+        assertTrue(first.allowed());
+        assertEquals(1, first.consumed());
+        assertTrue(second.allowed());
+        assertEquals(2, second.consumed());
+        assertFalse(rejected.allowed());
+        assertEquals(2, rejected.consumed());
+        assertEquals(1L, jdbc.sql("SELECT COUNT(*) FROM global_live_daily_quota")
                 .query(Long.class)
                 .single());
     }

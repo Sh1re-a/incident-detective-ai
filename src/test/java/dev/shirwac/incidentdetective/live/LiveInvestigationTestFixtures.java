@@ -120,7 +120,6 @@ final class LiveInvestigationTestFixtures {
                                 "The payment timeout is shorter than observed duration.",
                                 List.of(
                                         "cpt-v1-log-timeout-config",
-                                        "cpt-v1-log-timeout-error",
                                         "cpt-v1-trace-failed-checkout"
                                 )
                         ),
@@ -148,7 +147,6 @@ final class LiveInvestigationTestFixtures {
                                 "Payment latency reaches the timeout boundary.",
                                 List.of(
                                         "cpt-v1-metric-payment-p95",
-                                        "cpt-v1-log-timeout-error",
                                         "cpt-v1-trace-failed-checkout"
                                 )
                         )

@@ -45,7 +45,7 @@ import static org.mockito.Mockito.when;
         "incident-detective.ai.live-enabled=true",
         "incident-detective.ai.gemini-api-key=test-only-key",
         "incident-detective.ai.model-id=gemini-3.5-flash-lite",
-        "incident-detective.ai.prompt-version=test-prompt-v1"
+        "incident-detective.ai.prompt-version=gemini-live-v6"
 })
 class LiveInvestigationServiceTest {
 

@@ -103,53 +103,155 @@ public final class LiveInvestigationController {
             ),
             @ApiResponse(
                     responseCode = "429",
-                    description = "Live AI concurrency or rolling start limit reached",
+                    description = "Application admission, global daily allowance, or Gemini "
+                            + "provider rate limit reached. Application limits include Retry-After; "
+                            + "the provider SDK does not expose a trustworthy value.",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ApiProblemResponse.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "title": "Live AI is busy",
-                                      "status": 429,
-                                      "detail": "Another live investigation is already running.",
-                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
-                                      "code": "LIVE_AI_RATE_LIMITED"
-                                    }
-                                    """)
+                            examples = {
+                                    @ExampleObject(
+                                            name = "application_admission_limit",
+                                            value = """
+                                                    {
+                                                      "title": "Live AI is busy",
+                                                      "status": 429,
+                                                      "detail": "Another live investigation is already running.",
+                                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                                      "code": "LIVE_AI_RATE_LIMITED"
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "daily_live_allowance",
+                                            value = """
+                                                    {
+                                                      "title": "Daily live AI limit reached",
+                                                      "status": 429,
+                                                      "detail": "The public demo has used its live AI allowance for today.",
+                                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                                      "code": "LIVE_AI_DAILY_LIMIT_REACHED"
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "provider_rate_limit",
+                                            value = """
+                                                    {
+                                                      "title": "Model provider rate limited",
+                                                      "status": 429,
+                                                      "detail": "Gemini temporarily rejected the bounded model request.",
+                                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                                      "code": "MODEL_PROVIDER_RATE_LIMITED"
+                                                    }
+                                                    """
+                                    )
+                            }
                     )
             ),
             @ApiResponse(
                     responseCode = "502",
-                    description = "Provider response or model tool arguments were invalid",
+                    description = "Model or embedding provider failed, or returned "
+                            + "output outside a strict contract",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ApiProblemResponse.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "title": "Model provider failed",
-                                      "status": 502,
-                                      "detail": "Gemini could not complete the bounded model request.",
-                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
-                                      "code": "MODEL_PROVIDER_ERROR"
-                                    }
-                                    """)
+                            examples = {
+                                    @ExampleObject(
+                                            name = "model_provider_error",
+                                            value = """
+                                                    {
+                                                      "title": "Model provider failed",
+                                                      "status": 502,
+                                                      "detail": "Gemini could not complete the bounded model request.",
+                                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                                      "code": "MODEL_PROVIDER_ERROR"
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "rag_embedding_provider_error",
+                                            value = """
+                                                    {
+                                                      "title": "Runbook embedding provider failed",
+                                                      "status": 502,
+                                                      "detail": "The embedding provider could not complete the bounded retrieval request.",
+                                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                                      "code": "RAG_EMBEDDING_PROVIDER_ERROR"
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "rag_embedding_response_invalid",
+                                            value = """
+                                                    {
+                                                      "title": "Runbook embedding response rejected",
+                                                      "status": 502,
+                                                      "detail": "The embedding provider returned output outside the allowed contract.",
+                                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                                      "code": "RAG_EMBEDDING_RESPONSE_INVALID"
+                                                    }
+                                                    """
+                                    )
+                            }
                     )
             ),
             @ApiResponse(
                     responseCode = "503",
-                    description = "Live AI is disabled or not configured",
+                    description = "Live AI or its pgvector retrieval dependency is unavailable",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ApiProblemResponse.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "title": "Live AI unavailable",
-                                      "status": 503,
-                                      "detail": "Live AI is disabled by server configuration.",
-                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
-                                      "code": "LIVE_AI_DISABLED"
-                                    }
-                                    """)
+                            examples = {
+                                    @ExampleObject(
+                                            name = "live_ai_disabled",
+                                            value = """
+                                                    {
+                                                      "title": "Live AI unavailable",
+                                                      "status": 503,
+                                                      "detail": "Live AI is disabled by server configuration.",
+                                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                                      "code": "LIVE_AI_DISABLED"
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "rag_index_not_ready",
+                                            value = """
+                                                    {
+                                                      "title": "Runbook retrieval unavailable",
+                                                      "status": 503,
+                                                      "detail": "The pgvector runbook index is not ready for live retrieval.",
+                                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                                      "code": "RAG_INDEX_NOT_READY"
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "rag_embedding_not_configured",
+                                            value = """
+                                                    {
+                                                      "title": "Runbook retrieval unavailable",
+                                                      "status": 503,
+                                                      "detail": "The embedding provider is not configured for live retrieval.",
+                                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                                      "code": "RAG_EMBEDDING_NOT_CONFIGURED"
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "rag_database_unavailable",
+                                            value = """
+                                                    {
+                                                      "title": "Runbook retrieval unavailable",
+                                                      "status": 503,
+                                                      "detail": "The pgvector runbook store is temporarily unavailable.",
+                                                      "instance": "/api/v1/scenarios/checkout-orders-at-risk-v1/runs/live-ai",
+                                                      "code": "RAG_DATABASE_UNAVAILABLE"
+                                                    }
+                                                    """
+                                    )
+                            }
                     )
             ),
             @ApiResponse(
