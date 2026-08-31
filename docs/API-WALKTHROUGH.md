@@ -8,15 +8,20 @@
 
 En webbshops checkout börjar fallera. Incident Detective låter en AI undersöka syntetiska metrics, logs, traces och runbooks, kräver bevis för slutsatsen och låter sedan Java kontrollera resultatet mot ett syntetiskt facit.
 
-## Tre endpoints och varför de finns
+## Sex endpoints och varför de finns
 
 | Endpoint | Vad den gör | Varför den finns |
 |---|---|---|
+| `GET /api/v1/capabilities` | Beskriver aktiv runtime, säkra gränser, modellbudget, retrieval och cachepolicy. | Frontend ska kunna visa vad just denna backend faktiskt kör utan hårdkodade påståenden. |
 | `GET /api/v1/scenarios` | Listar säkra sammanfattningar av incidenterna. | Besökaren behöver välja ett fall utan att få evidens eller facit i förväg. |
 | `POST /api/v1/scenarios/{scenarioId}/runs/recorded-replay` | Spelar upp en färdig, deterministisk utredning. | Demon ska alltid kunna visas snabbt, gratis och reproducerbart. Ingen modell körs. |
 | `POST /api/v1/scenarios/{scenarioId}/runs/live-ai` | Låter Gemini välja read-only tools och skapa en ny diagnos. | Det bevisar verklig tool calling, structured output och verifiering. Varje request kräver uttryckligt godkännande. |
+| `POST /api/v1/generated-cases/runs/live-ai` | Genererar ett request-lokalt Payment Timeout-fall och låter Gemini utreda det i samma request. | Besökaren kan skapa ett reproducerbart fall utan logguppladdning, lagring eller extra API-livscykel. |
+| `GET /api/v1/proof/evals/retrieval` | Returnerar en publicerad, historisk retrieval-eval på aggregatnivå. | RAG- och embeddingpåståenden ska kunna granskas utan att en ny eval startas. |
 
-`GET` läser en resurs. `POST` startar en ny körning och skapar därför bland annat ett nytt `run_id`.
+`GET` läser en resurs. `POST` startar en ny incidentkörning och skapar därför
+bland annat ett nytt `run_id`. Det finns ingen HTTP-endpoint som startar en
+eval, importerar embeddings eller utför remediation.
 
 ## Prova i Swagger
 
@@ -30,11 +35,31 @@ Starta backend:
 
 En trygg demoordning är:
 
-1. Kör `GET /api/v1/scenarios` och visa att svaret bara innehåller incidentens startläge.
-2. Kör recorded replay för `checkout-orders-at-risk-v1`.
-3. Öppna tool events, evidence IDs, diagnosen och verifieringen i svaret.
-4. Visa live-endpointens request body och förklara kostnadsbekräftelsen.
-5. Kör live endast när servern är aktiverad och du medvetet vill använda en modellrequest.
+1. Kör `GET /api/v1/capabilities` och visa de aktiva säkerhets- och runtimegränserna.
+2. Kör `GET /api/v1/scenarios` och visa att svaret bara innehåller incidentens startläge.
+3. Kör recorded replay för `checkout-orders-at-risk-v1`.
+4. Öppna tool events, evidence IDs, diagnosen och verifieringen i svaret.
+5. Visa generated-endpointens fyra controls och förklara att samma seed ger
+   samma syntetiska signaler men inte nödvändigtvis identiskt LLM-svar.
+6. Visa retrieval-proof och skilj den historiska mätningen från aktiv runtime.
+7. Kör live endast när servern är aktiverad och du medvetet vill använda en modellrequest.
+
+## 0. Capabilities
+
+`GET /api/v1/capabilities` är frontendens maskinläsbara källa för:
+
+- recorded/live-läge och deras truth labels,
+- de fyra read-only-verktygen,
+- liveaktivering, providerkonfiguration, modell/prompt och hårda call-/tidsbudgeter,
+- generated-case-controls samt om dygnskvoten är processlokal eller databasgemensam,
+- aktiv retrieval-backend: `deterministic_fixture` eller `pgvector_exact_cosine`,
+- aktiv embeddingprofil endast när pgvector faktiskt är aktivt,
+- cachepolicy: `provider_implicit`, explicit caching avstängd.
+
+`live_ai.enabled_by_configuration` och `credentials_configured` visar de två
+lokala förutsättningarna separat. `request_configured = true` betyder att båda
+är uppfyllda, men garanterar inte att providern är nåbar eller frisk. Endpointen
+returnerar aldrig en providernyckel.
 
 ## 1. Scenario-listan
 
@@ -119,6 +144,22 @@ Live-svaret har samma grundberättelse som replay, men innehåller verklig körm
 
 `confirm_live_ai` är ett medvetet kostnadsval, inte autentisering. Replay är standardläget och kostar inget modellanrop.
 
+## 4. Publicerade evalbevis
+
+Proof-endpointen läser en versionsmärkt snapshot som paketerats med backend. Den
+startar inga evals och gör inga provider- eller databasanrop.
+
+`GET /api/v1/proof/evals/retrieval` visar den frysta pgvector-/embeddingmätningen
+med egen git SHA och tidpunkt: development 5/5 och held-out 4/5 Hit@4. Null
+providerusage och null kostnad betyder **Not reported**, inte noll. Endpointen
+visar också uttryckligen att adversarial synthesis-säkerhet inte mättes av just
+retrieval-evalen.
+
+Git SHA och tidpunkt i proof-svaret hör till den publicerade mätningen. De ska
+inte beskrivas som den nuvarande API-processens checkout. Diagnoskvalitet visas
+i stället per körning genom schema, citationer, evidensstöd, claim coverage och
+korrekt diagnos.
+
 ## De fyra read-only-verktygen
 
 | Tool | Enkel fråga det svarar på | Exempel i checkoutfallet |
@@ -132,9 +173,14 @@ Alla fyra är scenarioavgränsade och kan bara läsa syntetisk data. Modellen f�
 
 ### Vad `retrieve_runbooks` är just nu
 
-I standardprofilen för recorded replay används den deterministiska scenariofixturen, så demon fungerar utan databas eller provider. I den uttryckliga `rag`-profilen söker samma tool i en fristående korpus med 10 syntetiska dokument och 12 chunks. Gemini skapar 768-dimensionella embeddings och PostgreSQL/pgvector rankar högst fyra chunks med exakt cosine-sökning.
+Recorded replay spelar upp sina frysta tool-resultat och gör ingen ny
+retrieval. När den vanliga backendprofilen faktiskt kör runbookverktyget används
+deterministisk scenario-fixture, så demon fungerar utan databas eller provider.
+I den uttryckliga `rag`-profilen söker samma tool i en fristående korpus med 10
+syntetiska dokument och 12 chunks. Gemini skapar 768-dimensionella embeddings
+och PostgreSQL/pgvector rankar högst fyra chunks med exakt cosine-sökning.
 
-Engineering View visar dokument, chunk, version, rank, similarity, embeddingmodell, innehållshash, korpusversion och retrieval-backend när modellen väljer runbookverktyget. Metrics, logs och traces stannar bakom sina typade tools. Retrieval v1 är mätt till development 5/5 och held-out 4/5 Hit@4; det missade held-out-fallet och den osäkra topprankade runbooken är öppna kvalitetsproblem.
+En framtida Engineering View kan visa dokument, chunk, version, rank, similarity, embeddingmodell, innehållshash, korpusversion och retrieval-backend när modellen väljer runbookverktyget. Metrics, logs och traces stannar bakom sina typade tools. Retrieval v1 är mätt till development 5/5 och held-out 4/5 Hit@4; det missade held-out-fallet och den osäkra topprankade runbooken är öppna kvalitetsproblem.
 
 ## Vad verifieraren kontrollerar
 
@@ -158,7 +204,10 @@ Ett `verification_failed`-resultat returneras som HTTP 200 eftersom API-körning
 
 `GroundTruth` är dolt för modellen under `COLLECT` och `SYNTHESIZE`. Verifieraren öppnar det först efter sista modellanropet.
 
-Det är däremot inte en hemlighet för en människa: de två nuvarande demofaciten finns i det publika repot. De fungerar som transparenta referensfall. Vecka 3 behöver separata held-out evalfall för trovärdig kvalitetsmätning.
+Det är däremot inte en hemlighet för en människa: de två nuvarande demofaciten
+finns i repot och fungerar som transparenta replay-referenser. Backenden
+publicerar ingen batch-accuracy för diagnoser. I stället verifieras varje
+replay- eller livekörning separat efter modellens sista anrop.
 
 ## Felsvar som går att förstå
 
@@ -169,15 +218,27 @@ Felsvar använder `application/problem+json` och en stabil `code`.
 | 400 | `LIVE_AI_CONFIRMATION_REQUIRED` | Liveanropet bekräftades inte. |
 | 400 | `INVALID_REQUEST_BODY` | JSON saknas, är trasig eller innehåller oväntade fält. |
 | 404 | `SCENARIO_NOT_FOUND` | Scenario-ID finns inte. |
+| 404 | `ROUTE_NOT_FOUND` | Ingen route matchar klientens path. |
+| 405 | `METHOD_NOT_ALLOWED` | Rätt path användes med fel HTTP-metod. |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | Live-body skickades inte som `application/json`. |
 | 429 | `LIVE_AI_RATE_LIMITED` | En annan körning pågår eller den lokala startgränsen är nådd. |
+| 429 | `LIVE_AI_DAILY_LIMIT_REACHED` | Den konfigurerade dygnskvoten är slut; dess scope framgår av capabilities. |
+| 429 | `MODEL_PROVIDER_RATE_LIMITED` | Providern avvisade det begränsade modellanropet tillfälligt. |
 | 502 | `MODEL_PROVIDER_ERROR` | Leverantören eller modellkontraktet misslyckades. Rå leverantörsdata returneras inte. |
+| 502 | `RAG_EMBEDDING_PROVIDER_ERROR` | Embeddingprovidern kunde inte slutföra retrievalanropet. |
+| 502 | `RAG_EMBEDDING_RESPONSE_INVALID` | Embeddingsvaret bröt det förväntade kontraktet. |
 | 503 | `LIVE_AI_DISABLED` | Live AI är avstängt på servern. |
 | 503 | `LIVE_AI_NOT_CONFIGURED` | Servern saknar modellkonfiguration. |
+| 503 | `RAG_EMBEDDING_NOT_CONFIGURED` | Embeddingprovidern är inte konfigurerad. |
+| 503 | `RAG_INDEX_NOT_READY` | Korpusantal eller innehållshash matchar inte aktivt pgvectorindex. |
+| 503 | `RAG_DATABASE_UNAVAILABLE` | pgvector-databasen är tillfälligt otillgänglig. |
 | 504 | `MODEL_PROVIDER_TIMEOUT` | Modellleverantören svarade inte inom sitt timeoutfönster. |
 | 504 | `LIVE_INVESTIGATION_TIMEOUT` | Hela den begränsade utredningen nådde 45 sekunder. |
 
-Ett fel triggar aldrig en dold automatisk live-retry och märks aldrig om till en lyckad Live AI-körning.
+Ett fel triggar aldrig en dold automatisk live-retry och märks aldrig om till
+en lyckad Live AI-körning. `LIVE_AI_RATE_LIMITED` kan ha `Retry-After`;
+provider-rate-limit utlovar inget tillförlitligt sådant värde. En ny livekörning
+kräver alltid ett nytt medvetet användarval.
 
 ## Vad de automatiska API-testerna bevisar
 
@@ -188,13 +249,19 @@ Ett fel triggar aldrig en dold automatisk live-retry och märks aldrig om till e
 - Ett påhittat evidence-ID blir `verification_failed`.
 - Modellnyckel, råa providersvar, GroundTruth och evidens som modellen inte såg hålls borta från publika svar.
 - Trasig JSON, fel content-type, okänt scenario, rate limit, providerfel och timeout mappas till avsedda felkontrakt.
-- OpenAPI innehåller exakt de tre produkt-endpointsen och skiljer på replay- och live-svar.
+- Capability-kontraktet visar aktiv profil/retrieval utan credentials eller hårdkodad frontendlogik.
+- Retrieval-proof läcker inte GroundTruth, modelltext eller råa providerfel och kan inte starta en eval.
+- OpenAPI innehåller exakt de sex produkt- och proof-endpointsen och skiljer på replay, live, generated live och historisk retrieval.
 
 De viktigaste testerna finns i:
 
 - [`ScenarioCatalogApiTest`](../src/test/java/dev/shirwac/incidentdetective/scenario/ScenarioCatalogApiTest.java)
 - [`RecordedReplayApiTest`](../src/test/java/dev/shirwac/incidentdetective/replay/RecordedReplayApiTest.java)
 - [`LiveInvestigationApiTest`](../src/test/java/dev/shirwac/incidentdetective/live/LiveInvestigationApiTest.java)
+- [`GeneratedCaseApiTest`](../src/test/java/dev/shirwac/incidentdetective/generated/GeneratedCaseApiTest.java)
+- [`CapabilitiesApiTest`](../src/test/java/dev/shirwac/incidentdetective/capabilities/CapabilitiesApiTest.java)
+- [`ProofEvalApiTest`](../src/test/java/dev/shirwac/incidentdetective/proof/ProofEvalApiTest.java)
+- [`ApiCorsConfigurationTest`](../src/test/java/dev/shirwac/incidentdetective/api/ApiCorsConfigurationTest.java)
 - [`OpenApiDocumentationTest`](../src/test/java/dev/shirwac/incidentdetective/openapi/OpenApiDocumentationTest.java)
 
 ## Förslag på presentation, cirka 7 minuter
@@ -229,7 +296,11 @@ Förklara `COLLECT → SYNTHESIZE → VERIFY`: Gemini väljer read-only tools, l
 
 ### 6:15–7:00 – ärlig avslutning
 
-“Den senaste v5-smoken gav rätt inventory-diagnos och 5/5 stödda evidenslänkar efter att verifieraren hittat en 3/5-regression i v4. Det är inte ett accuracyresultat. Nästa bevis är riktig pgvector-retrieval med Hit@4, därefter fulla development- och held-out-evals. Observability, container och Cloud Run återstår.”
+“Retrieval-evalen mätte riktig pgvector- och embeddingretrieval: development
+5/5 och held-out 4/5 Hit@4. Varje diagnos graderas separat av Java mot den
+evidens modellen såg. Jag visar därför ett verkligt failure case utan att
+låtsas ha full systemaccuracy. OpenTelemetry, lokal verifiering av containerimagen
+och Cloud Run återstår.”
 
 ## Om publiken är icke-teknisk
 
@@ -245,13 +316,14 @@ Hoppa över JSON Schema och klassnamn om ingen frågar.
 
 Var beredd att förklara:
 
-- varför telemetri går genom typade tools men endast runbooks senare ska använda pgvector,
+- varför metrics, logs och traces går genom typade tools medan endast runbooks använder pgvector i `rag`-profilen,
 - varför state machine är begränsad till två collection-rundor och tre model calls,
 - hur trace-ID måste upptäckas i tidigare tool-evidens innan `get_trace` får köras,
 - varför synthesis saknar tools,
 - varför verifieraren är deterministisk,
-- skillnaden mellan demofacit i publikt repo och framtida held-out evalfall,
-- varför den nuvarande rate limiten är per backendinstans och ännu inte ett komplett publikt missbruksskydd.
+- skillnaden mellan verifiering av aktuell körning och en historisk retrieval-eval,
+- varför concurrency och rolling rate limit är per backendinstans medan
+  dygnskvoten kan vara `process_local` eller `database_global`.
 
 ## Bra kodordning i IntelliJ
 
@@ -267,12 +339,17 @@ För officiellt läsmaterial och korta övningar, använd [lärspåret](./LEARNI
 
 ## Ännu inte färdigt
 
-- Kvalitet över 18 evalfall och held-out data är inte mätt.
-- Full diagnoskvalitet över 18 evalfall, inklusive abstention och adversarial synthesis, är ännu inte mätt.
+- Full modellaccuracy, held-out live-kvalitet och p95 är inte mätta.
+- En retrieval-eval är inte ett bevis på säker adversarial synthesis; den säkerhetsgränsen är uttrycklig i proof-svaret.
 - Git SHA sparas ännu inte i körresultatet.
 - Strukturerade JSON-loggar och OpenTelemetry återstår.
-- Rate limit är minnesbaserad per applikationsinstans.
+- Concurrency och rolling rate limit är minnesbaserade per
+  applikationsinstans. Dygnskvotens scope exponeras i capabilities.
 - Swagger ska omprövas före publik Cloud Run-deploy.
-- Container, Cloud Run, budgetlarm och smoke-serien 20/20 återstår.
+- Dockerfile och CI finns, men lokal imageverifiering, Cloud Run, budgetlarm och
+  smoke-serien 20/20 återstår.
 
-Detta är medvetet en funktionell sprintprodukt under utveckling, inte ett påstående om ett färdigt produktionssystem.
+Detta är medvetet en funktionell demo under utveckling, inte ett påstående om ett färdigt produktionssystem.
+
+För exakt frontendintegration, null-regler, CORS och retry-policy, se
+[`FRONTEND-API-HANDOFF.md`](./FRONTEND-API-HANDOFF.md).

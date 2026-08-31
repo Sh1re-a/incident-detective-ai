@@ -35,7 +35,7 @@ Modellen kan endast välja mellan `get_metrics`, `search_logs`, `get_trace` och 
 | Runbook-RAG | Byggt och delvis verifierat | PostgreSQL/pgvector, 10 dokument/12 chunks, Gemini embeddings, hash-readiness och explicit import fungerar lokalt. |
 | Retrieval-kvalitet | Mätt, förbättring krävs | Development Hit@4 5/5; held-out 4/5; no-match 3/3. Unsafe legacy-runbook var top-1 i det missade held-out-fallet. |
 | Prompt-injection-säkerhet | Inte verifierat | Den osäkra runbooken hämtades rank 1 i adversarial-fallet. Ett separat synthesis-test återstår. |
-| Full diagnos-eval | Inte verifierat | 18-falls-harnessen, baseline och korrekta abstentioner återstår. Enskilda live-smokes är inte accuracy. |
+| Diagnoskvalitet | Verifierad per körning, inte aggregerad | Schema, citationer, stöd, coverage och correctness returneras per replay/live-run. Full modellaccuracy är inte mätt. |
 | Observability | Inte byggt | Run metadata finns, men strukturerade JSON-loggar och OpenTelemetry-spans återstår. |
 | Deployment | Inte verifierat | GitHub och lokal demo finns; ingen Cloud Run-version är deployad. |
 
@@ -43,13 +43,13 @@ Modellen kan endast välja mellan `get_metrics`, `search_logs`, `get_trace` och 
 
 | ID | Risk | Nuvarande skydd | Nästa verifiering |
 |---|---|---|---|
-| R-01 | Modellen ger en felaktig, ofullständig eller dåligt stödd diagnos | Structured output, evidence IDs, separat citation/support/coverage/correctness och `insufficient_evidence` | 18 fulla evalfall med held-out-data |
+| R-01 | Modellen ger en felaktig, ofullständig eller dåligt stödd diagnos | Structured output, evidence IDs, separat citation/support/coverage/correctness och `insufficient_evidence` | Kör små opt-in live-smokes och lägg bara till held-out-fall när ett konkret kvalitetsbeslut kräver dem |
 | R-02 | En runbook innehåller indirekt prompt injection | Runbooks behandlas som data, tools är read-only och modellen saknar åtgärdsbehörighet | Tvinga in den redan hämtade adversarial chunken i synthesis och kontrollera output/approval |
 | R-03 | Retrieval returnerar relevant-looking men fel text | Development-only tröskel, exact cosine, rank/similarity/hash och no-match-test | Förbättra corpus/query-kontrakt i en ny benchmarkversion utan held-out-tuning |
 | R-04 | Indexet är gammalt eller ofullständigt | Retrieval kontrollerar både antal och innehållshash före query-embedding | Behåll stale/missing-index-tester i CI |
 | R-05 | Modellen använder för många eller okända verktyg | Dynamisk tillåtelselista från återstående budget, atomisk preflight, per-tool-gränser, totalbudget och hard timeout | Behåll negativa kontraktstester i CI |
-| R-06 | Schema, citation eller facit underkänns men presenteras som korrekt | Deterministisk verifiering och separat `verification_failed` | Mäta hela evalmängden och visa failure cases |
-| R-07 | Publik användning orsakar kostnad eller överbelastning | Replay som standard, explicit livebekräftelse, lokal concurrency/rate limit och timeout | Cloud Run max-instances, persistent global gräns och budgetlarm före deploy |
+| R-06 | Schema, citation eller facit underkänns men presenteras som korrekt | Deterministisk verifiering och separat `verification_failed` | Behåll negativa kontraktstester och visa ett verkligt failure case |
+| R-07 | Publik användning orsakar kostnad eller överbelastning | Replay som standard, explicit livebekräftelse, lokal concurrency/rolling rate limit, timeout och ett dagstak vars scope exponeras; `rag` använder en atomisk PostgreSQL-räknare | Cloud Run max-instances och providerbudgetlarm före deploy |
 | R-08 | Hemligheter eller onödiga data hamnar i telemetry | Nyckelfilen ignoreras av Git; publika payloads utesluter `GroundTruth` | Implementera och testa en allowlist för JSON-loggar/OpenTelemetry |
 | R-09 | Leverantören är långsam eller otillgänglig | Sanerade providerfel, kontrollerad timeout, mätt låg-latensstandard och ingen tyst replay | Mäta stabilitet; historiken innehåller timeout även om de två senaste RAG-smokesen slutfördes |
 | R-10 | Evalresultat överanpassas | Development och held-out hålls isär; tröskeln fryses före held-out | Versionshantera framtida dataset och ändra aldrig v1 efter resultatet |

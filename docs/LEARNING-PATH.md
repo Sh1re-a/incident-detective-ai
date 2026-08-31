@@ -1,7 +1,8 @@
 # Lärspår och verktyg
 
-- **Status:** Story/Engineering View, replay/live-API, fyra typade read-only tools och riktiga Gemini-körningar är verifierade
-- **Senast verifierad:** 26 augusti 2026
+- **Status:** replay/live-API, bounded function calling, structured output,
+  runbook-RAG, deterministisk verifiering och ett litet opt-in evalspår finns.
+- **Senast verifierad:** 27 augusti 2026
 
 Målet är inte att läsa allt innan jag bygger. Jag följer samma korta loop:
 
@@ -14,29 +15,29 @@ Målet är inte att läsa allt innan jag bygger. Jag följer samma korta loop:
 
 Backend byggs med **Java 21, Spring Boot 4.1.1 och Maven**. Det passar projektet eftersom jag vill bli bättre på Spring Boot och redan kan Java. Jag behöver därför inte lära mig ett nytt backend-språk samtidigt som jag lär mig tool calling, structured output och evals.
 
-Maven används i stället för Gradle i sprinten. Det finns redan på datorn, fungerar direkt i IntelliJ och räcker för ett litet monorepo. Byggkommandot går genom Maven Wrapper så att samma Maven-version kan användas lokalt och i CI.
+Maven används i stället för Gradle. Det finns redan på datorn, fungerar direkt i IntelliJ och räcker för ett litet monorepo. Byggkommandot går genom Maven Wrapper så att samma Maven-version kan användas lokalt och i CI.
 
 | När | Verktyg | Varför |
 |---|---|---|
-| Nu | Java 21 | Backend, domänlogik, verifiering och evalharness. |
+| Nu | Java 21 | Backend, domänlogik, verifiering och små testbaserade evals. |
 | Nu | Spring Boot 4.1.1 och Spring MVC | Ett tydligt API-lager utan att dela upp projektet i flera backendtjänster. |
 | Nu | Maven Wrapper | Reproducerbara bygg- och testkommandon. |
 | Nu | Java records, Jakarta Validation och Jackson | Typade kontrakt, JSON och tydliga valideringsfel. |
 | Nu | JUnit och Spring Boot Test | Deterministiska tester av regler och applikationsstart. |
 | Nu | Google Gen AI SDK för Java 1.67.0 | Verklig function calling och structured output bakom en liten intern gateway. |
 | Nu | PostgreSQL och pgvector | Retrieval endast över den fristående syntetiska runbookkorpusen. |
-| Vecka 2–3 | Strukturerade JSON-loggar och OpenTelemetry | Förklara körningar, fel och latency. |
+| Senare | Strukturerade JSON-loggar och OpenTelemetry | Förklara körningar, fel och latency. |
 | Nu | React 19, TypeScript och Vite | Story View, Engineering View och beteendetester mot API-kontraktet. |
-| Vecka 4 | Docker och Google Cloud CLI | Containerkontroll och separat godkänd Cloud Run-deploy. |
+| Senare | Docker och Google Cloud CLI | Containerkontroll och separat godkänd Cloud Run-deploy. |
 
-Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i sprintens kärna. Flödet är den egna, begränsade processen `COLLECT → SYNTHESIZE → VERIFY`.
+Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i kärnan. Flödet är den egna, begränsade processen `COLLECT → SYNTHESIZE → VERIFY`.
 
 ## Verifierat på datorn
 
 - Java 21.0.10 LTS, `javac` 21.0.10 och Maven 3.9.12 finns.
 - Projektet använder Spring Boot 4.1.1 och Maven Wrapper 3.3.4 med Maven 3.9.16.
 - IntelliJ IDEA 2025.3.3, Google Cloud CLI och Docker finns. Den lokala PostgreSQL/pgvector-containern var healthy vid kontrollen 26 augusti.
-- Hela den nätverksfria Maven-testsuiten har 198 gröna tester. Tre pgvector-integrationstester passerar separat. Frontend har 15 gröna beteendetester och en godkänd produktionsbuild.
+- Hela den providerfria Maven-testsuiten passerar. Pgvector-integrationerna och fyra Flyway-migrationer passerar separat mot PostgreSQL 17/pgvector 0.8.6. Aktuella testantal ska läsas från CI, inte hårdkodas i projektdokumentationen.
 - Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.1-flash-lite` med `MINIMAL` thinking och `gemini-live-v6`.
 - De senaste två v6-smokesen i RAG-profilen gav rätt diagnos och giltiga citationer på 6,06 respektive 5,51 sekunder. Payment-körningen valde riktig pgvector-retrieval; inventory-körningen valde en trace. Historiken innehåller sämre evidensprecision och provider-timeouts; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
 - Livevägen har ett första kostnadsskydd: en samtidig körning och fem starter per rullande tio minuter per backendinstans. Cloud Run-instansgräns och budgetlarm är ännu inte konfigurerade.
@@ -88,9 +89,18 @@ Byggresultat: en fristående, versionshanterad korpus med 10–15 syntetiska run
 
 ### Pass 5 – evals och verifiering
 
-Läs [OpenAI: Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices). Guiden används för allmän evalmetod; själva harnessen är leverantörsoberoende och körs lokalt/CI.
+Läs [OpenAI: Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices). Guiden används för allmän evalmetod; implementationen här är liten och testbaserad.
 
-Byggresultat: först 10 positiva retrievalfall och två no-result-fall för Hit@4, därefter en portabel JUnit-/kommandoradsbaserad evalharness över 18 versionshanterade incidentfall och egna deterministiska scorers. Citation validity, evidence precision, claim coverage, diagnosis correctness, abstention och retrieval hålls som separata mått. Ett adversarial runbook måste faktiskt hamna i topp 4 för att säkerhetstestet ska räknas.
+Byggresultat: `RunbookRetrievalEvalIT` har 10 positiva frågor och tre
+no-result-fall. Den kör verkliga Gemini embeddings och pgvector endast efter
+explicit opt-in. Varje replay/live-körning verifieras separat i Java för
+citation validity, evidence precision, claim coverage, diagnosis correctness
+och abstention. Det finns ingen diagnosis-batchharness i webbappens runtime.
+
+Övning: följ en replay-claim till dess evidence ID och förklara varför ett
+giltigt ID inte automatiskt betyder att evidensen stöder påståendet. Jämför
+sedan development 5/5 med held-out 4/5 i retrieval-proof och förklara varför
+det missade fallet ska visas.
 
 ### Pass 6 – logging och tracing
 
@@ -99,7 +109,11 @@ Läs:
 1. [Cloud Run: Logging](https://docs.cloud.google.com/run/docs/logging)
 2. [OpenTelemetry: Spring Boot starter](https://opentelemetry.io/docs/zero-code/java/spring-boot-starter/)
 
-Byggresultat: strukturerade körhändelser för API, tools och verifiering utan hemligheter eller privat tankekedja.
+Byggresultat hittills: Actuator/Micrometer använder lågkardinalitetstaggar och
+API-resultatet sparar sanerad körmetadata, latency, calls och nullable usage.
+Nästa del är strukturerade körhändelser och
+OpenTelemetry-spans för API, tools och verifiering utan hemligheter eller privat
+tankedja.
 
 ### Pass 7 – container och Cloud Run
 
@@ -108,11 +122,17 @@ Läs:
 1. [Cloud Run: Container runtime contract](https://docs.cloud.google.com/run/docs/container-contract)
 2. [Cloud Run: Deploy container images](https://docs.cloud.google.com/run/docs/deploying)
 
-Byggresultat: en lokalt testad container och därefter en separat godkänd deploy. Ett publikt GitHub-repo betyder inte att Cloud Run redan är klar.
+Mål: en lokalt testad container och därefter en separat godkänd deploy. Ett publikt GitHub-repo betyder inte att Cloud Run redan är klar.
 
 ## Nuvarande kodgrund
 
-Nu finns React Story/Engineering View, säker scenario-lista, klickbar evidens, ärlig replay/live-fallback, Spring Boot replay/live-API, separat dold `GroundTruth`, deterministisk verifierare, två fixturepaket, Swagger/OpenAPI, fyra typade tools, Gemini-gateway, strict structured output och kostnadsestimat. En fristående runbookkorpus, PostgreSQL/pgvector, idempotent import och retrieval-eval är byggda. Full diagnos-eval, observability, applikationscontainer och deploy saknas fortfarande.
+Nu finns en Spring Boot-backend med säker scenario-lista, tydligt separerade
+replay/live-kontrakt, dold `GroundTruth`, deterministisk verifierare, fyra
+typade tools, Gemini-gateway, strict structured output och kostnadsestimat.
+Runbookkorpus, PostgreSQL/pgvector, idempotent import, en liten retrieval-eval
+och lågkardinalitetsmetrics är byggda. Frontenden byggs separat mot OpenAPI och
+räknas ännu inte som färdig. Dockerfile och providerfri CI finns; lokal
+imageverifiering, strukturerade logs, OpenTelemetry och deploy återstår.
 
 ## Två implementerade startscenarier
 

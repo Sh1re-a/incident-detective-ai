@@ -19,9 +19,9 @@ All incidentdata är syntetisk. Tool calling, modellbeteende, verifiering, evals
 
 **Status:** Accepted, 25 augusti 2026
 
-Frontend, backend, scenariofixtures, verifierare och evalharness ligger i ett monorepo. Slutleveransen ska kunna köras som en container på Cloud Run.
+Frontend, backend, scenariofixtures, verifierare och små opt-in-testspår ligger i ett monorepo. Slutleveransen ska kunna köras som en container på Cloud Run.
 
-**Varför:** Ett litet individuellt sprintprojekt behöver enkel lokal reproduktion och en tydlig deployväg.
+**Varför:** Ett litet individuellt demoprojekt behöver enkel lokal reproduktion och en tydlig deployväg.
 
 **Konsekvens:** Ingen microservice-fleet, Kubernetes eller Terraform krävs för kärnan.
 
@@ -31,7 +31,7 @@ Frontend, backend, scenariofixtures, verifierare och evalharness ligger i ett mo
 
 Story/Engineering View byggs med React, TypeScript och Vite. API, tool contracts och verifiering byggs med Java 21, Spring Boot, Spring MVC, Jakarta Validation och Jackson.
 
-**Varför:** Shirwac kan redan Java och vill använda projektet för att bli bättre på Spring Boot samtidigt som AI-systemet byggs. Den officiella Gemini-SDK:n fungerar i Java, så ett extra backend-runtime behövs inte i sprintens kärna.
+**Varför:** Shirwac kan redan Java och vill använda projektet för att bli bättre på Spring Boot samtidigt som AI-systemet byggs. Den officiella Gemini-SDK:n fungerar i Java, så ett extra backend-runtime behövs inte i kärnan.
 
 **Konsekvens:** Delade begrepp måste kontraktstestas mellan TypeScript och Java; de får inte utvecklas som två oberoende sanningar. Spring Boot 4 använder Jackson 3 och den sealed `Evidence`-hierarkin round-trip-testas. Python ingår inte i kärnarkitekturen.
 
@@ -69,7 +69,7 @@ Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. D
 
 **Status:** Accepted for the current slice, updated 26 augusti 2026
 
-Det aktuella liveflödet använder Gemini Developer API genom den officiella Java SDK:n, pinnad till `google-genai` 1.67.0. Standardprofilen är `gemini-3.1-flash-lite` med `MINIMAL` thinking och kontraktet `gemini-live-v6`. Endast en modellleverantör används i sprintens kärna.
+Det aktuella liveflödet använder Gemini Developer API genom den officiella Java SDK:n, pinnad till `google-genai` 1.67.0. Standardprofilen är `gemini-3.1-flash-lite` med `MINIMAL` thinking och kontraktet `gemini-live-v6`. Endast en modellleverantör används i kärnan.
 
 **Varför:** Meritvärdet ligger i arkitektur, evals och omdöme, inte i leverantörens namn. Gratis lokal utveckling minskar startkostnaden utan att låtsas att den publika demon blir kostnadsfri.
 
@@ -108,15 +108,21 @@ Story View prioriterar affärspåverkan, tidslinje, rotorsak, bevis och nästa s
 
 **Varför:** Två målgrupper behöver olika detaljnivå, men ingen behöver modellens privata resonemang.
 
-## DEC-011 – Portabel evalharness
+## DEC-011 – Små evalspår utanför runtime
 
-**Status:** Accepted; retrieval slice implemented, full harness pending, updated 26 augusti 2026
+**Status:** Accepted and simplified, 27 augusti 2026
 
-Evals ska kunna köras med lokala/CI-kommandon över versionshanterade fixtures och deterministiska scorers.
+Varje replay/live-resultat graderas av den deterministiska verifieraren. En
+separat opt-in `RunbookRetrievalEvalIT` kör riktig Gemini embedding och pgvector
+över en versionshanterad retrievalsvit.
 
-**Varför:** Utvärderingen ska överleva leverantörsförändringar och vara reproducerbar för en teknisk granskare.
+**Varför:** Projektet ska visa evaldisciplin utan att webbappen blir ett eget
+benchmarkramverk.
 
-**Konsekvens:** Ingen avvecklad provider-hostad Evals API-funktion får vara kritisk väg. Retrieval v1 har ett explicit lokalt kommando som ger JSON- och Markdownrapport med development/held-out, tröskel, rank, similarity, corpus/dataset-hash, embeddingprofil, nullable provider-usage, latency och git SHA. Vanlig CI kör deterministiska scorers utan betalda provideranrop; den explicita retrieval-evalen gör riktiga embeddings. Den fulla diagnos-evalen ska även identifiera modellprofil, prompt, diagnosschema och git SHA. När dataset, prompt, schema, korpus, chunkning, embeddingkonfiguration eller scorer ändras behandlas tidigare resultat som historiska tills relevant evalsvit har körts igen.
+**Konsekvens:** Ingen evalrunner, baseline, datasetgenerator eller report engine
+paketeras i runtime-JAR:en. Vanliga tester är providerfria. RAG-eval och live
+smoke kräver uttryckligt opt-in. Den frysta retrievalrapporten är historisk när
+korpus, embeddingprofil, tröskel eller scorer ändras.
 
 ## DEC-012 – JSON-loggar och OpenTelemetry först
 
@@ -134,7 +140,7 @@ Systemet ska använda strukturerade JSON-loggar och OpenTelemetry för API-, too
 
 Slutcontainern ska deployas till Cloud Run. Hemligheter finns endast på serversidan. Manuell, verifierad deploy kommer före eventuell GitHub Actions/OIDC-automatisering.
 
-**Varför:** Projektet ska bevisa verklig driftsättning utan att CI/CD blir sprintens första problem.
+**Varför:** Projektet ska bevisa verklig driftsättning utan att CI/CD blir det första problemet.
 
 **Konsekvens:** Ingen deploy görs i grundfasen. Extern deploy och publik åtkomst kräver uttryckligt klartecken.
 

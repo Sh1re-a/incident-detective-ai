@@ -67,7 +67,7 @@ Ett svar får inte innehålla automatisk remediation, dold tankekedja eller evid
 
 ## 4. GroundTruth
 
-Det dolda syntetiska facit som bara används av verifierare och evalharness.
+Det dolda syntetiska facit som bara används av verifieraren och testkod.
 
 Minsta innehåll:
 
@@ -122,7 +122,7 @@ UI-regel:
 
 ## 7. Körgränser
 
-Kontraktet nedan är sprintens yttergräns. Den nuvarande liveimplementationen är striktare: högst två collection-rundor och tre modellanrop inklusive synthesis.
+Kontraktet nedan är systemets yttergräns. Den nuvarande liveimplementationen är striktare: högst två collection-rundor och tre modellanrop inklusive synthesis.
 
 - högst tre collection-rundor,
 - högst åtta tool calls totalt,
@@ -142,7 +142,7 @@ Verifieraren svarar på fyra separata frågor:
 3. **Claim coverage:** hur stor andel av referensens unika `(claim_code, claim_value_code)` finns i modellsvaret?
 4. **Diagnosis correctness:** matchar `root_cause_code` det dolda facit i diagnosbara fall? I avsedda abstentionfall krävs `status = insufficient_evidence` och `root_cause_code = null`.
 
-Evidence precision beräknas per diagnosbart evalfall över unika citerade tripplar av `(claim_code, claim_value_code, evidence_id)`: täljaren är tripplar vars evidence ID är tillåtet för motsvarande claimnyckel i `GroundTruth.claim_support`, och nämnaren är alla citerade tripplar. Ett schemafel eller diagnostiserat svar utan citat får precision 0 för fallet. Releasevärdet är makromedelvärdet av fallens precision, så varje diagnosbart fall väger lika. Abstentionfall redovisas separat och ingår inte i detta medelvärde. `affected_service` mäts som ett separat diagnosfält och blandas inte in i root-cause-måttet.
+Evidence precision beräknas per avslutad diagnos över unika citerade tripplar av `(claim_code, claim_value_code, evidence_id)`: täljaren är tripplar vars evidence ID är tillåtet för motsvarande claimnyckel i `GroundTruth.claim_support`, och nämnaren är alla citerade tripplar. Ett schemafel eller diagnostiserat svar utan citat får precision 0 för körningen. Backenden beräknar inget batch- eller releasevärde för diagnoser. `affected_service` mäts som ett separat diagnosfält och blandas inte in i root-cause-måttet.
 
 Claim coverage använder GroundTruth som fast nämnare och exakt matchning på både claim code och claim value. Publikt API visar endast matched count, reference count och score. Ett svar med två korrekta, välstödda claims av fem får därför 100 procent evidence precision men 40 procent coverage. Låg coverage är inte ett `hard_error`; måttet ska synliggöra ett ofullständigt men fortfarande inspekterbart svar.
 
