@@ -35,9 +35,16 @@ public final class GetTraceTool {
             String scenarioId,
             GetTraceArguments arguments
     ) {
-        validate(arguments);
         InvestigationData data = catalog.findById(scenarioId)
                 .orElseThrow(() -> new InvestigationScenarioNotFoundException(scenarioId));
+        return execute(data, arguments);
+    }
+
+    public GetTraceResult execute(
+            InvestigationData data,
+            GetTraceArguments arguments
+    ) {
+        validate(arguments);
         String currentScenarioId = data.scenario().scenarioId();
 
         return data.evidenceInventory().stream()

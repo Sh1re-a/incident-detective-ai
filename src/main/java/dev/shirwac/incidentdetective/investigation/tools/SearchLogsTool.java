@@ -44,11 +44,20 @@ public final class SearchLogsTool {
             String scenarioId,
             SearchLogsArguments arguments
     ) {
-        validate(arguments);
         validateScenarioId(scenarioId);
 
         InvestigationData data = catalog.findById(scenarioId)
                 .orElseThrow(() -> new InvestigationScenarioNotFoundException(scenarioId));
+        return execute(data, arguments);
+    }
+
+    public SearchLogsResult execute(
+            InvestigationData data,
+            SearchLogsArguments arguments
+    ) {
+        validate(arguments);
+        String scenarioId = data.scenario().scenarioId();
+        validateScenarioId(scenarioId);
         requireMatchingScenario(scenarioId, data);
         requireScenarioWindow(data.scenario().timeWindow(), arguments);
 

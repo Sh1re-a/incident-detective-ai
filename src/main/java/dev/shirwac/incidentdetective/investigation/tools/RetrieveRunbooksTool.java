@@ -1,5 +1,7 @@
 package dev.shirwac.incidentdetective.investigation.tools;
 
+import dev.shirwac.incidentdetective.investigation.InvestigationData;
+
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import org.springframework.stereotype.Service;
@@ -30,10 +32,18 @@ public final class RetrieveRunbooksTool {
 
     public RetrieveRunbooksResult execute(
             String scenarioId,
-        RetrieveRunbooksArguments arguments
+            RetrieveRunbooksArguments arguments
     ) {
         validate(arguments);
         return retrieval.retrieve(scenarioId, arguments);
+    }
+
+    public RetrieveRunbooksResult execute(
+            InvestigationData data,
+            RetrieveRunbooksArguments arguments
+    ) {
+        validate(arguments);
+        return retrieval.retrieve(data, arguments);
     }
 
     public String safeModeDescription() {

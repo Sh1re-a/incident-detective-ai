@@ -1,10 +1,12 @@
 package dev.shirwac.incidentdetective.rag;
 
 import dev.shirwac.incidentdetective.domain.evidence.RunbookEvidence;
+import dev.shirwac.incidentdetective.investigation.InvestigationData;
 import dev.shirwac.incidentdetective.investigation.InvestigationScenarioCatalog;
 import dev.shirwac.incidentdetective.investigation.InvestigationScenarioNotFoundException;
 import dev.shirwac.incidentdetective.investigation.tools.RetrieveRunbooksArguments;
 import dev.shirwac.incidentdetective.investigation.tools.RetrieveRunbooksResult;
+import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalBackend;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalMetadata;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalStrategy;
 import org.springframework.context.annotation.Profile;
@@ -46,6 +48,21 @@ public final class PgvectorRunbookRetrievalStrategy
             RetrieveRunbooksArguments arguments
     ) {
         requireScenario(scenarioId);
+        return retrieveForScenario(scenarioId, arguments);
+    }
+
+    @Override
+    public RetrieveRunbooksResult retrieve(
+            InvestigationData data,
+            RetrieveRunbooksArguments arguments
+    ) {
+        return retrieveForScenario(data.scenario().scenarioId(), arguments);
+    }
+
+    private RetrieveRunbooksResult retrieveForScenario(
+            String scenarioId,
+            RetrieveRunbooksArguments arguments
+    ) {
         RunbookIndexStatus indexStatus = indexReadiness.requireReady();
 
         EmbeddingResult queryEmbedding = embeddings.embedQuery(arguments.query());
@@ -92,6 +109,11 @@ public final class PgvectorRunbookRetrievalStrategy
                                 .toList()
                 )
         );
+    }
+
+    @Override
+    public RunbookRetrievalBackend backend() {
+        return RunbookRetrievalBackend.PGVECTOR_EXACT_COSINE;
     }
 
     @Override

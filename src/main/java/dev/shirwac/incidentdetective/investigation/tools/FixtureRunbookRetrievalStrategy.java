@@ -30,6 +30,14 @@ public final class FixtureRunbookRetrievalStrategy
     ) {
         InvestigationData data = catalog.findById(scenarioId)
                 .orElseThrow(() -> new InvestigationScenarioNotFoundException(scenarioId));
+        return retrieve(data, arguments);
+    }
+
+    @Override
+    public RetrieveRunbooksResult retrieve(
+            InvestigationData data,
+            RetrieveRunbooksArguments arguments
+    ) {
         List<RunbookEvidence> runbooks = data.evidenceInventory().stream()
                 .filter(RunbookEvidence.class::isInstance)
                 .map(RunbookEvidence.class::cast)
@@ -67,6 +75,11 @@ public final class FixtureRunbookRetrievalStrategy
                         ))
                         .toList())
         );
+    }
+
+    @Override
+    public RunbookRetrievalBackend backend() {
+        return RunbookRetrievalBackend.DETERMINISTIC_FIXTURE;
     }
 
     @Override

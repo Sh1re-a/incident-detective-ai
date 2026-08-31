@@ -37,12 +37,19 @@ public final class GetMetricsTool {
             String scenarioId,
             GetMetricsArguments arguments
     ) {
-        validate(arguments);
         InvestigationData data = catalog.findById(scenarioId)
                 .orElseThrow(() -> new InvestigationScenarioNotFoundException(scenarioId));
+        return execute(data, arguments);
+    }
+
+    public GetMetricsResult execute(
+            InvestigationData data,
+            GetMetricsArguments arguments
+    ) {
+        validate(arguments);
         requireScenarioWindow(data.scenario().timeWindow(), arguments);
 
-        List<String> availableMetricNames = availableMetricNames(data);
+        List<String> availableMetricNames = metricNames(data);
         Set<String> availableNames = Set.copyOf(availableMetricNames);
         Set<String> requestedNames = new HashSet<>(arguments.metricNames());
         List<String> unknownMetricNames = requestedNames.stream()
@@ -74,7 +81,11 @@ public final class GetMetricsTool {
     public List<String> availableMetricNames(String scenarioId) {
         InvestigationData data = catalog.findById(scenarioId)
                 .orElseThrow(() -> new InvestigationScenarioNotFoundException(scenarioId));
-        return availableMetricNames(data);
+        return metricNames(data);
+    }
+
+    public List<String> availableMetricNames(InvestigationData data) {
+        return metricNames(data);
     }
 
     private void validate(GetMetricsArguments arguments) {
@@ -125,7 +136,7 @@ public final class GetMetricsTool {
                 && !observedAt.isAfter(arguments.end());
     }
 
-    private List<String> availableMetricNames(InvestigationData data) {
+    private List<String> metricNames(InvestigationData data) {
         return data.evidenceInventory().stream()
                 .filter(MetricEvidence.class::isInstance)
                 .map(MetricEvidence.class::cast)

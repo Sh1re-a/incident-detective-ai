@@ -15,8 +15,10 @@ public record RunbookRetrievalMetadata(
         @Valid QueryEmbeddingUsage queryEmbedding,
         @NotNull List<@NotNull @Valid Match> matches
 ) {
-    private static final String FIXTURE_BACKEND = "deterministic_fixture";
-    private static final String PGVECTOR_BACKEND = "pgvector_exact_cosine";
+    private static final String FIXTURE_BACKEND =
+            RunbookRetrievalBackend.DETERMINISTIC_FIXTURE.wireValue();
+    private static final String PGVECTOR_BACKEND =
+            RunbookRetrievalBackend.PGVECTOR_EXACT_COSINE.wireValue();
 
     public RunbookRetrievalMetadata {
         matches = matches == null ? null : List.copyOf(matches);

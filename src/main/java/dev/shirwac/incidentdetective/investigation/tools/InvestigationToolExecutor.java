@@ -2,6 +2,7 @@ package dev.shirwac.incidentdetective.investigation.tools;
 
 import dev.shirwac.incidentdetective.ai.CollectionToolCall;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
+import dev.shirwac.incidentdetective.investigation.InvestigationData;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectReader;
@@ -36,6 +37,10 @@ public final class InvestigationToolExecutor {
         return getMetrics.availableMetricNames(scenarioId);
     }
 
+    public List<String> availableMetricNames(InvestigationData data) {
+        return getMetrics.availableMetricNames(data);
+    }
+
     public ToolExecution execute(
             String scenarioId,
             CollectionToolCall call
@@ -45,6 +50,18 @@ public final class InvestigationToolExecutor {
             case SEARCH_LOGS -> logs(scenarioId, call);
             case GET_TRACE -> trace(scenarioId, call);
             case RETRIEVE_RUNBOOKS -> runbooks(scenarioId, call);
+        };
+    }
+
+    public ToolExecution execute(
+            InvestigationData data,
+            CollectionToolCall call
+    ) {
+        return switch (call.toolName()) {
+            case GET_METRICS -> metrics(data, call);
+            case SEARCH_LOGS -> logs(data, call);
+            case GET_TRACE -> trace(data, call);
+            case RETRIEVE_RUNBOOKS -> runbooks(data, call);
         };
     }
 
@@ -64,12 +81,44 @@ public final class InvestigationToolExecutor {
         );
     }
 
+    private ToolExecution metrics(
+            InvestigationData data,
+            CollectionToolCall call
+    ) {
+        GetMetricsResult result = getMetrics.execute(
+                data,
+                decode(call, GetMetricsArguments.class)
+        );
+        return execution(
+                call,
+                "Returned " + result.returnedCount()
+                        + " bounded metric evidence item(s).",
+                List.copyOf(result.evidence())
+        );
+    }
+
     private ToolExecution logs(
             String scenarioId,
             CollectionToolCall call
     ) {
         SearchLogsResult result = searchLogs.execute(
                 scenarioId,
+                decode(call, SearchLogsArguments.class)
+        );
+        return execution(
+                call,
+                "Returned " + result.returnedCount()
+                        + " bounded log evidence item(s).",
+                List.copyOf(result.evidence())
+        );
+    }
+
+    private ToolExecution logs(
+            InvestigationData data,
+            CollectionToolCall call
+    ) {
+        SearchLogsResult result = searchLogs.execute(
+                data,
                 decode(call, SearchLogsArguments.class)
         );
         return execution(
@@ -100,12 +149,50 @@ public final class InvestigationToolExecutor {
         );
     }
 
+    private ToolExecution trace(
+            InvestigationData data,
+            CollectionToolCall call
+    ) {
+        GetTraceResult result = getTrace.execute(
+                data,
+                decode(call, GetTraceArguments.class)
+        );
+        List<Evidence> evidence = result.found()
+                ? List.of(result.evidence())
+                : List.of();
+        return execution(
+                call,
+                result.found()
+                        ? "Returned one exact synthetic trace."
+                        : "No synthetic trace matched the exact trace ID.",
+                evidence
+        );
+    }
+
     private ToolExecution runbooks(
             String scenarioId,
             CollectionToolCall call
     ) {
         RetrieveRunbooksResult result = retrieveRunbooks.execute(
                 scenarioId,
+                decode(call, RetrieveRunbooksArguments.class)
+        );
+        return execution(
+                call,
+                "Returned " + result.returnedCount()
+                        + " bounded runbook chunk(s) using "
+                        + retrieveRunbooks.safeModeDescription() + ".",
+                List.copyOf(result.evidence()),
+                result.retrievalMetadata()
+        );
+    }
+
+    private ToolExecution runbooks(
+            InvestigationData data,
+            CollectionToolCall call
+    ) {
+        RetrieveRunbooksResult result = retrieveRunbooks.execute(
+                data,
                 decode(call, RetrieveRunbooksArguments.class)
         );
         return execution(
