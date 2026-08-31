@@ -266,7 +266,6 @@
         "display_text": "The incompatible response is produced by inventory service.",
         "evidence_ids": [
           "cic-v1-log-inventory-release",
-          "cic-v1-log-schema-mismatch",
           "cic-v1-trace-contract-failure"
         ]
       },
@@ -291,7 +290,6 @@
         "display_text": "Checkout records contract validation errors immediately after inventory responds.",
         "evidence_ids": [
           "cic-v1-metric-contract-errors",
-          "cic-v1-log-schema-mismatch",
           "cic-v1-trace-contract-failure"
         ]
       }

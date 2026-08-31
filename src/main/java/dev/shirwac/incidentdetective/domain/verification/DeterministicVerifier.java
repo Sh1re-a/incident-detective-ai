@@ -61,7 +61,7 @@ public final class DeterministicVerifier {
             claimCoverage = ClaimCoverage.notApplicable();
             diagnosisCorrectness = DiagnosisCorrectness.notEvaluated();
         } else if (!diagnosisSchemaValid) {
-            evidencePrecision = groundTruth.expectedStatus() == DiagnosisStatus.DIAGNOSED
+            evidencePrecision = hasReferenceClaimSupport(groundTruth)
                     ? EvidencePrecision.scored(List.of())
                     : EvidencePrecision.notApplicable();
             claimCoverage = groundTruth.expectedClaims().isEmpty()
@@ -107,12 +107,8 @@ public final class DeterministicVerifier {
         Objects.requireNonNull(diagnosis, "diagnosis must not be null");
         Objects.requireNonNull(groundTruth, "groundTruth must not be null");
 
-        if (groundTruth.expectedStatus() == DiagnosisStatus.INSUFFICIENT_EVIDENCE) {
+        if (!hasReferenceClaimSupport(groundTruth)) {
             return EvidencePrecision.notApplicable();
-        }
-
-        if (diagnosis.status() != DiagnosisStatus.DIAGNOSED) {
-            return EvidencePrecision.scored(List.of());
         }
 
         Set<CitationTriple> citationTriples = citationTriples(diagnosis);
@@ -136,6 +132,11 @@ public final class DeterministicVerifier {
                 .toList();
 
         return EvidencePrecision.scored(citationSupport);
+    }
+
+    private boolean hasReferenceClaimSupport(GroundTruth groundTruth) {
+        return groundTruth.claimSupport() != null
+                && !groundTruth.claimSupport().isEmpty();
     }
 
     ClaimCoverage scoreClaimCoverage(

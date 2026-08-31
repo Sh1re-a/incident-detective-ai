@@ -54,13 +54,10 @@ public final class DiagnosisValidator implements ConstraintValidator<ValidDiagno
             return false;
         }
 
-        Set<ClaimCode> allowedClaims = Set.of(
-                ClaimCode.OBSERVED_SYMPTOM,
-                ClaimCode.MISSING_EVIDENCE
-        );
-
         return diagnosis.claims().stream()
-                .allMatch(claim -> allowedClaims.contains(claim.claimCode())
+                .allMatch(claim -> claim.claimCode() != null
+                        && claim.claimCode().allowedForInsufficientEvidence()
+                        && hasEvidence(claim)
                         && hasCanonicalClaimValue(claim));
     }
 

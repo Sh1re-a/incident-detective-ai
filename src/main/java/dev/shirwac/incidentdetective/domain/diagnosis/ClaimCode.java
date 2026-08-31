@@ -24,6 +24,10 @@ public enum ClaimCode {
         return wireValue;
     }
 
+    public boolean allowedForInsufficientEvidence() {
+        return this == OBSERVED_SYMPTOM || this == MISSING_EVIDENCE;
+    }
+
     @JsonCreator
     public static ClaimCode fromWireValue(String value) {
         return Arrays.stream(values())

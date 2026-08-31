@@ -250,7 +250,6 @@
         "display_text": "The payment provider read timeout was reduced below observed request duration.",
         "evidence_ids": [
           "cpt-v1-log-timeout-config",
-          "cpt-v1-log-timeout-error",
           "cpt-v1-trace-failed-checkout"
         ]
       },
@@ -287,7 +286,6 @@
         "display_text": "Payment latency rose to the same range as the configured timeout.",
         "evidence_ids": [
           "cpt-v1-metric-payment-p95",
-          "cpt-v1-log-timeout-error",
           "cpt-v1-trace-failed-checkout"
         ]
       }

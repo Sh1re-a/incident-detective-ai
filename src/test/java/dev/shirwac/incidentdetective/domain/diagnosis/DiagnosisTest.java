@@ -72,6 +72,18 @@ class DiagnosisTest {
     }
 
     @Test
+    void rejectsAClaimWithNullEvidenceIds() {
+        Claim claim = new Claim(
+                ClaimCode.MISSING_EVIDENCE,
+                "PAYMENT_PROVIDER_RESPONSE",
+                "The provider response is missing.",
+                null
+        );
+
+        assertFalse(validator.validate(claim).isEmpty());
+    }
+
+    @Test
     void rejectsANonCanonicalClaimValue() {
         Diagnosis diagnosis = diagnosed(
                 "PAYMENT_TIMEOUT_CONFIG",
@@ -196,6 +208,45 @@ class DiagnosisTest {
         );
 
         assertTrue(validator.validate(diagnosis).isEmpty());
+    }
+
+    @Test
+    void rejectsAnInsufficientEvidenceClaimWithoutACitation() {
+        Diagnosis diagnosis = new Diagnosis(
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                "The impact is visible, but the cause is not proven.",
+                "The available evidence does not isolate a root cause.",
+                List.of(claim(
+                        ClaimCode.MISSING_EVIDENCE,
+                        "PAYMENT_PROVIDER_RESPONSE"
+                )),
+                safeNextStep()
+        );
+
+        assertFalse(validator.validate(diagnosis).isEmpty());
+    }
+
+    @Test
+    void rejectsAClaimWithMoreThanTwoCitations() {
+        Diagnosis diagnosis = new Diagnosis(
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                "The impact is visible, but the cause is not proven.",
+                "The available evidence does not isolate a root cause.",
+                List.of(claim(
+                        ClaimCode.MISSING_EVIDENCE,
+                        "PAYMENT_PROVIDER_RESPONSE",
+                        "ev-log-001",
+                        "ev-log-002",
+                        "ev-log-003"
+                )),
+                safeNextStep()
+        );
+
+        assertFalse(validator.validate(diagnosis).isEmpty());
     }
 
     @Test

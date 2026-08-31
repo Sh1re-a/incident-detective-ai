@@ -129,6 +129,69 @@ class DeterministicVerifierEvidencePrecisionTest {
         assertTrue(result.citationSupport().isEmpty());
     }
 
+    @Test
+    void scoresSupportedEvidenceForAnInsufficientEvidenceClaim() {
+        Diagnosis diagnosis = insufficientEvidence(
+                "PAYMENT_PROVIDER_RESPONSE",
+                "ev-gap"
+        );
+
+        VerificationReport report = verifier.verify(
+                diagnosis,
+                java.util.Set.of("ev-gap"),
+                abstentionGroundTruth()
+        );
+
+        assertTrue(report.diagnosisSchemaPass());
+        assertTrue(report.evidencePrecision().applicable());
+        assertEquals(1, report.evidencePrecision().supportedTriples());
+        assertEquals(1, report.evidencePrecision().totalTriples());
+        assertEquals(1.0, report.evidencePrecision().score(), TOLERANCE);
+        assertEquals(1.0, report.claimCoverage().score(), TOLERANCE);
+    }
+
+    @Test
+    void scoresAnIrrelevantCitationForAnInsufficientEvidenceClaimAsZero() {
+        Diagnosis diagnosis = insufficientEvidence(
+                "PAYMENT_PROVIDER_RESPONSE",
+                "ev-other"
+        );
+
+        VerificationReport report = verifier.verify(
+                diagnosis,
+                java.util.Set.of("ev-other"),
+                abstentionGroundTruth()
+        );
+
+        assertTrue(report.diagnosisSchemaPass());
+        assertTrue(report.citationValidity().valid());
+        assertTrue(report.evidencePrecision().applicable());
+        assertEquals(0, report.evidencePrecision().supportedTriples());
+        assertEquals(1, report.evidencePrecision().totalTriples());
+        assertEquals(0.0, report.evidencePrecision().score(), TOLERANCE);
+        assertEquals(1.0, report.claimCoverage().score(), TOLERANCE);
+    }
+
+    @Test
+    void rejectsAndScoresZeroForAnUncitedInsufficientEvidenceClaim() {
+        Diagnosis diagnosis = insufficientEvidence(
+                "PAYMENT_PROVIDER_RESPONSE"
+        );
+
+        VerificationReport report = verifier.verify(
+                diagnosis,
+                java.util.Set.of(),
+                abstentionGroundTruth()
+        );
+
+        assertFalse(report.diagnosisSchemaPass());
+        assertTrue(report.evidencePrecision().applicable());
+        assertEquals(0, report.evidencePrecision().supportedTriples());
+        assertEquals(0, report.evidencePrecision().totalTriples());
+        assertEquals(0.0, report.evidencePrecision().score(), TOLERANCE);
+        assertEquals(0.0, report.claimCoverage().score(), TOLERANCE);
+    }
+
     private static GroundTruth diagnosableGroundTruth() {
         return new GroundTruth(
                 "checkout-timeout-v1",
@@ -158,6 +221,44 @@ class DeterministicVerifierEvidencePrecisionTest {
                         )
                 ),
                 List.of()
+        );
+    }
+
+    private static GroundTruth abstentionGroundTruth() {
+        return new GroundTruth(
+                "checkout-provider-gap-v1",
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                List.of(new ExpectedClaim(
+                        ClaimCode.MISSING_EVIDENCE,
+                        "PAYMENT_PROVIDER_RESPONSE"
+                )),
+                List.of(new ClaimSupport(
+                        ClaimCode.MISSING_EVIDENCE,
+                        "PAYMENT_PROVIDER_RESPONSE",
+                        List.of("ev-gap")
+                )),
+                List.of()
+        );
+    }
+
+    private static Diagnosis insufficientEvidence(
+            String missingEvidenceCode,
+            String... evidenceIds
+    ) {
+        return new Diagnosis(
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                "The impact is visible, but the cause is not proven.",
+                "A provider response is needed to isolate the cause.",
+                List.of(claim(
+                        ClaimCode.MISSING_EVIDENCE,
+                        missingEvidenceCode,
+                        evidenceIds
+                )),
+                safeNextStep()
         );
     }
 

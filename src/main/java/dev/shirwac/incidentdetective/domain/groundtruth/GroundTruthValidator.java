@@ -74,14 +74,9 @@ public final class GroundTruthValidator
             return false;
         }
 
-        Set<ClaimCode> forbiddenClaims = Set.of(
-                ClaimCode.ROOT_CAUSE,
-                ClaimCode.AFFECTED_SERVICE,
-                ClaimCode.TRIGGER
-        );
-
         return expectedClaims.stream()
-                .noneMatch(claim -> forbiddenClaims.contains(claim.claimCode()));
+                .allMatch(claim -> claim.claimCode() != null
+                        && claim.claimCode().allowedForInsufficientEvidence());
     }
 
     private boolean hasExactlyOneMatchingClaim(

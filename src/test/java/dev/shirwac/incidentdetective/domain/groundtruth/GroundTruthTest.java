@@ -187,6 +187,63 @@ class GroundTruthTest {
     }
 
     @Test
+    void acceptsOnlyReachableClaimTypesForAnAbstentionGroundTruth() {
+        GroundTruth groundTruth = new GroundTruth(
+                "checkout-missing-provider-data-v1",
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                List.of(
+                        new ExpectedClaim(
+                                ClaimCode.OBSERVED_SYMPTOM,
+                                "PAYMENT_LATENCY_SPIKE"
+                        ),
+                        new ExpectedClaim(
+                                ClaimCode.MISSING_EVIDENCE,
+                                "PAYMENT_PROVIDER_RESPONSE"
+                        )
+                ),
+                List.of(
+                        support(
+                                ClaimCode.OBSERVED_SYMPTOM,
+                                "PAYMENT_LATENCY_SPIKE",
+                                "ev-metric-001"
+                        ),
+                        support(
+                                ClaimCode.MISSING_EVIDENCE,
+                                "PAYMENT_PROVIDER_RESPONSE",
+                                "ev-log-001"
+                        )
+                ),
+                List.of()
+        );
+
+        assertTrue(validator.validate(groundTruth).isEmpty());
+    }
+
+    @Test
+    void rejectsAnUnreachableCustomerImpactClaimForAnAbstentionGroundTruth() {
+        GroundTruth groundTruth = new GroundTruth(
+                "checkout-missing-provider-data-v1",
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                List.of(new ExpectedClaim(
+                        ClaimCode.CUSTOMER_IMPACT,
+                        "CHECKOUT_PAYMENT_FAILURES"
+                )),
+                List.of(support(
+                        ClaimCode.CUSTOMER_IMPACT,
+                        "CHECKOUT_PAYMENT_FAILURES",
+                        "ev-metric-001"
+                )),
+                List.of()
+        );
+
+        assertFalse(validator.validate(groundTruth).isEmpty());
+    }
+
+    @Test
     void rejectsRootCauseFieldsForAnAbstentionCase() {
         GroundTruth groundTruth = new GroundTruth(
                 "checkout-missing-provider-data-v1",
