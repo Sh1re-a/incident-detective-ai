@@ -3,6 +3,7 @@ package dev.shirwac.incidentdetective.ai;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GeminiAiPropertiesTest {
@@ -14,14 +15,14 @@ class GeminiAiPropertiesTest {
                 false,
                 "gemini-test",
                 GeminiThinkingLevel.LOW,
-                "prompt-v1"
+                GeminiPromptContracts.LIVE_PROMPT_VERSION
         );
         GeminiAiProperties enabledWithoutKey = new GeminiAiProperties(
                 " ",
                 true,
                 "gemini-test",
                 GeminiThinkingLevel.MINIMAL,
-                "prompt-v1"
+                GeminiPromptContracts.LIVE_PROMPT_VERSION
         );
 
         assertTrue(disabled.hasApiKey());
@@ -29,5 +30,18 @@ class GeminiAiPropertiesTest {
         assertTrue(disabled.thinkingLevel() == GeminiThinkingLevel.LOW);
         assertFalse(enabledWithoutKey.hasApiKey());
         assertTrue(enabledWithoutKey.liveEnabled());
+    }
+
+    @Test
+    void rejectsAPromptLabelThatDoesNotMatchTheRuntimeContract() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new GeminiAiProperties(
+                        "test-key",
+                        true,
+                        "gemini-test",
+                        GeminiThinkingLevel.MINIMAL,
+                        "overridden-prompt-label"
+                )
+        );
     }
 }

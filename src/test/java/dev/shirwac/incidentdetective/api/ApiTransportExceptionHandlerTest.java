@@ -37,4 +37,11 @@ class ApiTransportExceptionHandlerTest {
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
     }
+
+    @Test
+    void returnsAStableProblemCodeForUnknownRoutes() throws Exception {
+        mockMvc.perform(get("/api/v1/not-a-route"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ROUTE_NOT_FOUND"));
+    }
 }

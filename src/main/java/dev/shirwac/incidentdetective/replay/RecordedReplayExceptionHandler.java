@@ -6,6 +6,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import static dev.shirwac.incidentdetective.api.ApiProblemResponse.Code.SCENARIO_NOT_FOUND;
+
 @RestControllerAdvice
 public final class RecordedReplayExceptionHandler {
 
@@ -15,7 +17,7 @@ public final class RecordedReplayExceptionHandler {
                 HttpStatus.NOT_FOUND,
                 "Recorded scenario not found",
                 exception.getMessage(),
-                "SCENARIO_NOT_FOUND"
+                SCENARIO_NOT_FOUND
         );
     }
 }

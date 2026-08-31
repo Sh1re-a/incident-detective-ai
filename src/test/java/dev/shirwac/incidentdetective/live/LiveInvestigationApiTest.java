@@ -44,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "incident-detective.ai.live-enabled=true",
         "incident-detective.ai.gemini-api-key=test-only-key",
         "incident-detective.ai.model-id=gemini-3.1-flash-lite",
-        "incident-detective.ai.prompt-version=test-prompt-v1"
+        "incident-detective.ai.prompt-version=gemini-live-v6"
 })
 @AutoConfigureMockMvc
 class LiveInvestigationApiTest {
@@ -303,7 +303,7 @@ class LiveInvestigationApiTest {
     }
 
     @Test
-    void mapsProviderContractAndTimeoutFailuresWithoutRawDetails() throws Exception {
+    void mapsProviderFailuresWithoutRawDetails() throws Exception {
         when(model.collect(
                 any(), anyList(), anyList(), any(), eq(1), any()
         ))
@@ -336,6 +336,26 @@ class LiveInvestigationApiTest {
                         .content("{\"confirm_live_ai\":true}"))
                 .andExpect(status().isGatewayTimeout())
                 .andExpect(jsonPath("$.code").value("MODEL_PROVIDER_TIMEOUT"));
+
+        reset(model);
+        when(model.collect(
+                any(), anyList(), anyList(), any(), eq(1), any()
+        ))
+                .thenThrow(new ModelProviderException(
+                        ModelProviderFailure.RATE_LIMITED,
+                        "private provider response with request-id request-123"
+                ));
+
+        MvcResult rateLimited = mockMvc.perform(post(PATH, SCENARIO_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirm_live_ai\":true}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code")
+                        .value("MODEL_PROVIDER_RATE_LIMITED"))
+                .andReturn();
+        assertFalse(rateLimited.getResponse().getContentAsString()
+                .contains("request-123"));
+        assertFalse(rateLimited.getResponse().containsHeader("Retry-After"));
     }
 
     @Test

@@ -8,6 +8,7 @@ import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionCallingConfig;
 import com.google.genai.types.FunctionCallingConfigMode;
 import com.google.genai.types.FunctionDeclaration;
+import com.google.genai.types.FinishReason;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.GenerateContentResponseUsageMetadata;
@@ -44,11 +45,6 @@ public final class GeminiInvestigationModelGateway
         implements InvestigationModelGateway {
 
     private static final Duration MAX_PROVIDER_TIMEOUT = Duration.ofSeconds(28);
-    private static final String COLLECT_PROMPT_RESOURCE =
-            "ai/prompts/collect-gemini-live-v6.txt";
-    private static final String SYNTHESIZE_PROMPT_RESOURCE =
-            "ai/prompts/synthesize-gemini-live-v6.txt";
-
     private final GeminiAiProperties properties;
     private final GeminiDiagnosisDecoder diagnosisDecoder;
     private final JsonMapper jsonMapper;
@@ -60,15 +56,20 @@ public final class GeminiInvestigationModelGateway
 
     public GeminiInvestigationModelGateway(
             GeminiAiProperties properties,
+            DiagnosisContractProperties diagnosisContract,
             GeminiDiagnosisDecoder diagnosisDecoder,
             JsonMapper jsonMapper
     ) {
         this.properties = properties;
         this.diagnosisDecoder = diagnosisDecoder;
         this.jsonMapper = jsonMapper;
-        collectInstructions = loadText(COLLECT_PROMPT_RESOURCE);
-        synthesizeInstructions = loadText(SYNTHESIZE_PROMPT_RESOURCE);
-        diagnosisSchema = loadSchema("ai/diagnosis-schema-v3.json");
+        collectInstructions = loadText(
+                GeminiPromptContracts.COLLECTION_PROMPT_RESOURCE
+        );
+        synthesizeInstructions = loadText(
+                GeminiPromptContracts.SYNTHESIS_PROMPT_RESOURCE
+        );
+        diagnosisSchema = loadSchema(diagnosisContract.schemaResource());
         functionDeclarations = List.of(
                 function(
                         ToolName.GET_METRICS,
@@ -185,6 +186,7 @@ public final class GeminiInvestigationModelGateway
                 .responseMimeType("application/json")
                 .responseJsonSchema(diagnosisSchema)
                 .maxOutputTokens(2_048)
+                .temperature(0.0F)
                 .thinkingConfig(ThinkingConfig.builder()
                         .thinkingLevel(properties.thinkingLevel().sdkValue())
                         .includeThoughts(false)
@@ -203,6 +205,7 @@ public final class GeminiInvestigationModelGateway
             GenerateContentResponse response
     ) {
         try {
+            rejectTruncatedResponse(response);
             List<CollectionToolCall> calls = new ArrayList<>();
             for (FunctionCall functionCall : response.functionCalls()) {
                 String callId = functionCall.id().orElseThrow(() -> malformed(
@@ -236,6 +239,7 @@ public final class GeminiInvestigationModelGateway
 
     Diagnosis decodeDiagnosis(GenerateContentResponse response) {
         try {
+            rejectTruncatedResponse(response);
             return diagnosisDecoder.decode(response.text());
         } catch (ModelProviderException exception) {
             throw exception;
@@ -244,6 +248,12 @@ public final class GeminiInvestigationModelGateway
                     "Gemini synthesis response could not be read",
                     exception
             );
+        }
+    }
+
+    private void rejectTruncatedResponse(GenerateContentResponse response) {
+        if (response.finishReason().knownEnum() == FinishReason.Known.MAX_TOKENS) {
+            throw malformed("Gemini response was truncated at the output-token limit");
         }
     }
 
@@ -272,7 +282,7 @@ public final class GeminiInvestigationModelGateway
             }
             throw upstream(exception);
         } catch (ApiException exception) {
-            throw upstream(exception);
+            throw translateApiFailure(exception);
         } catch (ModelProviderException exception) {
             throw exception;
         } catch (RuntimeException exception) {
@@ -292,10 +302,16 @@ public final class GeminiInvestigationModelGateway
                 phase,
                 round,
                 response.responseId().orElse(null),
-                response.modelVersion().orElse(properties.modelId()),
+                providerReportedModelVersion(response),
                 decodeUsage(usage),
                 timed.latencyMs()
         );
+    }
+
+    String providerReportedModelVersion(GenerateContentResponse response) {
+        return response.modelVersion()
+                .filter(version -> !version.isBlank())
+                .orElse(null);
     }
 
     ModelTokenUsage decodeUsage(
@@ -436,6 +452,21 @@ public final class GeminiInvestigationModelGateway
     }
 
     private ModelProviderException upstream(Throwable cause) {
+        return new ModelProviderException(
+                ModelProviderFailure.UPSTREAM,
+                "Gemini provider request failed",
+                cause
+        );
+    }
+
+    static ModelProviderException translateApiFailure(ApiException cause) {
+        if (cause.code() == 429) {
+            return new ModelProviderException(
+                    ModelProviderFailure.RATE_LIMITED,
+                    "Gemini provider rate limit reached",
+                    cause
+            );
+        }
         return new ModelProviderException(
                 ModelProviderFailure.UPSTREAM,
                 "Gemini provider request failed",

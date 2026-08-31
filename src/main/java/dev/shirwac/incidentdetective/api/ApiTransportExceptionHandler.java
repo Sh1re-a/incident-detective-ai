@@ -7,6 +7,12 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import static dev.shirwac.incidentdetective.api.ApiProblemResponse.Code.INVALID_REQUEST_BODY;
+import static dev.shirwac.incidentdetective.api.ApiProblemResponse.Code.METHOD_NOT_ALLOWED;
+import static dev.shirwac.incidentdetective.api.ApiProblemResponse.Code.ROUTE_NOT_FOUND;
+import static dev.shirwac.incidentdetective.api.ApiProblemResponse.Code.UNSUPPORTED_MEDIA_TYPE;
 
 @RestControllerAdvice
 public final class ApiTransportExceptionHandler {
@@ -17,7 +23,7 @@ public final class ApiTransportExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 "Invalid request body",
                 "Send a valid JSON body that matches the endpoint contract.",
-                "INVALID_REQUEST_BODY"
+                INVALID_REQUEST_BODY
         );
     }
 
@@ -29,7 +35,7 @@ public final class ApiTransportExceptionHandler {
                 HttpStatus.UNSUPPORTED_MEDIA_TYPE,
                 "Unsupported media type",
                 "Send the request body as application/json.",
-                "UNSUPPORTED_MEDIA_TYPE"
+                UNSUPPORTED_MEDIA_TYPE
         );
     }
 
@@ -41,7 +47,17 @@ public final class ApiTransportExceptionHandler {
                 HttpStatus.METHOD_NOT_ALLOWED,
                 "Method not allowed",
                 "Use the HTTP method documented for this endpoint.",
-                "METHOD_NOT_ALLOWED"
+                METHOD_NOT_ALLOWED
+        );
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    ProblemDetail handleUnknownRoute(NoResourceFoundException exception) {
+        return ApiProblemFactory.create(
+                HttpStatus.NOT_FOUND,
+                "Route not found",
+                "No API route matches this request.",
+                ROUTE_NOT_FOUND
         );
     }
 }

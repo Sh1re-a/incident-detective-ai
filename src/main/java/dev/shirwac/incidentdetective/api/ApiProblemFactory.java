@@ -12,11 +12,11 @@ public final class ApiProblemFactory {
             HttpStatus status,
             String title,
             String detail,
-            String code
+            ApiProblemResponse.Code code
     ) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setTitle(title);
-        problem.setProperty("code", code);
+        problem.setProperty("code", code.name());
         return problem;
     }
 }

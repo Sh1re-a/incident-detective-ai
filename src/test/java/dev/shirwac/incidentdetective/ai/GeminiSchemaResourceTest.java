@@ -9,6 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.io.InputStream;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -24,6 +25,7 @@ class GeminiSchemaResourceTest {
                 "ai/diagnosis-schema-v1.json",
                 "ai/diagnosis-schema-v2.json",
                 "ai/diagnosis-schema-v3.json",
+                "ai/diagnosis-schema-v4.json",
                 "ai/tool-schemas/get_metrics-v1.json",
                 "ai/tool-schemas/search_logs-v1.json",
                 "ai/tool-schemas/get_trace-v1.json",
@@ -140,7 +142,8 @@ class GeminiSchemaResourceTest {
     }
 
     @Test
-    void diagnosisSchemaV3UsesTheSharedClaimValueTaxonomy() throws Exception {
+    void diagnosisSchemaV3RemainsFrozenAtTheOriginalTwoFamilyTaxonomy()
+            throws Exception {
         JsonNode schema;
         try (InputStream input = new ClassPathResource(
                 "ai/diagnosis-schema-v3.json"
@@ -157,7 +160,20 @@ class GeminiSchemaResourceTest {
         HashSet<String> schemaValues = new HashSet<>();
         values.forEach(value -> schemaValues.add(value.asText()));
 
-        assertEquals(ClaimValueTaxonomy.allValues(), schemaValues);
+        assertEquals(Set.of(
+                "PAYMENT_TIMEOUT_CONFIG",
+                "INVENTORY_SCHEMA_MISMATCH",
+                "PAYMENT_ADAPTER",
+                "INVENTORY_SERVICE",
+                "PAYMENT_ADAPTER_RELEASE",
+                "INVENTORY_SERVICE_RELEASE",
+                "CHECKOUT_PAYMENT_FAILURES",
+                "MULTI_ITEM_CHECKOUT_FAILURES",
+                "PAYMENT_LATENCY_SPIKE",
+                "INVENTORY_CONTRACT_VALIDATION_ERRORS",
+                "PAYMENT_PROVIDER_RESPONSE"
+        ), schemaValues);
+        assertTrue(ClaimValueTaxonomy.allValues().containsAll(schemaValues));
         assertEquals(2, schema.get("properties")
                 .get("claims")
                 .get("items")
@@ -165,5 +181,30 @@ class GeminiSchemaResourceTest {
                 .get("evidence_ids")
                 .get("maxItems")
                 .asInt());
+        assertFalse(schema.get("properties")
+                .get("claims")
+                .get("items")
+                .get("properties")
+                .get("evidence_ids")
+                .has("minItems"));
+    }
+
+    @Test
+    void diagnosisSchemaV4RequiresEveryClaimToCiteEvidence()
+            throws Exception {
+        String resourcePath = "ai/diagnosis-schema-v4.json";
+        JsonNode schema;
+        try (InputStream input = new ClassPathResource(resourcePath)
+                .getInputStream()) {
+            schema = jsonMapper.readTree(input);
+        }
+
+        JsonNode evidenceIds = schema.get("properties")
+                .get("claims")
+                .get("items")
+                .get("properties")
+                .get("evidence_ids");
+        assertEquals(1, evidenceIds.get("minItems").asInt(), resourcePath);
+        assertEquals(2, evidenceIds.get("maxItems").asInt(), resourcePath);
     }
 }
