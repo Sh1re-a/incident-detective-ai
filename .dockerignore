@@ -10,7 +10,6 @@ local-secrets.properties
 secrets
 
 docs
-frontend
 scripts
 target
 **/node_modules
