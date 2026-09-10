@@ -27,6 +27,7 @@ import dev.shirwac.incidentdetective.investigation.InvestigationScenarioNotFound
 import dev.shirwac.incidentdetective.investigation.tools.InvestigationToolExecutor;
 import dev.shirwac.incidentdetective.investigation.tools.ToolExecution;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
+import dev.shirwac.incidentdetective.observability.InvestigationTelemetry;
 import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
 import dev.shirwac.incidentdetective.replay.RunMode;
 import org.springframework.stereotype.Service;
@@ -78,6 +79,7 @@ public final class LiveInvestigationService {
     private final LiveInvestigationAdmissionGuard admissionGuard;
     private final LiveInvestigationMetrics metrics;
     private final GlobalDailyLiveQuota dailyQuota;
+    private final InvestigationTelemetry telemetry;
     private final Clock clock;
 
     public LiveInvestigationService(
@@ -91,6 +93,7 @@ public final class LiveInvestigationService {
             LiveInvestigationAdmissionGuard admissionGuard,
             LiveInvestigationMetrics metrics,
             GlobalDailyLiveQuota dailyQuota,
+            InvestigationTelemetry telemetry,
             Clock clock
     ) {
         this.properties = properties;
@@ -103,6 +106,7 @@ public final class LiveInvestigationService {
         this.admissionGuard = admissionGuard;
         this.metrics = metrics;
         this.dailyQuota = dailyQuota;
+        this.telemetry = telemetry;
         this.clock = clock;
     }
 
@@ -169,6 +173,39 @@ public final class LiveInvestigationService {
     private LiveInvestigationResult investigateAdmitted(
             InvestigationContext context
     ) {
+        try (InvestigationTelemetry.InvestigationSpan span =
+                     telemetry.startInvestigation(
+                             context.scenarioId(),
+                             context.generatedCase(),
+                             MAX_COLLECTION_ROUNDS,
+                             MAX_TOOL_CALLS_TOTAL,
+                             HARD_DEADLINE.toMillis()
+                     )) {
+            try {
+                LiveInvestigationResult result = runInvestigation(context);
+                int evidenceCount = (int) result.toolEvents().stream()
+                        .flatMap(event -> event.evidence().stream())
+                        .map(Evidence::evidenceId)
+                        .distinct()
+                        .count();
+                span.completed(
+                        result.runId(),
+                        result.status(),
+                        evidenceCount,
+                        result.toolCallCount(),
+                        result.modelCallCount()
+                );
+                return result;
+            } catch (RuntimeException exception) {
+                span.failed(exception);
+                throw exception;
+            }
+        }
+    }
+
+    private LiveInvestigationResult runInvestigation(
+            InvestigationContext context
+    ) {
         String scenarioId = context.scenarioId();
         Scenario scenario = context.scenario();
         Instant startedAt = clock.instant();
@@ -202,40 +239,73 @@ public final class LiveInvestigationService {
                 }
                 break;
             }
-            CollectionModelResult collection = model.collect(
-                    scenario,
-                    availableMetricNames,
-                    List.copyOf(evidenceById.values()),
-                    toolBudget,
-                    round,
-                    timeout.orElseThrow()
-            );
-            requireWithinDeadline(startedAt);
-            modelCalls.add(collection.metadata());
-            if (collection.toolCalls().isEmpty()) {
-                break;
-            }
-            preflightToolCalls(
-                    collection.toolCalls(),
-                    toolBudget,
-                    callsByType,
-                    callIds
-            );
-            for (CollectionToolCall call : collection.toolCalls()) {
-                ToolExecution execution = context.executeTool().apply(call);
-                ensureScenarioIsolation(scenarioId, execution.evidence());
-                execution.evidence().forEach(evidence ->
-                        evidenceById.putIfAbsent(evidence.evidenceId(), evidence)
-                );
-                toolEvents.add(new LiveToolEvent(
-                        execution.callId(),
-                        round,
-                        execution.toolName(),
-                        execution.arguments(),
-                        execution.safeSummary(),
-                        execution.evidence(),
-                        execution.runbookRetrieval()
-                ));
+            try (InvestigationTelemetry.CollectionSpan collectionSpan =
+                         telemetry.startCollection(
+                                 round,
+                                 toolBudget.allowedTools().size(),
+                                 properties.modelId()
+                         )) {
+                try {
+                    CollectionModelResult collection = model.collect(
+                            scenario,
+                            availableMetricNames,
+                            List.copyOf(evidenceById.values()),
+                            toolBudget,
+                            round,
+                            timeout.orElseThrow()
+                    );
+                    requireWithinDeadline(startedAt);
+                    modelCalls.add(collection.metadata());
+                    collectionSpan.modelCompleted(
+                            collection.metadata(),
+                            collection.toolCalls().size()
+                    );
+                    if (collection.toolCalls().isEmpty()) {
+                        collectionSpan.completed(evidenceById.size());
+                        break;
+                    }
+                    preflightToolCalls(
+                            collection.toolCalls(),
+                            toolBudget,
+                            callsByType,
+                            callIds
+                    );
+                    for (CollectionToolCall call : collection.toolCalls()) {
+                        ToolExecution execution = telemetry.executeTool(
+                                round,
+                                call.toolName(),
+                                () -> {
+                                    ToolExecution result = context
+                                            .executeTool()
+                                            .apply(call);
+                                    ensureScenarioIsolation(
+                                            scenarioId,
+                                            result.evidence()
+                                    );
+                                    return result;
+                                }
+                        );
+                        execution.evidence().forEach(evidence ->
+                                evidenceById.putIfAbsent(
+                                        evidence.evidenceId(),
+                                        evidence
+                                )
+                        );
+                        toolEvents.add(new LiveToolEvent(
+                                execution.callId(),
+                                round,
+                                execution.toolName(),
+                                execution.arguments(),
+                                execution.safeSummary(),
+                                execution.evidence(),
+                                execution.runbookRetrieval()
+                        ));
+                    }
+                    collectionSpan.completed(evidenceById.size());
+                } catch (RuntimeException exception) {
+                    collectionSpan.failed(exception);
+                    throw exception;
+                }
             }
         }
 
@@ -243,17 +313,26 @@ public final class LiveInvestigationService {
         Duration synthesisTimeout = synthesisTimeoutFor(
                 elapsedSince(startedAt)
         ).orElseThrow(this::deadlineExceeded);
-        SynthesisModelResult synthesis = model.synthesize(
-                scenario,
-                List.copyOf(evidenceById.values()),
-                synthesisTimeout
+        SynthesisModelResult synthesis = telemetry.synthesize(
+                properties.modelId(),
+                evidenceById.size(),
+                () -> {
+                    SynthesisModelResult result = model.synthesize(
+                            scenario,
+                            List.copyOf(evidenceById.values()),
+                            synthesisTimeout
+                    );
+                    requireWithinDeadline(startedAt);
+                    return result;
+                }
         );
-        requireWithinDeadline(startedAt);
         modelCalls.add(synthesis.metadata());
 
-        CompletedInvestigationVerification verification = context.verify().apply(
-                synthesis.diagnosis(),
-                Set.copyOf(evidenceById.keySet())
+        CompletedInvestigationVerification verification = telemetry.verify(
+                () -> context.verify().apply(
+                        synthesis.diagnosis(),
+                        Set.copyOf(evidenceById.keySet())
+                )
         );
         if (!verification.report().diagnosisSchemaPass()) {
             throw malformed("Model diagnosis failed the validated contract");
@@ -330,7 +409,8 @@ public final class LiveInvestigationService {
                         seenEvidenceIds
                 ),
                 TRUTH_LABEL,
-                this::limitations
+                this::limitations,
+                false
         );
     }
 
@@ -350,7 +430,8 @@ public final class LiveInvestigationService {
                         seenEvidenceIds
                 ),
                 GENERATED_TRUTH_LABEL,
-                this::generatedLimitations
+                this::generatedLimitations,
+                true
         );
     }
 
@@ -653,7 +734,8 @@ public final class LiveInvestigationService {
             Function<CollectionToolCall, ToolExecution> executeTool,
             BiFunction<Diagnosis, Set<String>, CompletedInvestigationVerification> verify,
             String truthLabel,
-            Supplier<List<String>> limitations
+            Supplier<List<String>> limitations,
+            boolean generatedCase
     ) {
         private InvestigationContext {
             availableMetricNames = List.copyOf(availableMetricNames);

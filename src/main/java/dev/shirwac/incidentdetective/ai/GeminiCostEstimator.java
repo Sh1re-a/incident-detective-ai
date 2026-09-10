@@ -11,9 +11,10 @@ import java.util.Map;
 public final class GeminiCostEstimator {
 
     static final String PAID_LIST_PRICE_BASIS =
-            "Gemini paid Standard list prices checked 2026-08-26; "
-                    + "this is not a provider invoice and the API does not "
-                    + "report whether the run was free-tier billed.";
+            "Gemini paid Standard list prices checked 2026-08-31; "
+                    + "model generation only. This is not a provider invoice, "
+                    + "and the API does not report the actual charged amount "
+                    + "or whether the run was free-tier billed.";
     private static final String UNKNOWN_PRICE_BASIS =
             "No paid list-price estimate is configured for this model.";
     private static final String CACHE_NOT_REPORTED_BASIS =

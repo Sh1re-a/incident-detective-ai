@@ -68,7 +68,10 @@ public record LiveInvestigationResult(
         @Schema(
                 requiredMode = Schema.RequiredMode.REQUIRED,
                 nullable = true,
-                description = "Null when no paid list-price estimate is configured."
+                description = "Model-generation-only paid Standard list-price "
+                        + "estimate in USD, calculated from provider-reported token "
+                        + "metadata. Not an invoice or actual charged amount. Null "
+                        + "when the model price or core usage is unavailable."
         )
         BigDecimal estimatedCostUsd,
         @Schema(
@@ -77,7 +80,11 @@ public record LiveInvestigationResult(
                 description = "Null when the model price or core provider usage is unavailable."
         )
         ModelCostBreakdown modelCostBreakdown,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                description = "Human-readable pricing snapshot and assumptions. "
+                        + "The frontend must not present the estimate as an invoice."
+        )
         String estimatedCostBasis,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "0")
         int toolCallCount,
