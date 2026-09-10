@@ -24,7 +24,7 @@ public record KnowledgeDocumentLibraryResponse(
         List<KnowledgeDocument> documents
 ) {
     public static final String CONTRACT_VERSION =
-            "nordly-knowledge-document-library-v1";
+            "nordly-knowledge-document-library-v2";
     public static final String MODE = "read_only_corpus";
 
     public KnowledgeDocumentLibraryResponse {
@@ -75,16 +75,25 @@ public record KnowledgeDocumentLibraryResponse(
     private static KnowledgeDocument document(
             KnowledgeCorpusManifest.KnowledgeDocument document
     ) {
+        RagEligibility eligibility = eligibility(document);
         return new KnowledgeDocument(
                 document.id(),
                 document.version(),
+                document.displayFilename(),
+                document.documentType(),
+                document.classification(),
                 document.title(),
+                document.titleSv(),
+                document.summarySv(),
+                document.summaryEn(),
                 document.ownerTeam(),
                 document.lifecycle(),
                 document.effectiveFrom(),
                 document.effectiveUntil(),
                 document.accessScopes(),
-                eligibility(document),
+                document.relatedDocumentIds(),
+                eligibility,
+                eligibility.eligible(),
                 document.chunks().stream()
                         .map(chunk -> new KnowledgeChunk(
                                 chunk.id(),
@@ -93,7 +102,7 @@ public record KnowledgeDocumentLibraryResponse(
                                 chunk.evidenceId(),
                                 chunk.displaySummarySv(),
                                 chunk.displaySummaryEn(),
-                                chunk.text()
+                                eligibility.eligible() ? chunk.text() : null
                         ))
                         .toList()
         );
@@ -152,18 +161,27 @@ public record KnowledgeDocumentLibraryResponse(
     public record KnowledgeDocument(
             String id,
             String version,
+            String displayFilename,
+            String documentType,
+            String classification,
             String title,
+            String titleSv,
+            String summarySv,
+            String summaryEn,
             String ownerTeam,
             String lifecycle,
             String effectiveFrom,
             @Schema(nullable = true)
             String effectiveUntil,
             List<String> accessScopes,
+            List<String> relatedDocumentIds,
             RagEligibility ragEligibility,
+            boolean contentVisible,
             List<KnowledgeChunk> chunks
     ) {
         public KnowledgeDocument {
             accessScopes = List.copyOf(accessScopes);
+            relatedDocumentIds = List.copyOf(relatedDocumentIds);
             chunks = List.copyOf(chunks);
         }
     }
@@ -183,6 +201,11 @@ public record KnowledgeDocumentLibraryResponse(
             String evidenceId,
             String displaySummarySv,
             String displaySummaryEn,
+            @Schema(
+                    nullable = true,
+                    description = "Full synthetic body for approved public-demo "
+                            + "documents; null for excluded material."
+            )
             String text
     ) {
     }

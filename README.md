@@ -63,7 +63,9 @@ Swagger finns lokalt på `http://localhost:8080/swagger-ui.html` och OpenAPI på
 
 Frontend ska generera typer från aktuell OpenAPI. Se
 [frontendkontraktet](./docs/FRONTEND-API-HANDOFF.md) och
-[API-genomgången](./docs/API-WALKTHROUGH.md).
+[API-genomgången](./docs/API-WALKTHROUGH.md). Den fiktiva företagssanningen,
+dokumentkartan och säkerhetsgränsen beskrivs i
+[Nordly company knowledge](./docs/NORDLY-COMPANY-KNOWLEDGE.md).
 
 ## Kör lokalt
 

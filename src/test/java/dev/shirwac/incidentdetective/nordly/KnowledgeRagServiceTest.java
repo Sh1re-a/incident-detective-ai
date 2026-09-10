@@ -65,7 +65,7 @@ class KnowledgeRagServiceTest {
 
     @BeforeEach
     void configureCorpus() {
-        when(corpus.version()).thenReturn("nordly-knowledge-corpus-v1");
+        when(corpus.version()).thenReturn("nordly-knowledge-corpus-v2");
         when(corpus.eligibleDocumentCount()).thenReturn(10);
         when(corpus.eligibleChunkCount()).thenReturn(18);
     }

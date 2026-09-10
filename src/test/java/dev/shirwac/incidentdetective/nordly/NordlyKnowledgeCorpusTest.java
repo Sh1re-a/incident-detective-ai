@@ -39,15 +39,18 @@ class NordlyKnowledgeCorpusTest {
 
     @Test
     void exposesOnlyApprovedPublicDemoDocuments() {
-        assertEquals("nordly-knowledge-corpus-v1", corpus.version());
-        assertEquals(10, corpus.eligibleDocumentCount());
-        assertEquals(18, corpus.eligibleChunkCount());
+        assertEquals("nordly-knowledge-corpus-v2", corpus.version());
+        assertEquals(13, corpus.eligibleDocumentCount());
+        assertEquals(27, corpus.eligibleChunkCount());
         assertTrue(corpus.entries().stream()
                 .allMatch(entry -> corpus.metadata(entry.evidenceId())
                         .status().equals("APPROVED")));
         assertFalse(corpus.entries().stream().anyMatch(entry ->
                 entry.documentId().equals("kb-legacy-refund-playbook")
                         || entry.documentId().equals("kb-untrusted-shortcuts")
+                        || entry.documentId().equals(
+                                "kb-employee-compensation-register"
+                        )
         ));
     }
 
@@ -70,14 +73,17 @@ class NordlyKnowledgeCorpusTest {
         RunbookImportReport first = importer.importMissingOrChanged();
         RunbookImportReport second = importer.importMissingOrChanged();
 
-        assertEquals(18, first.importedChunks());
+        assertEquals(27, first.importedChunks());
         assertEquals(0, first.skippedChunks());
         assertEquals(0, second.importedChunks());
-        assertEquals(18, second.skippedChunks());
-        assertEquals(18, embeddings.inputs.size());
-        assertEquals(18, store.upserted.size());
+        assertEquals(27, second.skippedChunks());
+        assertEquals(27, embeddings.inputs.size());
+        assertEquals(27, store.upserted.size());
         assertFalse(store.upserted.contains("nordly-evidence-legacy-refund-window"));
         assertFalse(store.upserted.contains("nordly-evidence-untrusted-instruction"));
+        assertFalse(store.upserted.contains(
+                "nordly-evidence-restricted-compensation"
+        ));
     }
 
     private static final class CountingEmbeddings implements EmbeddingGateway {

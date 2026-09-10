@@ -125,7 +125,7 @@ class KnowledgeRagApiTest {
                 List.of(),
                 new KnowledgeRagResponse.RetrievalResult(
                         KnowledgeRagResponse.BACKEND,
-                        "nordly-knowledge-corpus-v1",
+                        "nordly-knowledge-corpus-v2",
                         "APPROVED",
                         "public_demo",
                         10,

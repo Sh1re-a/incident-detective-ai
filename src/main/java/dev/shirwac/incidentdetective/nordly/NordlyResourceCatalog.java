@@ -21,7 +21,7 @@ public final class NordlyResourceCatalog {
 
     static final String WORLD_RESOURCE = "demo/nordly-demo-world-v1.json";
     static final String CORPUS_RESOURCE =
-            "knowledge/nordly-knowledge-corpus-v1.json";
+            "knowledge/nordly-knowledge-corpus-v2.json";
     static final String REPLAY_RESOURCE =
             "knowledge/replays/nordly-knowledge-replays-v1.json";
 
@@ -341,9 +341,6 @@ public final class NordlyResourceCatalog {
                 || summary.untrustedDocuments() != actualCounts.untrusted()) {
             throw invalid("demo corpus counts do not match the manifest");
         }
-        if (actualCounts.documents() != 12 || actualCounts.chunks() != 20) {
-            throw invalid("Nordly v1 requires exactly 12 documents and 20 chunks");
-        }
     }
 
     private static CorpusCounts validateCorpus(KnowledgeCorpusManifest corpus) {
@@ -352,6 +349,7 @@ public final class NordlyResourceCatalog {
         Set<String> chunkIds = new HashSet<>();
         Set<String> sourceRefs = new HashSet<>();
         Set<String> evidenceIds = new HashSet<>();
+        Map<String, List<String>> relatedDocuments = new LinkedHashMap<>();
         int chunks = 0;
         int approved = 0;
         int deprecated = 0;
@@ -364,7 +362,13 @@ public final class NordlyResourceCatalog {
             }
             requireNonBlank(document.id(), "document ID");
             requireNonBlank(document.version(), "document version");
+            requireNonBlank(document.displayFilename(), "display filename");
+            requireNonBlank(document.documentType(), "document type");
+            requireNonBlank(document.classification(), "document classification");
             requireNonBlank(document.title(), "document title");
+            requireNonBlank(document.titleSv(), "Swedish document title");
+            requireNonBlank(document.summarySv(), "Swedish document summary");
+            requireNonBlank(document.summaryEn(), "English document summary");
             requireNonBlank(document.ownerTeam(), "document owner team");
             requireNonBlank(document.lifecycle(), "document lifecycle");
             if (!documentIds.add(document.id())) {
@@ -383,6 +387,18 @@ public final class NordlyResourceCatalog {
             validateEffectiveDates(document);
             requireNonEmpty(document.accessScopes(), "document access scopes");
             requireUniqueNonBlank(document.accessScopes(), "document access scope");
+            requireNonEmptyOrEmptyList(
+                    document.relatedDocumentIds(),
+                    "related document IDs"
+            );
+            requireUniqueNonBlank(
+                    document.relatedDocumentIds(),
+                    "related document ID"
+            );
+            if (document.relatedDocumentIds().contains(document.id())) {
+                throw invalid("document cannot relate to itself " + document.id());
+            }
+            relatedDocuments.put(document.id(), document.relatedDocumentIds());
             requireNonEmpty(document.chunks(), "document chunks");
 
             for (KnowledgeCorpusManifest.KnowledgeChunk chunk
@@ -418,6 +434,16 @@ public final class NordlyResourceCatalog {
                         + "#" + chunk.id();
                 requireEqual(expectedSourceRef, chunk.sourceRef(), "source ref");
                 chunks++;
+            }
+        }
+
+        for (Map.Entry<String, List<String>> relationship
+                : relatedDocuments.entrySet()) {
+            for (String relatedId : relationship.getValue()) {
+                if (!documentIds.contains(relatedId)) {
+                    throw invalid("document " + relationship.getKey()
+                            + " relates to unknown document " + relatedId);
+                }
             }
         }
 

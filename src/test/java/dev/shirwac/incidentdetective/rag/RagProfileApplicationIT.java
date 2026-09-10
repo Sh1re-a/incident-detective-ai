@@ -80,13 +80,13 @@ class RagProfileApplicationIT {
         assertEquals(0L, jdbc.sql("SELECT COUNT(*) FROM runbook_embeddings")
                 .query(Long.class)
                 .single());
-        assertEquals(10, nordlyKnowledgeCorpus.eligibleDocumentCount());
-        assertEquals(18, nordlyKnowledgeCorpus.eligibleChunkCount());
+        assertEquals(13, nordlyKnowledgeCorpus.eligibleDocumentCount());
+        assertEquals(27, nordlyKnowledgeCorpus.eligibleChunkCount());
         RunbookIndexStatus nordlyIndex = nordlyKnowledgeIndexReadiness.inspect();
         assertFalse(nordlyIndex.ready());
         assertEquals(0, nordlyIndex.indexedChunks());
         assertEquals(0, nordlyIndex.currentChunks());
-        assertEquals(18, nordlyIndex.expectedChunks());
+        assertEquals(27, nordlyIndex.expectedChunks());
         CapabilitiesResponse.VectorIndexCapability index = capabilities
                 .describe()
                 .retrieval()

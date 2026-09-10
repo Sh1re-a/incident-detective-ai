@@ -233,16 +233,18 @@ class JdbcRunbookVectorStoreIT {
                 PROFILE
         ).inspect();
 
-        assertEquals("nordly-knowledge-corpus-v1", first.corpusVersion());
-        assertEquals(18, first.importedChunks());
+        assertEquals("nordly-knowledge-corpus-v2", first.corpusVersion());
+        assertEquals(27, first.importedChunks());
         assertEquals(0, second.importedChunks());
-        assertEquals(18, second.skippedChunks());
+        assertEquals(27, second.skippedChunks());
         assertTrue(status.ready());
-        assertEquals(18, store.count(corpus.version(), PROFILE));
+        assertEquals(27, store.count(corpus.version(), PROFILE));
         assertFalse(store.documentIds(corpus.version(), PROFILE)
                 .contains("kb-legacy-refund-playbook"));
         assertFalse(store.documentIds(corpus.version(), PROFILE)
                 .contains("kb-untrusted-shortcuts"));
+        assertFalse(store.documentIds(corpus.version(), PROFILE)
+                .contains("kb-employee-compensation-register"));
         assertEquals(0, store.count("runbook-corpus-v1", PROFILE));
     }
 

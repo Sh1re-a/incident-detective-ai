@@ -35,8 +35,8 @@ class NordlyResourceCatalogTest {
         assertTrue(world.services().stream()
                 .allMatch(service -> !service.displayNameEn().isBlank()
                         && !service.roleEn().isBlank()));
-        assertEquals(12, world.corpus().documentCount());
-        assertEquals(20, world.corpus().chunkCount());
+        assertEquals(16, world.corpus().documentCount());
+        assertEquals(30, world.corpus().chunkCount());
         assertEquals(
                 List.of(
                         "duplicate-authorization",
