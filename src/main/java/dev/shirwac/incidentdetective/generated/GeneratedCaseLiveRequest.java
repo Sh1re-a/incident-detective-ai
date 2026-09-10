@@ -9,6 +9,13 @@ import java.util.Objects;
 public record GeneratedCaseLiveRequest(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "42")
         Long seed,
+        @Schema(
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+                nullable = true,
+                description = "Optional bounded Nordly incident family. Defaults to payment_timeout.",
+                example = "catalog_cache_invalidation"
+        )
+        GeneratedIncidentFamily incidentFamily,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "diagnostic")
         GeneratedEvidenceMode evidenceMode,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "low")
@@ -22,12 +29,20 @@ public record GeneratedCaseLiveRequest(
 ) {
     public GeneratedCaseLiveRequest {
         Objects.requireNonNull(seed, "seed must not be null");
+        incidentFamily = incidentFamily == null
+                ? GeneratedIncidentFamily.PAYMENT_TIMEOUT
+                : incidentFamily;
         Objects.requireNonNull(evidenceMode, "evidenceMode must not be null");
         Objects.requireNonNull(noiseLevel, "noiseLevel must not be null");
     }
 
     GeneratedCaseRequest generatedCaseRequest() {
-        return new GeneratedCaseRequest(seed.longValue(), evidenceMode, noiseLevel);
+        return new GeneratedCaseRequest(
+                seed.longValue(),
+                incidentFamily,
+                evidenceMode,
+                noiseLevel
+        );
     }
 
     LiveInvestigationRequest liveRequest() {

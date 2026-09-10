@@ -199,6 +199,17 @@ class PaymentTimeoutGeneratedCaseGeneratorTest {
         );
     }
 
+    @Test
+    void legacyRequestDefaultsToPaymentTimeoutFamily() {
+        GeneratedCaseRequest request = request(
+                42L,
+                GeneratedEvidenceMode.DIAGNOSTIC,
+                GeneratedNoiseLevel.NONE
+        );
+
+        assertEquals(GeneratedIncidentFamily.PAYMENT_TIMEOUT, request.incidentFamily());
+    }
+
     private GeneratedCaseRequest request(
             long seed,
             GeneratedEvidenceMode evidenceMode,

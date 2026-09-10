@@ -30,6 +30,7 @@ public final class GeneratedCaseInvestigationService {
                 new GeneratedCaseRunResult.GenerationMetadata(
                         GeneratedCaseFactory.GENERATOR_VERSION,
                         request.seed(),
+                        request.incidentFamily(),
                         request.evidenceMode(),
                         request.noiseLevel()
                 ),

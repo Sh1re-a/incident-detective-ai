@@ -33,6 +33,11 @@ public final class PaymentTimeoutGeneratedCaseGenerator {
 
     public GeneratedCase generate(GeneratedCaseRequest request) {
         Objects.requireNonNull(request, "request must not be null");
+        if (request.incidentFamily() != GeneratedIncidentFamily.PAYMENT_TIMEOUT) {
+            throw new IllegalArgumentException(
+                    "Payment timeout generator requires incident_family payment_timeout"
+            );
+        }
 
         Random random = new Random(request.seed());
         String namespace = "%016x".formatted(random.nextLong());
