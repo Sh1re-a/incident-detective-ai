@@ -30,8 +30,9 @@ public class OpenApiConfiguration {
             Map.ofEntries(
                     Map.entry(
                             "RetrievalCapability",
-                            Set.of("active_embedding_profile")
+                            Set.of("active_embedding_profile", "index_status")
                     ),
+                    Map.entry("KnowledgeDocument", Set.of("effective_until")),
                     Map.entry(
                             "LiveInvestigationResult",
                             Set.of(
@@ -39,6 +40,31 @@ public class OpenApiConfiguration {
                                     "estimated_cost_usd",
                                     "model_cost_breakdown"
                             )
+                    ),
+                    Map.entry(
+                            "AdkAgentTurnResponse",
+                            Set.of(
+                                    "session_id",
+                                    "scenario",
+                                    "diagnosis",
+                                    "verification",
+                                    "comparison",
+                                    "verification_event"
+                            )
+                    ),
+                    Map.entry(
+                            "RuntimeEvent",
+                            Set.of(
+                                    "text",
+                                    "token_usage",
+                                    "provider_model_version"
+                            )
+                    ),
+                    Map.entry("FunctionCallEvent", Set.of("id")),
+                    Map.entry("FunctionResponseEvent", Set.of("id")),
+                    Map.entry(
+                            "ControlReceipt",
+                            Set.of("token_usage", "estimated_cost_usd")
                     ),
                     Map.entry(
                             "ModelCallMetadata",
@@ -117,8 +143,27 @@ public class OpenApiConfiguration {
                                     "provider_input_tokens",
                                     "estimated_list_price_cost_usd"
                             )
+                    ),
+                    Map.entry(
+                            "QueryEmbeddingSnapshot",
+                            Set.of("latency_ms")
+                    ),
+                    Map.entry(
+                            "RankedMatch",
+                            Set.of("similarity")
+                    ),
+                    Map.entry(
+                            "ReplayReceipt",
+                            Set.of(
+                                    "latency_ms",
+                                    "total_tokens",
+                                    "estimated_cost_usd"
+                            )
                     )
             );
+    private static final Map<String, Set<String>> OPTIONAL_PROPERTIES = Map.of(
+            "GeneratedCaseLiveRequest", Set.of("incident_family")
+    );
 
     @Bean
     OpenAPI incidentDetectiveOpenApi() {
@@ -126,9 +171,9 @@ public class OpenApiConfiguration {
                 .title("Incident Detective API")
                 .version("v1")
                 .description(
-                        "Synthetic incident data with two clearly separated modes: "
-                                + "recorded deterministic replay and an explicitly confirmed "
-                                + "live Gemini investigation. Neither mode executes remediation."
+                        "Synthetic incident data with recorded replay, bounded live Gemini, "
+                                + "and an explicitly enabled Google ADK agent turn. Every live "
+                                + "path is read-only and Java-verified; no mode executes remediation."
                 ));
     }
 
@@ -175,7 +220,7 @@ public class OpenApiConfiguration {
 
             enforceNullableProperties(schemas);
             normalizeNullableReferences(schemas);
-            requireEveryDeclaredProperty(schemas);
+            requireEveryDeclaredPropertyExceptDocumentedOptions(schemas);
         };
     }
 
@@ -259,10 +304,10 @@ public class OpenApiConfiguration {
         });
     }
 
-    private static void requireEveryDeclaredProperty(
+    private static void requireEveryDeclaredPropertyExceptDocumentedOptions(
             Map<String, Schema> schemas
     ) {
-        schemas.values().forEach(schema -> {
+        schemas.forEach((schemaName, schema) -> {
             if (schema.getProperties() == null
                     || schema.getProperties().isEmpty()) {
                 return;
@@ -272,6 +317,10 @@ public class OpenApiConfiguration {
                 required.addAll(schema.getRequired());
             }
             required.addAll(schema.getProperties().keySet());
+            required.removeAll(OPTIONAL_PROPERTIES.getOrDefault(
+                    schemaName,
+                    Set.of()
+            ));
             schema.setRequired(List.copyOf(required));
         });
     }

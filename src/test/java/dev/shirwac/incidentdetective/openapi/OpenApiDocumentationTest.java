@@ -9,6 +9,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,6 +35,11 @@ class OpenApiDocumentationTest {
             "$.paths['" + LIVE_PATH + "'].post";
     private static final String PROBLEM_JSON_EXAMPLE =
             ".content['application/problem+json'].example";
+    private static final String DEMO_WORLD_PATH = "/api/v1/demo-world";
+    private static final String KNOWLEDGE_REPLAY_PATH =
+            "/api/v1/knowledge/questions/{questionId}/runs/recorded-replay";
+    private static final String KNOWLEDGE_DOCUMENTS_PATH =
+            "/api/v1/knowledge/documents";
 
     @Autowired
     private MockMvc mockMvc;
@@ -185,7 +191,8 @@ class OpenApiDocumentationTest {
                         "RAG_EMBEDDING_PROVIDER_ERROR",
                         "RAG_EMBEDDING_RESPONSE_INVALID",
                         "RAG_DATABASE_UNAVAILABLE",
-                        "SCENARIO_NOT_FOUND"
+                        "SCENARIO_NOT_FOUND",
+                        "KNOWLEDGE_QUESTION_NOT_FOUND"
                 )))
                 .andExpect(jsonPath(
                         "$.components.schemas.ApiProblemResponse.properties.status.example"
@@ -196,7 +203,16 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.ApiProblemResponse.properties.code.example"
                 ).doesNotExist())
-                .andExpect(jsonPath("$.paths.length()").value(6))
+                .andExpect(jsonPath("$.paths.length()").value(10))
+                .andExpect(jsonPath(
+                        "$.paths['" + DEMO_WORLD_PATH + "'].get.summary"
+                ).value("Get the fictional Nordly demo world"))
+                .andExpect(jsonPath(
+                        "$.paths['" + KNOWLEDGE_REPLAY_PATH + "'].post.summary"
+                ).value("Replay a curated Nordly knowledge answer"))
+                .andExpect(jsonPath(
+                        "$.paths['" + KNOWLEDGE_DOCUMENTS_PATH + "'].get.summary"
+                ).value("Browse the synthetic Nordly knowledge library"))
                 .andExpect(jsonPath(LIVE_POST + ".responses['400']").exists())
                 .andExpect(jsonPath(LIVE_POST + ".responses['404']").exists())
                 .andExpect(jsonPath(LIVE_POST + ".responses['415']").exists())
@@ -285,6 +301,12 @@ class OpenApiDocumentationTest {
                         "$.components.schemas.LiveInvestigationResult.properties.model_cost_breakdown"
                 ).exists())
                 .andExpect(jsonPath(
+                        "$.components.schemas.LiveInvestigationResult"
+                                + ".properties.estimated_cost_usd.description"
+                ).value(containsString(
+                        "Model-generation-only paid Standard list-price estimate"
+                )))
+                .andExpect(jsonPath(
                         "$.components.schemas.ModelCostBreakdown.properties.observed_cache_savings_usd"
                 ).exists())
                 .andExpect(jsonPath(
@@ -306,8 +328,8 @@ class OpenApiDocumentationTest {
                 ).doesNotExist())
                 .andExpect(jsonPath(
                         "$.components.schemas.LiveInvestigationResult"
-                                + ".properties.estimated_cost_basis"
-                ).exists())
+                                + ".properties.estimated_cost_basis.description"
+                ).value(containsString("must not present the estimate as an invoice")))
                 .andExpect(jsonPath(
                         "$.components.schemas.Evidence.discriminator.propertyName"
                 ).value("evidence_type"))

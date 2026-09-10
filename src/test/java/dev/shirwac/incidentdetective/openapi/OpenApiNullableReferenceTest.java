@@ -10,6 +10,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,6 +22,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 class OpenApiNullableReferenceTest {
+
+    private static final Map<String, Set<String>> OPTIONAL_PROPERTIES = Map.of(
+            "GeneratedCaseLiveRequest",
+            Set.of("incident_family")
+    );
 
     @Autowired
     private MockMvc mockMvc;
@@ -97,7 +103,8 @@ class OpenApiNullableReferenceTest {
     }
 
     @Test
-    void marksEverySerializedObjectPropertyAsRequired() throws Exception {
+    void marksEveryNonOptionalSerializedObjectPropertyAsRequired()
+            throws Exception {
         MvcResult result = mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -114,6 +121,10 @@ class OpenApiNullableReferenceTest {
             Set<String> propertyNames = new HashSet<>(
                     properties.propertyNames()
             );
+            propertyNames.removeAll(OPTIONAL_PROPERTIES.getOrDefault(
+                    schemaName,
+                    Set.of()
+            ));
             Set<String> required = new HashSet<>();
             schema.get("required").forEach(
                     node -> required.add(node.asText())
