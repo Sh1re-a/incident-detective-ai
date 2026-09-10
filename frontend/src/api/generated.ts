@@ -480,6 +480,15 @@ export interface AdkRuntimeProvenance {
   streamed: boolean;
 }
 
+export interface AdkWorkflowReceipt {
+  type: "sequential_agent";
+  expected_agent_order: string[];
+  observed_agent_order: string[];
+  evidence_handoff: "adk_function_response";
+  final_response_author: string;
+  completed_in_order: boolean;
+}
+
 export interface AdkFunctionCallEvent {
   id: string | null;
   name: string;
@@ -521,6 +530,10 @@ export interface AdkVerificationEvent {
   schema_valid: boolean;
   citations_valid: boolean;
   factual_result_matches_ground_truth: boolean;
+  agent_sequence_valid: boolean;
+  evidence_handoff_valid: boolean;
+  tool_boundary_valid: boolean;
+  final_author_valid: boolean;
   answer_released: boolean;
   summary: string;
 }
@@ -541,7 +554,7 @@ export interface AdkControlReceipt {
 }
 
 export interface AdkAgentTurnResponse {
-  contract_version: "nordly-adk-turn-v1";
+  contract_version: "nordly-adk-turn-v2";
   run_id: string;
   session_id: string | null;
   turn_id: string;
@@ -551,6 +564,7 @@ export interface AdkAgentTurnResponse {
   scenario: Scenario | null;
   safety: AdkSafetyDecision;
   runtime: AdkRuntimeProvenance;
+  workflow: AdkWorkflowReceipt | null;
   events: AdkRuntimeEvent[];
   tool_events: LiveToolEvent[];
   diagnosis: Diagnosis | null;
