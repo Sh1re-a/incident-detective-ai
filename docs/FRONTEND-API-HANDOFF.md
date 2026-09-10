@@ -72,12 +72,12 @@ sker inom samma synkrona request. Fallet är request-lokalt och persisteras inte
 
 1. Hämta `capabilities`, `demo-world`, `scenarios` och den read-only
    retrieval-proof som frontenden visar parallellt när appen startar.
-2. Kräv `contract_version = capabilities-v3` för den här integrationen och
+2. Kräv `contract_version = capabilities-v4` för den här integrationen och
    bygg generatorns val från `generated_cases`, inte från egna konstanter.
 3. Visa fri Nordly-fråga som primärt läge när
    `capabilities.retrieval.active_profiles` innehåller `rag`; visa annars
    recorded replay som stabilt standardläge och erbjud inte en död live-route.
-4. Visa live-kontrollen utifrån `live_ai.request_configured`, men låt alltid
+4. Visa live-kontrollen utifrån `live_ai.request_routing_configured`, men låt alltid
    serverns svar vara auktoritativt eftersom providerhälsa kan ändras efter
    laddningen.
 5. Behandla retrieval-proof som kompletterande historiskt bevis: ett fel där
@@ -96,6 +96,13 @@ De befintliga fälten utan språksuffix är svenska kompatibilitetsfält. Använ
 engelska vyn. `POST .../runs/rag` returnerar också `truth_label_en`. Vid ett
 blockerat anrop är `question.text` redan maskerad på requestens `locale`
 (`sv` eller `en`); frontend ska aldrig försöka återskapa den inskickade frågan.
+
+Dokumentbiblioteket använder `nordly-knowledge-document-library-v2`.
+`manifest_version` och `corpus_content_sha256` identifierar exakt den
+godkända korpus som får bäddas in. Varje godkänd, publik chunk har
+`content_sha256`; restricted, deprecated och untrusted material har både
+`text = null` och `content_sha256 = null`. UI:t kan därför visa att ett
+dokument finns och varför det är exkluderat utan att lämna ut dess body.
 
 ```http
 POST /api/v1/knowledge/questions/{questionId}/runs/recorded-replay
@@ -141,8 +148,15 @@ Routen finns endast när Spring-profilen `rag` är aktiv. Tillåtna utfall är
 - En komplett körning gör högst ett query-embedding-anrop och ett
   Gemini-svarsanrop. Inga tools eller skrivfunktioner exponeras för modellen.
 - Endast dokument med `lifecycle = APPROVED` och access scope `public_demo`
-  finns i Nordly-indexet. Current-run-responsen rapporterar 10 möjliga dokument
-  och 18 textstycken för den versionshanterade V1-korpusen.
+  finns i Nordly-indexet. Current-run-responsen rapporterar 13 möjliga dokument
+  och 27 textstycken för den versionshanterade V2-korpusen.
+- Kontraktet `nordly-knowledge-rag-v2` returnerar
+  `retrieval.corpus_content_sha256`, ett nullable `index_snapshot` och
+  `content_sha256` för varje faktisk träff. Saknat indexsnapshot betyder att
+  readiness inte lästes i körningen; det får inte visas som ett redo index.
+- `provider_route` finns bara när minst ett provideranrop registrerades. Den
+  visar transport, auth-läge och eventuell Vertex-location, men aldrig
+  project-id eller credentials. Nollanrop ger `provider_route = null`.
 - `phases[]` är efterhandskvitton över observerat systemarbete, aldrig dold
   tankekedja eller simulerad streaming.
 - `ranked_matches[].similarity` är rå cosine-likhet och får inte presenteras som
@@ -156,10 +170,12 @@ Routen finns endast när Spring-profilen `rag` är aktiv. Tillåtna utfall är
 - Frontend ska uttryckligen varna att endast syntetiska frågor får skrivas och
   att demoskyddet inte är ett komplett DLP-system.
 
-`live_ai.enabled_by_configuration` och `live_ai.credentials_configured` visar
-de två lokala förutsättningarna separat. `live_ai.request_configured = true`
-betyder att båda är uppfyllda. Inget av fälten garanterar att providern är
-nåbar eller frisk just nu.
+`live_ai.enabled_by_configuration` och
+`provider.routing_configuration_complete` visar de två lokala
+routingförutsättningarna separat. `live_ai.request_routing_configured = true`
+betyder att båda är uppfyllda. `provider.credential_status = not_checked` för
+Vertex eftersom capability-endpointen medvetet inte laddar eller validerar ADC.
+Inget av fälten garanterar lyckad autentisering eller att providern är nåbar.
 
 ## Kontrollerat ADK-flöde
 
@@ -178,7 +194,7 @@ Content-Type: application/json
 ```
 
 Endpointen använder Google ADK for Java och kontrakt
-`nordly-adk-turn-v2`. Java kör säkerhetsgrinden före livebudget, ADK Runner,
+`nordly-adk-turn-v3`. Java kör säkerhetsgrinden före livebudget, ADK Runner,
 Gemini, tools och embeddings. En tillåten och bekräftad request skapar en
 request-lokal in-memory-session och kör ett `SequentialAgent` i denna fasta
 ordning:
@@ -200,7 +216,7 @@ evidensöverlämning, tool-fri diagnosagent, rätt slutlig författare samt godk
 schema, citationer och faktastöd. Annars är utfallet `verification_failed` och
 `diagnosis` hålls inne.
 
-### Workflow- och kontrollkvitto i v2
+### Workflow- och kontrollkvitto i v3
 
 - `workflow.type = sequential_agent`.
 - `workflow.expected_agent_order` kommer från backendens konfiguration.
@@ -214,6 +230,8 @@ schema, citationer och faktastöd. Annars är utfallet `verification_failed` och
 - `receipt` redovisar modellanrop, ADK-tool-anrop, underliggande read-only-
   operationer, embeddings, registrerade tools, tokens, listprisestimat och
   latency. `write_tools_available` och `action_executed` ska vara `false`.
+- `provider_route` finns bara när minst ett modell- eller embeddinganrop
+  faktiskt registrerades. Blockerat före AI ger `null`.
 
 `events[]` är sanerade, backendregistrerade post-run-events. Frontend får visa
 författare, tool call, `FunctionResponse`, tokenmetadata och ordning, men inte
@@ -242,14 +260,20 @@ stället `400 LIVE_AI_CONFIRMATION_REQUIRED` före quota och provider.
 
 Viktiga fält:
 
-- `contract_version = capabilities-v3`: capability-kontraktet som innehåller
+- `contract_version = capabilities-v4`: capability-kontraktet som innehåller
   stöd för Generated Synthetic Case och aktuell vector-index-readiness.
 - `synthetic_only`: är alltid `true` i den här demon.
 - `remediation_enabled`: är alltid `false`.
+- `provider`: vald Google Gen AI-transport, auth-läge, eventuell location,
+  routingstatus och en explicit credential-status. Det är inte ett health check.
+- `deployment`: `local` eller `cloud_run` samt nullable revision och injicerad
+  build-SHA. Frontend får inte fylla nullvärden med antaganden.
+- `knowledge_corpus`: manifestversion, corpusversion, deterministisk hash och
+  antal godkända dokument/chunks.
 - `modes`: truth label, model-backed-status och bekräftelsekrav per körläge.
 - `tools`: de typade funktioner som finns; alla är read-only.
-- `live_ai`: separat serveraktivering, credential-status, lokal
-  request-konfiguration, aktiv modell/prompt, thinking level och backendens
+- `live_ai`: separat serveraktivering, lokal request-routing, aktiv
+  modell/prompt, thinking level och backendens
   hårda call-/tidsbudgeter.
 - `generated_cases`: generatorns kontraktsversion, version, truth label,
   tillåtna controls och data-/persistensgräns.
@@ -259,7 +283,7 @@ Viktiga fält:
 Visa inte egna hårdkodade budgetar eller modellnamn när samma värde finns här.
 Endpointen returnerar aldrig API-nyckeln.
 
-### Exakt `generated_cases`-capability i `capabilities-v3`
+### Exakt `generated_cases`-capability i `capabilities-v4`
 
 ```json
 {
@@ -287,8 +311,9 @@ Endpointen returnerar aldrig API-nyckeln.
 ```
 
 Använd `generated_cases.enabled` för att visa funktionen och arrayerna för att
-bygga valen. `live_ai.request_configured = true` betyder bara att backendens
-lokala förutsättningar finns; det garanterar inte providerhälsa. Fältet
+bygga valen. `live_ai.request_routing_configured = true` betyder bara att
+backendens lokala routingförutsättningar finns; det garanterar inte lyckad
+autentisering eller providerhälsa. Fältet
 `live_ai.budget.daily_live_run_limit = 20` visar taket och
 `daily_quota_scope` visar om det är `process_local` eller
 `database_global`. Standardprofilens processlokala räknare återställs vid
@@ -651,7 +676,7 @@ begränsad query-retry om frontendramverket behöver det.
 - Typerna speglar aktuell `/v3/api-docs`; reproducerbar automatisk generering
   återstår att verifiera.
 - Driftläget använder `POST /api/v1/agent/turns` och kräver
-  `contract_version = nordly-adk-turn-v2`.
+  `contract_version = nordly-adk-turn-v3`.
 - Workflow-vyn visar endast `workflow`, `events`, `tool_events`,
   `verification_event` och `receipt` från samma avslutade backendrequest.
 - Ett ADK-svar presenteras bara när `verification_event.answer_released = true`;
@@ -659,7 +684,7 @@ begränsad query-retry om frontendramverket behöver det.
 - Frontend använder endast `POST /api/v1/generated-cases/runs/live-ai` för
   Generated Synthetic Case; den försöker inte skapa, polla, ladda upp eller
   återhämta ett persisterat case.
-- Generatorvalen kommer från `capabilities-v3.generated_cases` och requesten
+- Generatorvalen kommer från `capabilities-v4.generated_cases` och requesten
   skickar endast `seed`, `incident_family`, `evidence_mode`, `noise_level` och
   `confirm_live_ai`.
 - Replay fungerar utan livekonfiguration.

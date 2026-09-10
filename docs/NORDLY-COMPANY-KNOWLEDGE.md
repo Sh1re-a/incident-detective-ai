@@ -93,6 +93,32 @@ tests can prove that every expected source is eligible and every risky prompt
 is blocked, but only an explicitly approved provider run can measure semantic
 retrieval quality.
 
+## What this demonstrates to a reviewer
+
+The demo is designed so the practical AI work can be inspected without reading
+the source code:
+
+- **Embeddings:** an explicit import embeds every eligible document chunk. A
+  confirmed, configured run with a ready index embeds the accepted question
+  with the declared model and dimensionality.
+- **Semantic search:** pgvector ranks meaning, not only exact keywords, and the
+  receipt distinguishes similarity from confidence.
+- **RAG:** only the small set of chunks retrieved in the current run is sent to
+  the answer model; citations must point back to that same set.
+- **Data governance:** lifecycle and access scope decide what may be embedded
+  before vector ranking begins. Restricted, deprecated and untrusted content is
+  excluded from the live index.
+- **Responsible agent design:** Java owns the request gate, tool allowlist,
+  provider budget, schema checks and release decision. The model cannot silently
+  promote its own permissions.
+- **Evaluation:** frozen Swedish and English questions test retrieval, no-match,
+  multi-source answers and blocked requests separately from a polished demo.
+- **Operational proof:** response receipts identify the corpus fingerprint,
+  embedding profile and provider route selected for provider calls registered
+  in that run. A route can therefore describe an attempted call even when the
+  provider fails; unreported usage or cost stays unknown instead of being shown
+  as zero.
+
 ## Safety boundary
 
 The request gate runs before query embedding and model generation. It blocks:

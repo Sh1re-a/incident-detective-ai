@@ -56,10 +56,13 @@ En trygg demoordning är:
 - aktiv embeddingprofil endast när pgvector faktiskt är aktivt,
 - cachepolicy: `provider_implicit`, explicit caching avstängd.
 
-`live_ai.enabled_by_configuration` och `credentials_configured` visar de två
-lokala förutsättningarna separat. `request_configured = true` betyder att båda
-är uppfyllda, men garanterar inte att providern är nåbar eller frisk. Endpointen
-returnerar aldrig en providernyckel.
+`live_ai.enabled_by_configuration` och
+`provider.routing_configuration_complete` visar de två lokala
+routingförutsättningarna separat. `request_routing_configured = true` betyder
+att båda är uppfyllda. `provider.credential_status = not_checked` för Vertex
+eftersom endpointen inte laddar eller validerar ADC. Inget av fälten garanterar
+lyckad autentisering eller att providern är nåbar. Endpointen returnerar aldrig
+en providernyckel.
 
 ## 1. Scenario-listan
 

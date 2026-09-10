@@ -30,15 +30,17 @@ ADK-flödet har två modellsteg och en hård gräns på två modellanrop. `nordl
 | Område | Status | Evidens |
 |---|---|---|
 | Syntetisk datagräns | Verifierat | Scenariofixtures, evidens och runbooks är skapade för projektet; inga riktiga företagsloggar används. |
-| Begränsad agency | Verifierad lokalt i aktuell revision | Google ADK Java `SequentialAgent`, två namngivna barn, två modellanrop som hard cap, ett sammansatt read-only tool hos evidensagenten och noll tools hos diagnosagenten. Providerfria trajectory-tester ingår och backendens fullsvit passerade med 318 tester. |
-| Workflow-kvitto | Implementerat i aktuell arbetsrevision | Kontrakt `nordly-adk-turn-v2` redovisar förväntad/observerad agentordning, direkt ADK `FunctionResponse`-överlämning, slutlig författare och Java-verifieringens separata beslut. |
+| Begränsad agency | Verifierad lokalt i aktuell revision | Google ADK Java `SequentialAgent`, två namngivna barn, två modellanrop som hard cap, ett sammansatt read-only tool hos evidensagenten och noll tools hos diagnosagenten. Providerfria trajectory-tester ingår och backendens fullsvit passerade med 330 tester. |
+| Workflow-kvitto | Implementerat i aktuell arbetsrevision | Kontrakt `nordly-adk-turn-v3` redovisar förväntad/observerad agentordning, direkt ADK `FunctionResponse`-överlämning, slutlig författare, nullable faktisk provider-route och Java-verifieringens separata beslut. |
 | Structured output | Verifierat | Java-validering och deterministisk verifiering hanterar schema, citationer, evidensstöd och facit separat. |
 | Runbook-RAG | Byggt och delvis verifierat | PostgreSQL/pgvector, 10 dokument/12 chunks, Gemini embeddings, hash-readiness och explicit import fungerar lokalt. |
+| Nordly företags-RAG | Struktur och gränser verifierade lokalt | 16 syntetiska dokument/30 chunks; 13 dokument/27 chunks är godkända för publik RAG. Restricted, deprecated och untrusted material filtreras före embedding. Semantisk v2-kvalitet väntar på en separat provider-eval. |
+| Provider- och deployproveniens | Implementerad lokalt, inte molnverifierad | Gemensam Developer API/Vertex-klientgräns, transportseparerat vektorindex samt capabilities/RAG/ADK-kvitton utan project-id eller credentials. Inget Vertex-anrop eller ny deploy har gjorts. |
 | Retrieval-kvalitet | Mätt, förbättring krävs | Development Hit@4 5/5; held-out 4/5; no-match 3/3. Unsafe legacy-runbook var top-1 i det missade held-out-fallet. |
 | Prompt-injection-säkerhet | Inte verifierat | Den osäkra runbooken hämtades rank 1 i adversarial-fallet. Ett separat synthesis-test återstår. |
 | Diagnoskvalitet | Verifierad per körning, inte aggregerad | Schema, citationer, stöd, coverage och correctness returneras per replay/live-run. Full modellaccuracy är inte mätt. |
 | Observability | Avgränsad OpenTelemetry-slice byggd och testad | Liveflödet har sanerade spans för `investigation → collect → tool/retrieval → synthesize → verify`. Lokal standard är no-op och OTLP span-export är separat opt-in. Strukturerade JSON-loggar, collector/dashboard och exporterad end-to-end-trace är inte verifierade. |
-| Deployment | Aktuell revision inte deployad i denna uppgift | Den kombinerade frontend-/backendcontainern är lokalt verifierad. En äldre publik Cloud Run-revision kan finnas, men den bevisar inte att den aktuella Phase 1/2-koden är live. Cloud Run, Vertex AI och publik trafik är separata nästa beslut. |
+| Deployment | Aktuell revision inte deployad i denna uppgift | Den kombinerade frontend-/backendcontainern är lokalt verifierad. En äldre publik Cloud Run-revision kan finnas, men den bevisar inte att den aktuella Phase 3A-koden är live. Cloud Run, Vertex AI och publik trafik är separata nästa beslut. |
 
 ## Riskregister
 

@@ -1,7 +1,7 @@
 # Google Cloud path for Nordly
 
 Status: next-phase implementation plan, 10 September 2026. The current Phase
-1/2 working revision was not deployed in this task. An older public Cloud Run
+3A working revision was not deployed in this task. An older public Cloud Run
 revision may exist, but its URL is not evidence that the current code, ADK
 workflow or data configuration is live.
 
@@ -10,7 +10,9 @@ workflow or data configuration is live.
 - Spring Boot 4.1.1 on Java 21.
 - Google ADK for Java 1.7.0 with a two-child `SequentialAgent`.
 - Google Gen AI Java SDK 1.67.0.
-- Gemini Developer API authentication through a server-side API key.
+- One Google Gen AI client seam. The local default is Gemini Developer API with
+  a server-side API key; `vertex_ai` selects Vertex AI with ADC, project and
+  location configuration.
 - `gemini-embedding-2`, 768 dimensions.
 - PostgreSQL/pgvector exact cosine retrieval.
 - Local PostgreSQL 17 with pgvector through Docker Compose.
@@ -20,10 +22,13 @@ workflow or data configuration is live.
   Boot backend as one non-root image; that combined artifact has been verified
   locally.
 
-The current working revision still uses the Gemini Developer API and local
-PostgreSQL/pgvector. It does not establish Vertex AI, Cloud SQL or managed
-Vector Search readiness, and it has not been matched to any currently running
-Cloud Run revision.
+The current working revision is locally Vertex-ready at the client boundary,
+but its default route remains the Gemini Developer API and its database remains
+local PostgreSQL/pgvector. No Vertex request has been made, ADC reachability has
+not been proved, the corpus has not been re-embedded through Vertex, and the
+revision has not been matched to a currently running Cloud Run revision. It
+therefore does not establish Vertex AI, Cloud SQL or managed Vector Search
+readiness.
 
 ## Target with the smallest architecture change
 
@@ -43,6 +48,9 @@ Google ADK Java runtime stays inside the same process. No Python service or
 Vertex AI Agent Engine migration is part of this phase.
 
 ## Gate 1: provider seam in Java
+
+Local implementation status: implemented and provider-free tested. Cloud and
+provider execution remain pending explicit approval.
 
 Add one server-side provider setting:
 
@@ -78,6 +86,12 @@ Candidate change points:
 
 Provider construction is tested without network calls. A real provider smoke
 remains a separate, explicit and cost-bearing command.
+
+The pgvector identity also includes `provider_transport`. Existing rows are
+classified as `developer_api`; selecting `vertex_ai` therefore reports the
+index as not current until the corpus is explicitly re-embedded through that
+transport. The embedding client rejects a configuration where its selected
+provider and the stored embedding profile disagree.
 
 Changing provider transport, model revision, task semantics, dimensions or
 input formatting marks the current vector index stale. Live RAG stays disabled

@@ -21,7 +21,8 @@ remediation.
 | Function calling | Gemini får välja mellan `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks`. Alla tools är typade, scenarioavgränsade och read-only. |
 | Bounded orchestration | Flödet är `COLLECT → SYNTHESIZE → VERIFY`, med hårda gränser för rundor, tool calls, model calls och tid. Synthesis får inga tools. |
 | Structured output | Diagnosen måste följa ett strikt JSON-schema och valideras som Java-typer. |
-| RAG och embeddings | Endast runbooks bäddas in med Gemini embeddings och lagras i PostgreSQL/pgvector. Metrics, logs och traces hålls bakom typade tools. |
+| RAG och embeddings | Runbooks och Nordlys separat styrda företagskorpus bäddas in med Gemini embeddings och lagras i PostgreSQL/pgvector. Metrics, logs och traces hålls bakom typade tools. Restricted, deprecated och untrusted företagsdokument utesluts före embedding. |
+| Providergräns | Samma Google Gen AI-klientfabrik stödjer Developer API med API-nyckel och Vertex AI med ADC. Providertransport ingår i vektorindexets identitet. |
 | Eval | Varje körning graderas deterministiskt för schema, citationer, evidensstöd, claim coverage och korrekt diagnos. En liten opt-in RAG-eval mäter riktig embedding- och pgvectorretrieval i testspåret. |
 | Observability | Resultatet innehåller latency, model/tool calls, nullable tokenusage, cacheobservation och listprisestimat. Sanerade fel och Micrometer-mått finns. |
 
@@ -47,11 +48,16 @@ Detta är en observerbar evidence chain, inte modellens privata chain-of-thought
 
 ## API
 
-Backend har sex publika paths:
+Backendens publika demo-API omfattar:
 
 | Metod | Path | Syfte |
 |---|---|---|
 | `GET` | `/api/v1/capabilities` | Aktiv modell-, retrieval-, cache- och budgetkonfiguration utan credentials. |
+| `GET` | `/api/v1/demo-world` | Nordlys syntetiska företagsvärld och korpusöversikt. |
+| `GET` | `/api/v1/knowledge/documents` | Read-only dokumentbibliotek med lifecycle, åtkomstbeslut och innehållshashar. |
+| `POST` | `/api/v1/knowledge/questions/runs/rag` | Fri, säkerhetsgrindad fråga genom embeddings, pgvector, avgränsad kontext och Java-verifiering. |
+| `POST` | `/api/v1/knowledge/questions/{questionId}/runs/recorded-replay` | Providerfri kunskapsreplay. |
+| `POST` | `/api/v1/agent/turns` | Kontrollerat tvåagentsflöde med Google ADK och post-run-kvitto. |
 | `GET` | `/api/v1/scenarios` | Säkra scenariosammanfattningar utan facit eller evidensinventarium. |
 | `POST` | `/api/v1/scenarios/{scenarioId}/runs/recorded-replay` | Stabil providerfri referenskörning. |
 | `POST` | `/api/v1/scenarios/{scenarioId}/runs/live-ai` | Explicit bekräftad Gemini-utredning. |
@@ -92,6 +98,7 @@ Starta lokal pgvector och importera den versionshanterade korpusen explicit:
 ```bash
 docker compose up -d
 ./mvnw -q spring-boot:run -Dspring-boot.run.arguments=--import-runbooks
+./mvnw -q spring-boot:run -Dspring-boot.run.arguments=--import-nordly-knowledge
 ```
 
 Starta sedan backend med RAG och uttryckligen aktiverad live-AI:
@@ -124,11 +131,15 @@ Hit@4, med 3/3 no-match. Det missade held-out-fallet är kvar som failure case.
 Det bevisar retrieval på en liten syntetisk korpus — inte storskalig vector
 search eller full systemsäkerhet.
 
-## Live Gemini
+## Live Google Gen AI
 
-Live kräver en ignorerad lokal Gemini-nyckel, serverflaggan
-`INCIDENT_DETECTIVE_LIVE_AI_ENABLED=true` och `confirm_live_ai: true` i varje
-request. Ett livefel ersätts aldrig tyst av replay.
+Developer API är standard och kräver en ignorerad lokal Gemini-nyckel. Vertex
+AI väljs med `GOOGLE_GENAI_PROVIDER=vertex_ai` och kräver
+`GOOGLE_CLOUD_PROJECT` samt fungerande ADC. `GOOGLE_CLOUD_LOCATION` kan
+åsidosätta standardvärdet `global`. Båda vägarna kräver serverflaggan
+`INCIDENT_DETECTIVE_LIVE_AI_ENABLED=true` och
+`confirm_live_ai: true` i varje request. Ett livefel ersätts aldrig tyst av
+replay. Lokal konfiguration bevisar inte provider-reachability.
 
 Det separata opt-in-smoketestet kör en verklig utredning:
 

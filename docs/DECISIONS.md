@@ -67,13 +67,26 @@ Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. D
 
 ## DEC-007 – En leverantör, function calling och structured output
 
-**Status:** Accepted for the current slice, updated 26 augusti 2026
+**Status:** Accepted for the current slice, updated 10 september 2026
 
-Det aktuella liveflödet använder Gemini Developer API genom den officiella Java SDK:n, pinnad till `google-genai` 1.67.0. Standardprofilen är `gemini-3.1-flash-lite` med `MINIMAL` thinking och kontraktet `gemini-live-v6`. Endast en modellleverantör används i kärnan.
+Det aktuella liveflödet använder Googles officiella Java SDK, pinnad till
+`google-genai` 1.67.0. Gemini Developer API är lokal standard, medan samma
+klientgräns kan välja Vertex AI med ADC, project och location. Standardprofilen
+är `gemini-3.1-flash-lite` med `MINIMAL` thinking och kontraktet
+`gemini-live-v6`. Endast Google Gen AI används som modellleverantör i kärnan.
 
 **Varför:** Meritvärdet ligger i arkitektur, evals och omdöme, inte i leverantörens namn. Gratis lokal utveckling minskar startkostnaden utan att låtsas att den publika demon blir kostnadsfri.
 
-**Konsekvens:** Modellanrop isoleras bakom en liten intern gateway, men inget multi-provider-lager eller modellval byggs i gränssnittet. `COLLECT` använder custom function tools, `SYNTHESIZE` görs separat utan tools med ett strikt schema och `VERIFY` är deterministisk Java-kod. v6 behåller v5:s direkta evidenskrav och filtrerar tool-deklarationerna efter återstående serverbudget. Två v6-försök med `gemini-3.5-flash-lite` nådde timeout; två efterföljande RAG-smokes med standardprofilen slutfördes korrekt på 6 057 respektive 5 505 ms. Det är ett motiverat utvecklingsval, inte ett stabilitets- eller accuracybevis; evalsen får avgöra om profilen behålls.
+**Konsekvens:** Modell- och embeddinganrop går genom samma providerfabrik, men
+inget generellt multi-provider-lager eller modellval byggs i gränssnittet.
+Providerkonstruktionen är testad utan nätverksanrop; Vertex-reachability är inte
+verifierad. `COLLECT` använder custom function tools, `SYNTHESIZE` görs separat
+utan tools med ett strikt schema och `VERIFY` är deterministisk Java-kod. v6
+behåller v5:s direkta evidenskrav och filtrerar tool-deklarationerna efter
+återstående serverbudget. Två v6-försök med `gemini-3.5-flash-lite` nådde
+timeout; två efterföljande RAG-smokes med standardprofilen slutfördes korrekt på
+6 057 respektive 5 505 ms. Det är ett motiverat utvecklingsval, inte ett
+stabilitets- eller accuracybevis; evalsen får avgöra om profilen behålls.
 
 ## DEC-008 – RAG endast för runbooks
 
@@ -85,7 +98,12 @@ PostgreSQL/pgvector används för en fristående korpus med 10 ostrukturerade ru
 
 **Konsekvens:** Import är ett explicit och idempotent kommando; vanlig uppstart gör inga embedding-anrop. RAG-profilen vägrar retrieval om antal eller innehållshash inte matchar aktuell korpus och faller aldrig tyst tillbaka till keyword matching. Runbookresultat visar dokument-, chunk- och versionsmetadata samt rank, similarity, embeddingmodell, innehållshash, korpusversion och retrieval-backend. Tröskeln kalibreras endast på development. Retrieval v1 gav 5/5 development och 4/5 held-out Hit@4, medan tre no-match-fall gav 3/3. Den missade held-out-frågan och unsafe top-1 behålls som öppet kvalitetsproblem.
 
-`capabilities-v3` rapporterar nu samma readinesskontroll som aktuell backendstatus: korpusversion samt indexed/current/expected chunks. Det bevisar att indexet är redo, men aldrig att en enskild AI-körning använde RAG; det senare kräver ett faktiskt `retrieve_runbooks`-event.
+`capabilities-v4` rapporterar samma readinesskontroll som aktuell backendstatus:
+korpusversion samt indexed/current/expected chunks. Embeddingprofilens identitet
+inkluderar även providertransport, så Developer API-vektorer inte kan behandlas
+som aktuella Vertex-vektorer. Readiness bevisar att indexet är redo, men aldrig
+att en enskild AI-körning använde RAG; det senare kräver ett faktiskt
+`retrieve_runbooks`-event.
 
 ## DEC-009 – Fyra separata verifieringsdimensioner
 
@@ -146,7 +164,7 @@ Slutcontainern ska deployas till Cloud Run. Hemligheter finns endast på servers
 
 **Varför:** Projektet ska bevisa verklig driftsättning utan att CI/CD blir det första problemet.
 
-**Konsekvens:** Den kombinerade frontend-/backendcontainern verifieras lokalt först. Den aktuella Phase 1/2-revisionen deployas inte i denna uppgift. En eventuell äldre publik Cloud Run-revision är separat evidens och får inte användas som bevis för att aktuell kod är live. Cloud-resurser, Vertex AI, ny revision och publik trafik kräver separata uttryckliga beslut.
+**Konsekvens:** Den kombinerade frontend-/backendcontainern verifieras lokalt först. Den aktuella Phase 3A-revisionen deployas inte i denna uppgift. En eventuell äldre publik Cloud Run-revision är separat evidens och får inte användas som bevis för att aktuell kod är live. Cloud-resurser, Vertex AI, ny revision och publik trafik kräver separata uttryckliga beslut.
 
 ## DEC-014 – Publikt portfolio-repo utan licens
 
@@ -206,4 +224,25 @@ ADK-endpointen använder ett `SequentialAgent` med exakt två barn i fast ordnin
 
 **Varför:** Separationen visar ett verkligt multi-agentmönster utan att skapa fri agency. Evidensinsamling och formulering får olika behörigheter, samtidigt som ordning, kostnad och failure modes förblir begripliga.
 
-**Konsekvens:** `nordly-adk-turn-v2` returnerar ett workflow-kvitto med förväntad och observerad agentordning, handofftyp, slutlig författare och completionstatus. Deterministisk Java-kod är enda release gate och kontrollerar ordning, direkt evidensöverlämning, tool-gräns, slutlig författare, exakt två modellanrop, schema, citationer och faktastöd. Ett underkänt villkor ger `verification_failed` och diagnosen hålls inne. Ingen agent kan skriva, genomföra remediation eller visa privat chain-of-thought. En säkerhetsblockerad request stoppar före ADK, Gemini, tools och embeddings och returnerar noll i kontrollkvittot.
+**Konsekvens:** `nordly-adk-turn-v3` returnerar ett workflow-kvitto med förväntad och observerad agentordning, handofftyp, slutlig författare och completionstatus. En nullable `provider_route` finns bara när körningen registrerade minst ett modell- eller embeddinganrop. Deterministisk Java-kod är enda release gate och kontrollerar ordning, direkt evidensöverlämning, tool-gräns, slutlig författare, exakt två modellanrop, schema, citationer och faktastöd. Ett underkänt villkor ger `verification_failed` och diagnosen hålls inne. Ingen agent kan skriva, genomföra remediation eller visa privat chain-of-thought. En säkerhetsblockerad request stoppar före ADK, Gemini, tools och embeddings och returnerar noll i kontrollkvittot.
+
+## DEC-020 – En versionsstyrd Nordly-företagskorpus med exkludering före embedding
+
+**Status:** Accepted and implemented locally, 10 september 2026
+
+Nordly Commerce AB använder en syntetisk företagskorpus med 16
+dokumentposter och 30 chunks. Exakt 13 `APPROVED + public_demo`-dokument med
+27 chunks får bäddas in. Ett godkänt men restricted löneregister, en deprecated
+policy och en untrusted prompt-injection-fixture syns endast som metadata och
+utesluts före embedding, rankning och modellkontext.
+
+**Varför:** Demon ska visa både användbar företagskunskap och verklig
+informationsstyrning. Ett filter efter modellen vore för sent och ett separat
+dokumenthanteringssystem skulle vara onödig komplexitet i denna fas.
+
+**Konsekvens:** JSON-manifestet är canonical runtime source. Dokumentbiblioteket
+returnerar body och chunkhash endast för tillåtet material. RAG-kvitton binder
+varje körning till deterministisk korpushash, indexsnapshot och hash per träff.
+Den frysta v2-evalen innehåller svenska/engelska, held-out, multi-source,
+no-match och input-gate-fall, men semantic retrieval-kvalitet för v2 står kvar
+som `PENDING_PROVIDER_RUN` tills en separat betald körning godkänns.
