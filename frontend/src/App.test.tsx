@@ -5,6 +5,9 @@ import App from "./App";
 import type { DemoWorldResponse, KnowledgeRagResponse } from "./api/generated";
 
 const salaryQuestion = "Kan jag få reda på vad någon på Nordly har i lön?";
+const corpusSha256 =
+  "9ba9e0aeac7d6c090e3a6f6be9779f1734dce56febd032ee50616ec6af72e30a";
+const chunkSha256 = "b".repeat(64);
 
 const demoWorld: DemoWorldResponse = {
   contract_version: "nordly-demo-world-v1",
@@ -41,22 +44,23 @@ const demoWorld: DemoWorldResponse = {
   ],
   featured_scenario_id: "checkout-orders-at-risk-v1",
   corpus: {
-    version: "nordly-knowledge-corpus-v1",
-    document_count: 12,
-    chunk_count: 20,
-    approved_documents: 10,
+    version: "nordly-knowledge-corpus-v2",
+    document_count: 16,
+    chunk_count: 30,
+    approved_documents: 14,
     deprecated_documents: 1,
     untrusted_documents: 1,
   },
 };
 
 const blockedResponse: KnowledgeRagResponse = {
-  contract_version: "nordly-knowledge-rag-v1",
+  contract_version: "nordly-knowledge-rag-v2",
   run_id: "rag-run-test-1",
   mode: "live_rag",
   truth_label: "FIKTIV DATA · VERKLIG BACKEND",
   truth_label_en: "FICTIONAL DATA · REAL BACKEND",
   outcome: "refused",
+  provider_route: null,
   question: { text: "[MASKERAD]", locale: "sv", redacted: true },
   safety: {
     decision: "BLOCK",
@@ -77,11 +81,13 @@ const blockedResponse: KnowledgeRagResponse = {
   ],
   retrieval: {
     backend: "pgvector_exact_cosine",
-    corpus_version: "nordly-knowledge-corpus-v1",
+    corpus_version: "nordly-knowledge-corpus-v2",
+    corpus_content_sha256: corpusSha256,
+    index_snapshot: null,
     required_lifecycle: "APPROVED",
     required_access_scope: "public_demo",
-    eligible_document_count: 10,
-    eligible_chunk_count: 18,
+    eligible_document_count: 13,
+    eligible_chunk_count: 27,
     current_vector_search: false,
     top_k: 4,
     minimum_similarity: 0.7,
@@ -155,12 +161,17 @@ const confirmationResponse: KnowledgeRagResponse = {
 };
 
 const answeredResponse: KnowledgeRagResponse = {
-  contract_version: "nordly-knowledge-rag-v1",
+  contract_version: "nordly-knowledge-rag-v2",
   run_id: "nordly-rag-live-test-1",
   mode: "live_rag",
   truth_label: "FIKTIV DATA · VERKLIG BACKEND",
   truth_label_en: "FICTIONAL DATA · REAL BACKEND",
   outcome: "answered",
+  provider_route: {
+    transport: "developer_api",
+    authentication_mode: "api_key",
+    location: null,
+  },
   question: { text: safeQuestion, locale: "sv", redacted: false },
   safety: {
     decision: "ALLOW",
@@ -179,11 +190,19 @@ const answeredResponse: KnowledgeRagResponse = {
   ],
   retrieval: {
     backend: "pgvector_exact_cosine",
-    corpus_version: "nordly-knowledge-corpus-v1",
+    corpus_version: "nordly-knowledge-corpus-v2",
+    corpus_content_sha256: corpusSha256,
+    index_snapshot: {
+      status: "ready",
+      ready: true,
+      indexed_chunks: 27,
+      current_chunks: 27,
+      expected_chunks: 27,
+    },
     required_lifecycle: "APPROVED",
     required_access_scope: "public_demo",
-    eligible_document_count: 10,
-    eligible_chunk_count: 18,
+    eligible_document_count: 13,
+    eligible_chunk_count: 27,
     current_vector_search: true,
     top_k: 3,
     minimum_similarity: 0.68,
@@ -210,6 +229,7 @@ const answeredResponse: KnowledgeRagResponse = {
         owner_team: "Customer Operations",
         source_ref: "nordly://knowledge/kb-returns-refunds/2.0#refund-timing-card",
         evidence_id: "nordly-evidence-refund-timing-card",
+        content_sha256: chunkSha256,
         display_summary_sv: "Godkända kortåterbetalningar syns normalt inom två till fem bankdagar.",
         display_summary_en: "Approved card refunds normally appear within two to five banking days.",
         text: "Approved card refunds are sent to the payment provider the same business day. The bank normally displays the amount within two to five banking days.",

@@ -52,8 +52,7 @@ export interface LiveBudgetCapability {
 
 export interface LiveAiCapability {
   enabled_by_configuration: boolean;
-  credentials_configured: boolean;
-  request_configured: boolean;
+  request_routing_configured: boolean;
   explicit_confirmation_required: boolean;
   model_id: string;
   thinking_level: "MINIMAL" | "LOW" | "MEDIUM" | "HIGH";
@@ -75,10 +74,33 @@ export interface GeneratedCasesCapability {
 }
 
 export interface EmbeddingCapability {
+  provider_transport: "developer_api" | "vertex_ai";
   model_id: string;
   dimensions: number;
   format_version: string;
   minimum_similarity: number;
+}
+
+export interface ProviderCapability {
+  transport: "developer_api" | "vertex_ai";
+  authentication_mode: "api_key" | "adc";
+  location: string | null;
+  routing_configuration_complete: boolean;
+  credential_status: "configured" | "missing" | "not_checked";
+}
+
+export interface DeploymentCapability {
+  platform: "local" | "cloud_run";
+  revision: string | null;
+  build_git_sha: string | null;
+}
+
+export interface KnowledgeCorpusCapability {
+  manifest_version: string;
+  corpus_version: string;
+  corpus_content_sha256: string;
+  eligible_document_count: number;
+  eligible_chunk_count: number;
 }
 
 export interface VectorIndexCapability {
@@ -106,9 +128,12 @@ export interface PromptCacheCapability {
 }
 
 export interface CapabilitiesResponse {
-  contract_version: "capabilities-v3";
+  contract_version: "capabilities-v4";
   synthetic_only: boolean;
   remediation_enabled: boolean;
+  provider: ProviderCapability;
+  deployment: DeploymentCapability;
+  knowledge_corpus: KnowledgeCorpusCapability;
   modes: ModeCapability[];
   tools: ToolCapability[];
   live_ai: LiveAiCapability;
@@ -554,13 +579,14 @@ export interface AdkControlReceipt {
 }
 
 export interface AdkAgentTurnResponse {
-  contract_version: "nordly-adk-turn-v2";
+  contract_version: "nordly-adk-turn-v3";
   run_id: string;
   session_id: string | null;
   turn_id: string;
   mode: "adk_live_ai";
   truth_label: string;
   outcome: AdkAgentOutcome;
+  provider_route: GoogleGenAiProviderRoute | null;
   scenario: Scenario | null;
   safety: AdkSafetyDecision;
   runtime: AdkRuntimeProvenance;
@@ -777,6 +803,10 @@ export interface KnowledgeRankedMatch {
   text: string;
 }
 
+export interface KnowledgeRagRankedMatch extends KnowledgeRankedMatch {
+  content_sha256: string;
+}
+
 export interface KnowledgeRetrieval {
   backend: string;
   corpus_version: string;
@@ -894,27 +924,38 @@ export interface KnowledgeDocumentLibraryChunk {
   evidence_id: string;
   display_summary_sv: string;
   display_summary_en: string;
-  text: string;
+  text: string | null;
+  content_sha256: string | null;
 }
 
 export interface KnowledgeDocumentLibraryDocument {
   id: string;
   version: string;
+  display_filename: string;
+  document_type: string;
+  classification: string;
   title: string;
+  title_sv: string;
+  summary_sv: string;
+  summary_en: string;
   owner_team: string;
   lifecycle: string;
   effective_from: string;
   effective_until: string | null;
   access_scopes: string[];
+  related_document_ids: string[];
   rag_eligibility: KnowledgeDocumentLibraryEligibility;
+  content_visible: boolean;
   chunks: KnowledgeDocumentLibraryChunk[];
 }
 
 export interface KnowledgeDocumentLibraryResponse {
-  contract_version: "nordly-knowledge-document-library-v1";
+  contract_version: "nordly-knowledge-document-library-v2";
   mode: "read_only_corpus";
   truth_label: string;
+  manifest_version: string;
   corpus_version: string;
+  corpus_content_sha256: string;
   synthetic_only: boolean;
   current_vector_search: false;
   document_count: number;
@@ -967,9 +1008,25 @@ export interface KnowledgeRagQueryEmbedding {
   provider_input_tokens: number | null;
 }
 
+export interface GoogleGenAiProviderRoute {
+  transport: "developer_api" | "vertex_ai";
+  authentication_mode: "api_key" | "adc";
+  location: string | null;
+}
+
+export interface KnowledgeRagIndexSnapshot {
+  status: "ready" | "not_ready";
+  ready: boolean;
+  indexed_chunks: number;
+  current_chunks: number;
+  expected_chunks: number;
+}
+
 export interface KnowledgeRagRetrieval {
   backend: "pgvector_exact_cosine";
   corpus_version: string;
+  corpus_content_sha256: string;
+  index_snapshot: KnowledgeRagIndexSnapshot | null;
   required_lifecycle: "APPROVED";
   required_access_scope: "public_demo";
   eligible_document_count: number;
@@ -978,7 +1035,7 @@ export interface KnowledgeRagRetrieval {
   top_k: number;
   minimum_similarity: number;
   query_embedding: KnowledgeRagQueryEmbedding;
-  ranked_matches: KnowledgeRankedMatch[];
+  ranked_matches: KnowledgeRagRankedMatch[];
 }
 
 export interface KnowledgeRagVerification {
@@ -1013,12 +1070,13 @@ export interface KnowledgeRagError {
 }
 
 export interface KnowledgeRagResponse {
-  contract_version: "nordly-knowledge-rag-v1";
+  contract_version: "nordly-knowledge-rag-v2";
   run_id: string;
   mode: "live_rag";
   truth_label: string;
   truth_label_en: string;
   outcome: KnowledgeRagOutcome;
+  provider_route: GoogleGenAiProviderRoute | null;
   question: KnowledgeRagQuestion;
   safety: KnowledgeSafetyResult;
   phases: KnowledgeRagPhase[];

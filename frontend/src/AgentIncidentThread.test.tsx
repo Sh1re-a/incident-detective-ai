@@ -8,13 +8,18 @@ const scenarioId = "generated-catalog-cache-42";
 const citedLogId = "log-config-change";
 
 const completedResponse = {
-  contract_version: "nordly-adk-turn-v2",
+  contract_version: "nordly-adk-turn-v3",
   run_id: "adk-run-42",
   session_id: "session-42",
   turn_id: "turn-42",
   mode: "adk_live_ai",
   truth_label: "Generated synthetic incident — real Google ADK investigation.",
   outcome: "completed",
+  provider_route: {
+    transport: "developer_api",
+    authentication_mode: "api_key",
+    location: null,
+  },
   scenario: {
     scenario_id: scenarioId,
     title: "Generated storefront shows stale product information",
@@ -328,6 +333,7 @@ const blockedResponse = {
   run_id: "blocked-run-1",
   session_id: null,
   outcome: "blocked_before_ai",
+  provider_route: null,
   scenario: null,
   safety: {
     decision: "blocked",
