@@ -33,6 +33,8 @@ public record AdkAgentTurnResponse(
         Scenario scenario,
         SafetyDecision safety,
         RuntimeProvenance runtime,
+        @Schema(nullable = true)
+        WorkflowReceipt workflow,
         List<RuntimeEvent> events,
         List<LiveToolEvent> toolEvents,
         @Schema(nullable = true)
@@ -46,7 +48,7 @@ public record AdkAgentTurnResponse(
         ControlReceipt receipt,
         List<String> limitations
 ) {
-    public static final String CONTRACT_VERSION = "nordly-adk-turn-v1";
+    public static final String CONTRACT_VERSION = "nordly-adk-turn-v2";
     public static final String MODE = "adk_live_ai";
     public static final String TRUTH_LABEL =
             "Generated synthetic incident — real Google ADK investigation.";
@@ -77,6 +79,31 @@ public record AdkAgentTurnResponse(
             boolean runnerInvoked,
             boolean streamed
     ) {
+    }
+
+    /**
+     * Backend-observed receipt for the bounded ADK workflow.
+     *
+     * <p>The expected order is runtime configuration. The observed order,
+     * handoff, final author, and completion verdict are derived from the ADK
+     * event trajectory after the run.</p>
+     */
+    public record WorkflowReceipt(
+            String type,
+            List<String> expectedAgentOrder,
+            List<String> observedAgentOrder,
+            String evidenceHandoff,
+            String finalResponseAuthor,
+            boolean completedInOrder
+    ) {
+        public WorkflowReceipt {
+            expectedAgentOrder = expectedAgentOrder == null
+                    ? List.of()
+                    : List.copyOf(expectedAgentOrder);
+            observedAgentOrder = observedAgentOrder == null
+                    ? List.of()
+                    : List.copyOf(observedAgentOrder);
+        }
     }
 
     public record RuntimeEvent(
@@ -135,6 +162,10 @@ public record AdkAgentTurnResponse(
             boolean schemaValid,
             boolean citationsValid,
             boolean factualResultMatchesGroundTruth,
+            boolean agentSequenceValid,
+            boolean evidenceHandoffValid,
+            boolean toolBoundaryValid,
+            boolean finalAuthorValid,
             boolean answerReleased,
             String summary
     ) {

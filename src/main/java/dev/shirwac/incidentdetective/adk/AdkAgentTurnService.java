@@ -4,6 +4,7 @@ import dev.shirwac.incidentdetective.adk.AdkAgentTurnResponse.ControlReceipt;
 import dev.shirwac.incidentdetective.adk.AdkAgentTurnResponse.RuntimeProvenance;
 import dev.shirwac.incidentdetective.adk.AdkAgentTurnResponse.SafetyDecision;
 import dev.shirwac.incidentdetective.adk.AdkAgentTurnResponse.VerificationEvent;
+import dev.shirwac.incidentdetective.adk.AdkAgentTurnResponse.WorkflowReceipt;
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
 import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.GeminiDiagnosisDecoder;
@@ -47,7 +48,7 @@ public final class AdkAgentTurnService {
     private static final Logger LOG = LoggerFactory.getLogger(
             AdkAgentTurnService.class
     );
-    private static final String ADK_PROMPT_VERSION = "nordly-adk-incident-v1";
+    private static final String ADK_PROMPT_VERSION = "nordly-adk-sequential-v2";
     private static final String DELIVERY = "synchronous_post_run";
 
     private final AdkProperties adk;
@@ -130,6 +131,8 @@ public final class AdkAgentTurnService {
             throw translateAdkFailure(exception);
         }
 
+        AdkAgentRuntime.TrajectoryValidation trajectory =
+                runtime.validateTrajectory(run.events());
         String finalText = jsonEnvelope(runtime.finalText(run.events()));
         Diagnosis candidate;
         try {
@@ -156,7 +159,14 @@ public final class AdkAgentTurnService {
                 candidate,
                 seenEvidenceIds
         );
-        boolean answerReleased = run.toolInvocationCount() == 1
+        boolean answerReleased = trajectory.completedInOrder()
+                && trajectory.agentSequenceValid()
+                && trajectory.evidenceHandoffValid()
+                && trajectory.toolBoundaryValid()
+                && trajectory.finalAuthorValid()
+                && trajectory.transferBoundaryValid()
+                && run.modelCallCount() == 2
+                && run.toolInvocationCount() == 1
                 && !run.toolExecutions().isEmpty()
                 && checked.report().hardErrors().isEmpty()
                 && everyCitationDirectlySupported(checked)
@@ -188,12 +198,18 @@ public final class AdkAgentTurnService {
                 generated.scenario(),
                 safety(safety),
                 runtimeProvenance(true),
+                workflowReceipt(trajectory),
                 runtime.projectEvents(run.events(), false),
                 toolEvents,
                 answerReleased ? candidate : null,
                 checked.report(),
                 checked.comparison(),
-                verificationEvent(checked, completedAt, answerReleased),
+                verificationEvent(
+                        checked,
+                        trajectory,
+                        completedAt,
+                        answerReleased
+                ),
                 new ControlReceipt(
                         run.modelCallCount(),
                         run.toolInvocationCount(),
@@ -212,7 +228,7 @@ public final class AdkAgentTurnService {
                         "All incident data is synthetic and request-local.",
                         "The Google ADK session is in-memory and discarded after this request.",
                         "Events are returned after the synchronous run; this endpoint does not stream hidden reasoning.",
-                        "The agent has read-only evidence access and cannot execute remediation.",
+                        "Only the evidence agent has read-only evidence access; neither agent can execute remediation.",
                         "Correctness is checked against this generated case only; it is not a general model-accuracy claim."
                 )
         );
@@ -232,6 +248,7 @@ public final class AdkAgentTurnService {
                 null,
                 safety(safety),
                 runtimeProvenance(false),
+                null,
                 List.of(),
                 List.of(),
                 null,
@@ -323,6 +340,7 @@ public final class AdkAgentTurnService {
 
     private VerificationEvent verificationEvent(
             CompletedInvestigationVerification checked,
+            AdkAgentRuntime.TrajectoryValidation trajectory,
             Instant executedAt,
             boolean answerReleased
     ) {
@@ -332,10 +350,28 @@ public final class AdkAgentTurnService {
                 checked.report().diagnosisSchemaPass(),
                 checked.report().citationValidity().valid(),
                 factualResultMatches(checked),
+                trajectory.agentSequenceValid(),
+                trajectory.evidenceHandoffValid(),
+                trajectory.toolBoundaryValid()
+                        && trajectory.transferBoundaryValid(),
+                trajectory.finalAuthorValid(),
                 answerReleased,
                 answerReleased
-                        ? "Java accepted the schema, direct citation support, and factual match against the synthetic case."
-                        : "Java withheld the diagnosis because a hard verification rule failed."
+                        ? "Java accepted the agent order, function-response handoff, tool boundary, schema, direct citation support, and factual match against the synthetic case."
+                        : "Java withheld the diagnosis because a workflow or evidence verification rule failed."
+        );
+    }
+
+    private WorkflowReceipt workflowReceipt(
+            AdkAgentRuntime.TrajectoryValidation trajectory
+    ) {
+        return new WorkflowReceipt(
+                trajectory.workflowType(),
+                trajectory.expectedAgentOrder(),
+                trajectory.observedAgentOrder(),
+                trajectory.evidenceHandoff(),
+                trajectory.finalResponseAuthor(),
+                trajectory.completedInOrder()
         );
     }
 
