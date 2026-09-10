@@ -45,6 +45,9 @@ class CapabilitiesOpenApiTest {
                         "contract_version",
                         "synthetic_only",
                         "remediation_enabled",
+                        "provider",
+                        "deployment",
+                        "knowledge_corpus",
                         "modes",
                         "tools",
                         "live_ai",
@@ -55,7 +58,48 @@ class CapabilitiesOpenApiTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.CapabilitiesResponse"
                                 + ".properties.contract_version.enum"
-                ).value(contains("capabilities-v3")))
+                ).value(contains("capabilities-v4")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ProviderCapability.required"
+                ).value(containsInAnyOrder(
+                        "transport",
+                        "authentication_mode",
+                        "location",
+                        "routing_configuration_complete",
+                        "credential_status"
+                )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ProviderCapability"
+                                + ".properties.transport.enum"
+                ).value(contains("developer_api", "vertex_ai")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ProviderCapability"
+                                + ".properties.authentication_mode.enum"
+                ).value(contains("api_key", "adc")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ProviderCapability"
+                                + ".properties.credential_status.enum"
+                ).value(contains("configured", "missing", "not_checked")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.DeploymentCapability.required"
+                ).value(containsInAnyOrder(
+                        "platform",
+                        "revision",
+                        "build_git_sha"
+                )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.DeploymentCapability"
+                                + ".properties.platform.enum"
+                ).value(contains("local", "cloud_run")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.KnowledgeCorpusCapability.required"
+                ).value(containsInAnyOrder(
+                        "manifest_version",
+                        "corpus_version",
+                        "corpus_content_sha256",
+                        "eligible_document_count",
+                        "eligible_chunk_count"
+                )))
                 .andExpect(jsonPath(
                         "$.components.schemas.ToolCapability.properties.name.enum"
                 ).value(contains(
@@ -92,6 +136,15 @@ class CapabilitiesOpenApiTest {
                         "expected_chunks"
                 )))
                 .andExpect(jsonPath(
+                        "$.components.schemas.EmbeddingCapability.required"
+                ).value(containsInAnyOrder(
+                        "provider_transport",
+                        "model_id",
+                        "dimensions",
+                        "format_version",
+                        "minimum_similarity"
+                )))
+                .andExpect(jsonPath(
                         "$.components.schemas.PromptCacheCapability"
                                 + ".properties.strategy.enum"
                 ).value(contains("provider_implicit")))
@@ -117,13 +170,9 @@ class CapabilitiesOpenApiTest {
                 ).exists())
                 .andExpect(jsonPath(
                         "$.components.schemas.LiveAiCapability"
-                                + ".properties.credentials_configured"
-                ).exists())
-                .andExpect(jsonPath(
-                        "$.components.schemas.LiveAiCapability"
-                                + ".properties.request_configured.description"
+                                + ".properties.request_routing_configured.description"
                 ).value(org.hamcrest.Matchers.containsString(
-                        "does not claim provider reachability"
+                        "does not claim successful authentication"
                 )))
                 .andExpect(jsonPath(
                         "$.components.schemas.LiveAiCapability"
@@ -135,6 +184,8 @@ class CapabilitiesOpenApiTest {
         assertFalse(openApi.contains("openapi-capabilities-secret"));
         assertFalse(openApi.contains("geminiApiKey"));
         assertFalse(openApi.contains("gemini_api_key"));
+        assertFalse(openApi.contains("vertexProject"));
+        assertFalse(openApi.contains("vertex_project"));
         assertFalse(openApi.contains("databasePassword"));
         assertFalse(openApi.contains("database_password"));
     }

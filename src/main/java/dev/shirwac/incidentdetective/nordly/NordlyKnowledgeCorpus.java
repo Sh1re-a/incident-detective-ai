@@ -13,13 +13,16 @@ public final class NordlyKnowledgeCorpus {
     public static final String REQUIRED_LIFECYCLE = "APPROVED";
     public static final String REQUIRED_ACCESS_SCOPE = "public_demo";
 
+    private final String manifestVersion;
     private final String version;
+    private final String corpusContentSha256;
     private final List<RunbookCorpusEntry> entries;
     private final Map<String, EntryMetadata> metadataByEvidenceId;
     private final int eligibleDocumentCount;
 
     public NordlyKnowledgeCorpus(NordlyResourceCatalog catalog) {
         KnowledgeCorpusManifest manifest = catalog.knowledgeManifest();
+        manifestVersion = manifest.manifestVersion();
         version = manifest.corpusVersion();
 
         Map<String, EntryMetadata> metadata = new LinkedHashMap<>();
@@ -28,6 +31,7 @@ public final class NordlyKnowledgeCorpus {
                 .flatMap(document -> document.chunks().stream()
                         .map(chunk -> entry(document, chunk)))
                 .toList();
+        corpusContentSha256 = CorpusFingerprint.sha256(entries);
         for (KnowledgeCorpusManifest.KnowledgeDocument document
                 : manifest.documents()) {
             if (!eligible(document)) {
@@ -65,6 +69,14 @@ public final class NordlyKnowledgeCorpus {
 
     public String version() {
         return version;
+    }
+
+    public String manifestVersion() {
+        return manifestVersion;
+    }
+
+    public String corpusContentSha256() {
+        return corpusContentSha256;
     }
 
     public List<RunbookCorpusEntry> entries() {

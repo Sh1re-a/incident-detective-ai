@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
 
 class KnowledgeRagServiceTest {
 
+    private static final String CORPUS_SHA256 = "a".repeat(64);
     private static final RagProperties RAG_PROFILE = new RagProperties(
             "gemini-embedding-2",
             768,
@@ -68,6 +69,7 @@ class KnowledgeRagServiceTest {
     @BeforeEach
     void configureCorpus() {
         when(corpus.version()).thenReturn("nordly-knowledge-corpus-v2");
+        when(corpus.corpusContentSha256()).thenReturn(CORPUS_SHA256);
         when(corpus.eligibleDocumentCount()).thenReturn(10);
         when(corpus.eligibleChunkCount()).thenReturn(18);
     }
@@ -91,7 +93,9 @@ class KnowledgeRagServiceTest {
         );
         assertFalse(response.question().text().contains("NORD-2048"));
         assertEquals(0, response.receipt().providerCalls());
+        assertNull(response.providerRoute());
         assertFalse(response.retrieval().currentVectorSearch());
+        assertNull(response.retrieval().indexSnapshot());
         assertFalse(response.retrieval().queryEmbedding().executedInThisRun());
         assertNull(response.retrieval().queryEmbedding().provider());
         assertNull(response.retrieval().queryEmbedding().dimensions());
@@ -120,6 +124,7 @@ class KnowledgeRagServiceTest {
         );
         assertFalse(response.question().text().contains("NORD-2048"));
         assertEquals(0, response.receipt().providerCalls());
+        assertNull(response.providerRoute());
         verifyNoInteractions(readiness, store, embeddings, answers);
     }
 
@@ -137,6 +142,7 @@ class KnowledgeRagServiceTest {
         );
         assertTrue(response.question().redacted());
         assertEquals(0, response.receipt().providerCalls());
+        assertNull(response.providerRoute());
         assertFalse(response.retrieval().currentVectorSearch());
         verifyNoInteractions(readiness, store, embeddings, answers);
     }
@@ -149,6 +155,8 @@ class KnowledgeRagServiceTest {
 
         assertEquals("confirmation_required", response.outcome());
         assertEquals(0, response.receipt().providerCalls());
+        assertNull(response.providerRoute());
+        assertNull(response.retrieval().indexSnapshot());
         assertEquals("LIVE_AI_CONFIRMATION_REQUIRED", response.error().code());
         verifyNoInteractions(readiness, store, embeddings, answers);
     }
@@ -164,6 +172,12 @@ class KnowledgeRagServiceTest {
         assertEquals("unavailable", response.outcome());
         assertEquals("RAG_INDEX_NOT_READY", response.error().code());
         assertEquals(0, response.receipt().providerCalls());
+        assertNull(response.providerRoute());
+        assertEquals("not_ready", response.retrieval().indexSnapshot().status());
+        assertFalse(response.retrieval().indexSnapshot().ready());
+        assertEquals(17, response.retrieval().indexSnapshot().indexedChunks());
+        assertEquals(17, response.retrieval().indexSnapshot().currentChunks());
+        assertEquals(18, response.retrieval().indexSnapshot().expectedChunks());
         verifyNoInteractions(embeddings, store, answers);
     }
 
@@ -189,6 +203,12 @@ class KnowledgeRagServiceTest {
         assertEquals("insufficient_evidence", response.outcome());
         assertEquals("insufficient_evidence", response.answer().status());
         assertEquals(1, response.receipt().providerCalls());
+        assertEquals("developer_api", response.providerRoute().transport());
+        assertEquals("api_key", response.providerRoute().authenticationMode());
+        assertNull(response.providerRoute().location());
+        assertEquals(CORPUS_SHA256, response.retrieval().corpusContentSha256());
+        assertTrue(response.retrieval().indexSnapshot().ready());
+        assertEquals("ready", response.retrieval().indexSnapshot().status());
         assertEquals(1, response.receipt().embeddingCalls());
         assertEquals(0, response.receipt().generationCalls());
         assertEquals("embedding_cost_not_estimated",
@@ -201,7 +221,7 @@ class KnowledgeRagServiceTest {
 
     @Test
     void performsOneEmbeddingAndOneGroundedSynthesisForAMatch() {
-        arrangeMatch();
+        RunbookCorpusEntry entry = arrangeMatch();
         when(answers.generate(anyString(), anyList())).thenReturn(
                 generated("nordly-evidence-refund-timing-card")
         );
@@ -215,6 +235,9 @@ class KnowledgeRagServiceTest {
 
         assertEquals("answered", response.outcome());
         assertEquals(2, response.receipt().providerCalls());
+        assertEquals("developer_api", response.providerRoute().transport());
+        assertEquals("api_key", response.providerRoute().authenticationMode());
+        assertNull(response.providerRoute().location());
         assertEquals(1, response.receipt().embeddingCalls());
         assertEquals(1, response.receipt().generationCalls());
         assertTrue(response.retrieval().currentVectorSearch());
@@ -223,6 +246,9 @@ class KnowledgeRagServiceTest {
                 .getFirst().similarity());
         assertEquals("APPROVED", response.retrieval().rankedMatches()
                 .getFirst().status());
+        assertEquals(entry.contentSha256(), response.retrieval().rankedMatches()
+                .getFirst().contentSha256());
+        assertTrue(response.retrieval().indexSnapshot().ready());
         assertTrue(response.verification()
                 .citationsWithinRetrievedContext());
         assertTrue(response.verification().outputPiiScanPass());
@@ -270,10 +296,39 @@ class KnowledgeRagServiceTest {
         assertEquals("unavailable", response.outcome());
         assertEquals("LIVE_AI_DISABLED", response.error().code());
         assertEquals(0, response.receipt().providerCalls());
+        assertNull(response.providerRoute());
         verifyNoInteractions(readiness, store, embeddings, answers);
     }
 
-    private void arrangeMatch() {
+    @Test
+    void publishesVertexAdcRouteWithoutExposingTheProject() {
+        arrangeMatch();
+        when(answers.generate(anyString(), anyList())).thenReturn(
+                generated("nordly-evidence-refund-timing-card")
+        );
+        GeminiAiProperties vertex = new GeminiAiProperties(
+                null,
+                true,
+                "gemini-3.1-flash-lite",
+                GeminiThinkingLevel.MINIMAL,
+                GeminiPromptContracts.LIVE_PROMPT_VERSION,
+                GoogleGenAiProvider.VERTEX_AI,
+                "secret-project-id",
+                "europe-west1"
+        );
+
+        KnowledgeRagResponse response = service(vertex).ask(
+                request("När syns en godkänd återbetalning?", true)
+        );
+
+        assertEquals("vertex_ai", response.providerRoute().transport());
+        assertEquals("adc", response.providerRoute().authenticationMode());
+        assertEquals("europe-west1", response.providerRoute().location());
+        assertFalse(response.providerRoute().toString()
+                .contains("secret-project-id"));
+    }
+
+    private RunbookCorpusEntry arrangeMatch() {
         when(readiness.inspect()).thenReturn(new RunbookIndexStatus(18, 18, 18));
         when(embeddings.embedQuery(anyString())).thenReturn(embedding());
         RunbookCorpusEntry entry = new RunbookCorpusEntry(
@@ -309,6 +364,7 @@ class KnowledgeRagServiceTest {
                         entry.text()
                 )
         );
+        return entry;
     }
 
     private KnowledgeGenerationResult generated(String citationId) {

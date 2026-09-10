@@ -9,6 +9,7 @@ import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
 import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.GeminiDiagnosisDecoder;
 import dev.shirwac.incidentdetective.ai.GeminiPromptContracts;
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProviderRoute;
 import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
@@ -179,6 +180,8 @@ public final class AdkAgentTurnService {
         List<LiveToolEvent> toolEvents = run.toolExecutions().stream()
                 .map(this::toolEvent)
                 .toList();
+        int embeddingCallCount = embeddingCalls(toolEvents);
+        int providerCallCount = run.modelCallCount() + embeddingCallCount;
         ModelTokenUsage usage = aggregateUsage(run.events().stream()
                 .map(event -> event.usageMetadata()
                         .map(runtimeUsage())
@@ -195,6 +198,7 @@ public final class AdkAgentTurnService {
                 AdkAgentTurnResponse.MODE,
                 AdkAgentTurnResponse.TRUTH_LABEL,
                 answerReleased ? "completed" : "verification_failed",
+                providerRoute(providerCallCount),
                 generated.scenario(),
                 safety(safety),
                 runtimeProvenance(true),
@@ -214,7 +218,7 @@ public final class AdkAgentTurnService {
                         run.modelCallCount(),
                         run.toolInvocationCount(),
                         toolEvents.size(),
-                        embeddingCalls(toolEvents),
+                        embeddingCallCount,
                         false,
                         false,
                         true,
@@ -246,6 +250,7 @@ public final class AdkAgentTurnService {
                 AdkAgentTurnResponse.TRUTH_LABEL,
                 "blocked_before_ai",
                 null,
+                null,
                 safety(safety),
                 runtimeProvenance(false),
                 null,
@@ -271,6 +276,12 @@ public final class AdkAgentTurnService {
                 ),
                 List.of("The request was stopped before Google ADK, Gemini, tools, or embeddings ran.")
         );
+    }
+
+    private GoogleGenAiProviderRoute providerRoute(int providerCalls) {
+        return providerCalls > 0
+                ? GoogleGenAiProviderRoute.from(ai)
+                : null;
     }
 
     private RuntimeProvenance runtimeProvenance(boolean invoked) {

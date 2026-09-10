@@ -87,6 +87,7 @@ class KnowledgeOutputVerifierTest {
                 "Owner",
                 "knowledge/document#chunk",
                 CITATION,
+                "b".repeat(64),
                 "Sammanfattning",
                 "Summary",
                 "Grounded text"

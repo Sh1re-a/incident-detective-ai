@@ -28,6 +28,12 @@ public record CapabilitiesResponse(
         )
         boolean remediationEnabled,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        ProviderCapability provider,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        DeploymentCapability deployment,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        KnowledgeCorpusCapability knowledgeCorpus,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         List<ModeCapability> modes,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         List<ToolCapability> tools,
@@ -40,11 +46,87 @@ public record CapabilitiesResponse(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         PromptCacheCapability promptCache
 ) {
-    public static final String CONTRACT_VERSION = "capabilities-v3";
+    public static final String CONTRACT_VERSION = "capabilities-v4";
 
     public CapabilitiesResponse {
         modes = List.copyOf(modes);
         tools = List.copyOf(tools);
+    }
+
+    public record ProviderCapability(
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = {"developer_api", "vertex_ai"}
+            )
+            String transport,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = {"api_key", "adc"}
+            )
+            String authenticationMode,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    nullable = true,
+                    description = "Configured Vertex AI location, or null for the "
+                            + "Gemini Developer API."
+            )
+            String location,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "True when the selected provider's non-secret "
+                            + "routing prerequisites are present. This does not "
+                            + "prove authentication or provider reachability."
+            )
+            boolean routingConfigurationComplete,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = {"configured", "missing", "not_checked"},
+                    description = "API-key presence for the Developer API, or "
+                            + "not_checked for Vertex ADC. The capability probe "
+                            + "never loads or validates ADC credentials."
+            )
+            String credentialStatus
+    ) {
+    }
+
+    public record DeploymentCapability(
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = {"local", "cloud_run"}
+            )
+            String platform,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    nullable = true,
+                    description = "Cloud Run revision reported by the runtime, or null."
+            )
+            String revision,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    nullable = true,
+                    description = "Build Git SHA injected into the runtime, or null "
+                            + "when it was not supplied."
+            )
+            String buildGitSha
+    ) {
+    }
+
+    public record KnowledgeCorpusCapability(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String manifestVersion,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String corpusVersion,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "Deterministic SHA-256 fingerprint of the eligible "
+                            + "Nordly knowledge corpus."
+            )
+            String corpusContentSha256,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "0")
+            int eligibleDocumentCount,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "0")
+            int eligibleChunkCount
+    ) {
     }
 
     public record ModeCapability(
@@ -75,17 +157,12 @@ public record CapabilitiesResponse(
             boolean enabledByConfiguration,
             @Schema(
                     requiredMode = Schema.RequiredMode.REQUIRED,
-                    description = "Whether provider credentials are configured; "
-                            + "credentials are never returned."
-            )
-            boolean credentialsConfigured,
-            @Schema(
-                    requiredMode = Schema.RequiredMode.REQUIRED,
-                    description = "True when the local request prerequisites are "
-                            + "configured. This does not claim provider reachability "
+                    description = "True when live mode and the provider's non-secret "
+                            + "routing prerequisites are configured. This does not "
+                            + "claim successful authentication, provider reachability "
                             + "or health."
             )
-            boolean requestConfigured,
+            boolean requestRoutingConfigured,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             boolean explicitConfirmationRequired,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
@@ -217,6 +294,11 @@ public record CapabilitiesResponse(
     }
 
     public record EmbeddingCapability(
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = {"developer_api", "vertex_ai"}
+            )
+            String providerTransport,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             String modelId,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "1")

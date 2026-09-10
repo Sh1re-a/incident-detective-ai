@@ -19,6 +19,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "incident-detective.ai.live-enabled=true",
         "incident-detective.ai.gemini-api-key=capabilities-test-secret",
+        "incident-detective.ai.provider=vertex_ai",
+        "incident-detective.ai.vertex-project=capabilities-test-project-secret",
+        "incident-detective.ai.vertex-location=europe-west1",
         "incident-detective.ai.model-id=gemini-3.1-flash-lite",
         "incident-detective.ai.thinking-level=MINIMAL",
         "incident-detective.ai.prompt-version=gemini-live-v6"
@@ -35,9 +38,37 @@ class CapabilitiesApiTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("application/json"))
                 .andExpect(jsonPath("$.contract_version")
-                        .value("capabilities-v3"))
+                        .value("capabilities-v4"))
                 .andExpect(jsonPath("$.synthetic_only").value(true))
                 .andExpect(jsonPath("$.remediation_enabled").value(false))
+                .andExpect(jsonPath("$.provider.transport").value("vertex_ai"))
+                .andExpect(jsonPath("$.provider.authentication_mode")
+                        .value("adc"))
+                .andExpect(jsonPath("$.provider.location")
+                        .value("europe-west1"))
+                .andExpect(jsonPath("$.provider.routing_configuration_complete")
+                        .value(true))
+                .andExpect(jsonPath("$.provider.credential_status")
+                        .value("not_checked"))
+                .andExpect(jsonPath("$.deployment.platform").value("local"))
+                .andExpect(jsonPath("$.deployment.revision")
+                        .value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.deployment.build_git_sha")
+                        .value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.knowledge_corpus.manifest_version")
+                        .value("nordly-knowledge-manifest-v2"))
+                .andExpect(jsonPath("$.knowledge_corpus.corpus_version")
+                        .value("nordly-knowledge-corpus-v2"))
+                .andExpect(jsonPath("$.knowledge_corpus.corpus_content_sha256")
+                        .value(org.hamcrest.Matchers.matchesPattern(
+                                "[0-9a-f]{64}"
+                        )))
+                .andExpect(jsonPath(
+                        "$.knowledge_corpus.eligible_document_count"
+                ).value(13))
+                .andExpect(jsonPath(
+                        "$.knowledge_corpus.eligible_chunk_count"
+                ).value(27))
                 .andExpect(jsonPath("$.modes[*].mode").value(contains(
                         "recorded_replay",
                         "live_ai"
@@ -60,9 +91,7 @@ class CapabilitiesApiTest {
                         .value(org.hamcrest.Matchers.everyItem(
                                 org.hamcrest.Matchers.is(true)
                         )))
-                .andExpect(jsonPath("$.live_ai.credentials_configured")
-                        .value(true))
-                .andExpect(jsonPath("$.live_ai.request_configured")
+                .andExpect(jsonPath("$.live_ai.request_routing_configured")
                         .value(true))
                 .andExpect(jsonPath("$.live_ai.explicit_confirmation_required")
                         .value(true))
@@ -126,7 +155,9 @@ class CapabilitiesApiTest {
 
         String json = result.getResponse().getContentAsString();
         assertFalse(json.contains("capabilities-test-secret"));
+        assertFalse(json.contains("capabilities-test-project-secret"));
         assertFalse(json.contains("gemini_api_key"));
+        assertFalse(json.contains("vertex_project"));
         assertFalse(json.contains("database_password"));
         assertFalse(json.contains("database_username"));
         assertFalse(json.contains("database_url"));

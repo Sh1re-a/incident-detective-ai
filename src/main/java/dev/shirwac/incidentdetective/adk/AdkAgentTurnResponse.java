@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.adk;
 
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProviderRoute;
 import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.scenario.Scenario;
 import dev.shirwac.incidentdetective.domain.verification.VerificationReport;
@@ -30,6 +31,8 @@ public record AdkAgentTurnResponse(
         String truthLabel,
         String outcome,
         @Schema(nullable = true)
+        GoogleGenAiProviderRoute providerRoute,
+        @Schema(nullable = true)
         Scenario scenario,
         SafetyDecision safety,
         RuntimeProvenance runtime,
@@ -48,7 +51,7 @@ public record AdkAgentTurnResponse(
         ControlReceipt receipt,
         List<String> limitations
 ) {
-    public static final String CONTRACT_VERSION = "nordly-adk-turn-v2";
+    public static final String CONTRACT_VERSION = "nordly-adk-turn-v3";
     public static final String MODE = "adk_live_ai";
     public static final String TRUTH_LABEL =
             "Generated synthetic incident — real Google ADK investigation.";

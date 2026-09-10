@@ -1,8 +1,12 @@
 package dev.shirwac.incidentdetective.nordly;
 
+import dev.shirwac.incidentdetective.rag.RunbookCorpusEntry;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Schema(
         description = "Read-only view of every synthetic Nordly knowledge document. "
@@ -12,7 +16,9 @@ public record KnowledgeDocumentLibraryResponse(
         String contractVersion,
         String mode,
         String truthLabel,
+        String manifestVersion,
         String corpusVersion,
+        String corpusContentSha256,
         boolean syntheticOnly,
         boolean currentVectorSearch,
         int documentCount,
@@ -32,10 +38,16 @@ public record KnowledgeDocumentLibraryResponse(
     }
 
     static KnowledgeDocumentLibraryResponse from(
-            KnowledgeCorpusManifest manifest
+            KnowledgeCorpusManifest manifest,
+            NordlyKnowledgeCorpus corpus
     ) {
+        Map<String, String> contentHashes = corpus.entries().stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        RunbookCorpusEntry::evidenceId,
+                        RunbookCorpusEntry::contentSha256
+                ));
         List<KnowledgeDocument> documents = manifest.documents().stream()
-                .map(KnowledgeDocumentLibraryResponse::document)
+                .map(document -> document(document, contentHashes))
                 .toList();
         int eligibleDocumentCount = (int) documents.stream()
                 .filter(item -> item.ragEligibility().eligible())
@@ -52,7 +64,9 @@ public record KnowledgeDocumentLibraryResponse(
                 CONTRACT_VERSION,
                 MODE,
                 manifest.truthLabel(),
+                corpus.manifestVersion(),
                 manifest.corpusVersion(),
+                corpus.corpusContentSha256(),
                 true,
                 false,
                 documents.size(),
@@ -73,7 +87,8 @@ public record KnowledgeDocumentLibraryResponse(
     }
 
     private static KnowledgeDocument document(
-            KnowledgeCorpusManifest.KnowledgeDocument document
+            KnowledgeCorpusManifest.KnowledgeDocument document,
+            Map<String, String> contentHashes
     ) {
         RagEligibility eligibility = eligibility(document);
         return new KnowledgeDocument(
@@ -102,7 +117,15 @@ public record KnowledgeDocumentLibraryResponse(
                                 chunk.evidenceId(),
                                 chunk.displaySummarySv(),
                                 chunk.displaySummaryEn(),
-                                eligibility.eligible() ? chunk.text() : null
+                                eligibility.eligible() ? chunk.text() : null,
+                                eligibility.eligible()
+                                        ? Objects.requireNonNull(
+                                                contentHashes.get(
+                                                        chunk.evidenceId()
+                                                ),
+                                                "eligible chunk content hash"
+                                        )
+                                        : null
                         ))
                         .toList()
         );
@@ -206,7 +229,13 @@ public record KnowledgeDocumentLibraryResponse(
                     description = "Full synthetic body for approved public-demo "
                             + "documents; null for excluded material."
             )
-            String text
+            String text,
+            @Schema(
+                    nullable = true,
+                    description = "SHA-256 of the exact title and chunk body sent "
+                            + "to the embedding importer; null for excluded material."
+            )
+            String contentSha256
     ) {
     }
 }

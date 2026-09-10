@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.nordly;
 
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProviderRoute;
 import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -17,6 +18,8 @@ public record KnowledgeRagResponse(
         String truthLabel,
         String truthLabelEn,
         String outcome,
+        @Schema(nullable = true)
+        GoogleGenAiProviderRoute providerRoute,
         SubmittedQuestion question,
         SafetyDecision safety,
         List<PhaseEvent> phases,
@@ -29,7 +32,7 @@ public record KnowledgeRagResponse(
         ErrorDetail error,
         List<String> limitations
 ) {
-    public static final String CONTRACT_VERSION = "nordly-knowledge-rag-v1";
+    public static final String CONTRACT_VERSION = "nordly-knowledge-rag-v2";
     public static final String MODE = "live_rag";
     public static final String BACKEND = "pgvector_exact_cosine";
 
@@ -67,6 +70,9 @@ public record KnowledgeRagResponse(
     public record RetrievalResult(
             String backend,
             String corpusVersion,
+            String corpusContentSha256,
+            @Schema(nullable = true)
+            IndexSnapshot indexSnapshot,
             String requiredLifecycle,
             String requiredAccessScope,
             int eligibleDocumentCount,
@@ -82,6 +88,15 @@ public record KnowledgeRagResponse(
                     ? null
                     : List.copyOf(rankedMatches);
         }
+    }
+
+    public record IndexSnapshot(
+            String status,
+            boolean ready,
+            long indexedChunks,
+            long currentChunks,
+            int expectedChunks
+    ) {
     }
 
     public record QueryEmbedding(
@@ -115,6 +130,7 @@ public record KnowledgeRagResponse(
             String ownerTeam,
             String sourceRef,
             String evidenceId,
+            String contentSha256,
             String displaySummarySv,
             String displaySummaryEn,
             String text

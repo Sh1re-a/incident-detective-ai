@@ -71,6 +71,11 @@ class OpenApiNullableReferenceTest {
 
         String[][] nullableFields = {
                 {"ModelCallMetadata", "provider_response_id"},
+                {"ProviderCapability", "location"},
+                {"DeploymentCapability", "revision"},
+                {"DeploymentCapability", "build_git_sha"},
+                {"KnowledgeChunk", "text"},
+                {"KnowledgeChunk", "content_sha256"},
                 {"ModelTokenUsage", "input_tokens"},
                 {"ModelTokenUsage", "cached_input_tokens"},
                 {"ModelTokenUsage", "uncached_input_tokens"},

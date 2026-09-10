@@ -2,6 +2,7 @@ package dev.shirwac.incidentdetective.nordly;
 
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
 import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProviderRoute;
 import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.rag.EmbeddingGateway;
@@ -192,7 +193,7 @@ public final class KnowledgeRagService {
                     )
             );
         }
-        if (!aiProperties.hasApiKey()) {
+        if (!aiProperties.hasProviderConfiguration()) {
             appendSkipped(phases, "eligibility_filter");
             return response(
                     runId,
@@ -214,19 +215,20 @@ public final class KnowledgeRagService {
         }
 
         long eligibilityStarted = System.nanoTime();
+        RunbookIndexStatus indexStatus;
         try {
-            RunbookIndexStatus status = readiness.inspect();
-            if (!status.ready()) {
+            indexStatus = readiness.inspect();
+            if (!indexStatus.ready()) {
                 phases.add(phase(
                         "eligibility_filter",
                         "failed",
                         true,
                         "Endast APPROVED + public_demo valdes, men indexet är inte komplett ("
-                                + status.currentChunks() + "/"
-                                + status.expectedChunks() + ").",
+                                + indexStatus.currentChunks() + "/"
+                                + indexStatus.expectedChunks() + ").",
                         "Only APPROVED + public_demo was selected, but the index is incomplete ("
-                                + status.currentChunks() + "/"
-                                + status.expectedChunks() + ").",
+                                + indexStatus.currentChunks() + "/"
+                                + indexStatus.expectedChunks() + ").",
                         elapsedMs(eligibilityStarted)
                 ));
                 appendSkipped(phases, "query_embedding");
@@ -236,7 +238,7 @@ public final class KnowledgeRagService {
                         submittedQuestion,
                         safetyResponse,
                         phases,
-                        emptyRetrieval(),
+                        retrieval(null, false, List.of(), indexStatus),
                         null,
                         verification(false, true, true, true,
                                 "not_run_index_not_ready"),
@@ -314,7 +316,7 @@ public final class KnowledgeRagService {
                     submittedQuestion,
                     safetyResponse,
                     phases,
-                    retrieval(null, false, List.of()),
+                    retrieval(null, false, List.of(), indexStatus),
                     null,
                     verification(false, true, true, true,
                             "embedding_failed"),
@@ -368,7 +370,7 @@ public final class KnowledgeRagService {
                     submittedQuestion,
                     safetyResponse,
                     phases,
-                    retrieval(queryEmbedding, false, List.of()),
+                    retrieval(queryEmbedding, false, List.of(), indexStatus),
                     null,
                     verification(false, true, true, true,
                             "vector_database_unavailable"),
@@ -431,7 +433,7 @@ public final class KnowledgeRagService {
                     submittedQuestion,
                     safetyResponse,
                     phases,
-                    retrieval(queryEmbedding, true, matches),
+                    retrieval(queryEmbedding, true, matches, indexStatus),
                     new KnowledgeRagResponse.Answer(
                             "insufficient_evidence",
                             "Jag hittar ingen tillräckligt relevant godkänd källa i Nordlys dokument.",
@@ -487,7 +489,7 @@ public final class KnowledgeRagService {
                     submittedQuestion,
                     safetyResponse,
                     phases,
-                    retrieval(queryEmbedding, true, matches),
+                    retrieval(queryEmbedding, true, matches, indexStatus),
                     null,
                     verification(false, true, true, true,
                             "generation_failed"),
@@ -539,7 +541,7 @@ public final class KnowledgeRagService {
                     submittedQuestion,
                     safetyResponse,
                     phases,
-                    retrieval(queryEmbedding, true, matches),
+                    retrieval(queryEmbedding, true, matches, indexStatus),
                     null,
                     verification(
                             verification.schemaPass(),
@@ -581,7 +583,7 @@ public final class KnowledgeRagService {
                 submittedQuestion,
                 safetyResponse,
                 phases,
-                retrieval(queryEmbedding, true, matches),
+                retrieval(queryEmbedding, true, matches, indexStatus),
                 answer(generated.answer()),
                 verification(true, true, true, true,
                         "answered_with_verified_retrieved_citations"),
@@ -626,6 +628,7 @@ public final class KnowledgeRagService {
                     metadata.ownerTeam(),
                     metadata.sourceRef(),
                     metadata.evidenceId(),
+                    hit.entry().contentSha256(),
                     metadata.displaySummarySv(),
                     metadata.displaySummaryEn(),
                     metadata.text()
@@ -635,13 +638,14 @@ public final class KnowledgeRagService {
     }
 
     private KnowledgeRagResponse.RetrievalResult emptyRetrieval() {
-        return retrieval(null, false, List.of());
+        return retrieval(null, false, List.of(), null);
     }
 
     private KnowledgeRagResponse.RetrievalResult retrieval(
             EmbeddingResult embedding,
             boolean currentVectorSearch,
-            List<KnowledgeRagResponse.RankedMatch> matches
+            List<KnowledgeRagResponse.RankedMatch> matches,
+            RunbookIndexStatus indexStatus
     ) {
         KnowledgeRagResponse.QueryEmbedding queryEmbedding = embedding == null
                 ? new KnowledgeRagResponse.QueryEmbedding(
@@ -667,6 +671,8 @@ public final class KnowledgeRagService {
         return new KnowledgeRagResponse.RetrievalResult(
                 KnowledgeRagResponse.BACKEND,
                 corpus.version(),
+                corpus.corpusContentSha256(),
+                indexSnapshot(indexStatus),
                 NordlyKnowledgeCorpus.REQUIRED_LIFECYCLE,
                 NordlyKnowledgeCorpus.REQUIRED_ACCESS_SCOPE,
                 corpus.eligibleDocumentCount(),
@@ -715,6 +721,7 @@ public final class KnowledgeRagService {
                 TRUTH_LABEL,
                 TRUTH_LABEL_EN,
                 outcome,
+                providerRoute(receipt.providerCalls()),
                 question,
                 safety,
                 phases,
@@ -725,6 +732,27 @@ public final class KnowledgeRagService {
                 error,
                 LIMITATIONS
         );
+    }
+
+    private KnowledgeRagResponse.IndexSnapshot indexSnapshot(
+            RunbookIndexStatus status
+    ) {
+        if (status == null) {
+            return null;
+        }
+        return new KnowledgeRagResponse.IndexSnapshot(
+                status.ready() ? "ready" : "not_ready",
+                status.ready(),
+                status.indexedChunks(),
+                status.currentChunks(),
+                status.expectedChunks()
+        );
+    }
+
+    private GoogleGenAiProviderRoute providerRoute(int providerCalls) {
+        return providerCalls > 0
+                ? GoogleGenAiProviderRoute.from(aiProperties)
+                : null;
     }
 
     private KnowledgeRagResponse.SafetyDecision safety(

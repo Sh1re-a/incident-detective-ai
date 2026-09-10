@@ -204,8 +204,13 @@ class NordlyApiTest {
                 .andExpect(jsonPath("$.mode").value("read_only_corpus"))
                 .andExpect(jsonPath("$.synthetic_only").value(true))
                 .andExpect(jsonPath("$.current_vector_search").value(false))
+                .andExpect(jsonPath("$.manifest_version")
+                        .value("nordly-knowledge-manifest-v2"))
                 .andExpect(jsonPath("$.corpus_version")
                         .value("nordly-knowledge-corpus-v2"))
+                .andExpect(jsonPath("$.corpus_content_sha256").value(
+                        org.hamcrest.Matchers.matchesPattern("[0-9a-f]{64}")
+                ))
                 .andExpect(jsonPath("$.document_count").value(16))
                 .andExpect(jsonPath("$.chunk_count").value(30))
                 .andExpect(jsonPath("$.eligible_document_count").value(13))
@@ -231,6 +236,10 @@ class NordlyApiTest {
                         .value(org.hamcrest.Matchers.not(
                                 org.hamcrest.Matchers.blankString()
                         )))
+                .andExpect(jsonPath("$.documents[0].chunks[0].content_sha256")
+                        .value(org.hamcrest.Matchers.matchesPattern(
+                                "[0-9a-f]{64}"
+                        )))
                 .andExpect(jsonPath("$.documents[13].id")
                         .value("kb-employee-compensation-register"))
                 .andExpect(jsonPath("$.documents[13].rag_eligibility.eligible")
@@ -241,6 +250,9 @@ class NordlyApiTest {
                         .value(false))
                 .andExpect(jsonPath("$.documents[13].chunks[0].text")
                         .value(nullValue()))
+                .andExpect(jsonPath(
+                        "$.documents[13].chunks[0].content_sha256"
+                ).value(nullValue()))
                 .andExpect(jsonPath("$.documents[14].id")
                         .value("kb-legacy-refund-playbook"))
                 .andExpect(jsonPath("$.documents[14].lifecycle")
@@ -251,6 +263,9 @@ class NordlyApiTest {
                         .value("LIFECYCLE_NOT_APPROVED"))
                 .andExpect(jsonPath("$.documents[14].chunks[0].text")
                         .value(nullValue()))
+                .andExpect(jsonPath(
+                        "$.documents[14].chunks[0].content_sha256"
+                ).value(nullValue()))
                 .andExpect(jsonPath("$.documents[15].id")
                         .value("kb-untrusted-shortcuts"))
                 .andExpect(jsonPath("$.documents[15].lifecycle")
@@ -260,7 +275,10 @@ class NordlyApiTest {
                 .andExpect(jsonPath("$.documents[15].content_visible")
                         .value(false))
                 .andExpect(jsonPath("$.documents[15].chunks[0].text")
-                        .value(nullValue()));
+                        .value(nullValue()))
+                .andExpect(jsonPath(
+                        "$.documents[15].chunks[0].content_sha256"
+                ).value(nullValue()));
     }
 
     private org.springframework.test.web.servlet.ResultActions

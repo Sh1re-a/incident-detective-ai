@@ -28,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 class NordlyKnowledgeCorpusTest {
 
+    private static final String EXPECTED_CORPUS_CONTENT_SHA256 =
+            "9ba9e0aeac7d6c090e3a6f6be9779f1734dce56febd032ee50616ec6af72e30a";
     private static final RagProperties PROFILE = new RagProperties(
             "gemini-embedding-2",
             768,
@@ -41,7 +43,19 @@ class NordlyKnowledgeCorpusTest {
 
     @Test
     void exposesOnlyApprovedPublicDemoDocuments() {
+        assertEquals(
+                "nordly-knowledge-manifest-v2",
+                corpus.manifestVersion()
+        );
         assertEquals("nordly-knowledge-corpus-v2", corpus.version());
+        assertEquals(
+                EXPECTED_CORPUS_CONTENT_SHA256,
+                corpus.corpusContentSha256()
+        );
+        assertEquals(
+                CorpusFingerprint.sha256(corpus.entries()),
+                corpus.corpusContentSha256()
+        );
         assertEquals(13, corpus.eligibleDocumentCount());
         assertEquals(27, corpus.eligibleChunkCount());
         assertTrue(corpus.entries().stream()

@@ -32,7 +32,16 @@ public class OpenApiConfiguration {
                             "RetrievalCapability",
                             Set.of("active_embedding_profile", "index_status")
                     ),
+                    Map.entry("ProviderCapability", Set.of("location")),
+                    Map.entry(
+                            "DeploymentCapability",
+                            Set.of("revision", "build_git_sha")
+                    ),
                     Map.entry("KnowledgeDocument", Set.of("effective_until")),
+                    Map.entry(
+                            "KnowledgeChunk",
+                            Set.of("text", "content_sha256")
+                    ),
                     Map.entry(
                             "LiveInvestigationResult",
                             Set.of(

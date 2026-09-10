@@ -53,12 +53,17 @@ class KnowledgeRagApiTest {
                         MediaType.APPLICATION_JSON
                 ))
                 .andExpect(jsonPath("$.contract_version")
-                        .value(KnowledgeRagResponse.CONTRACT_VERSION))
+                        .value("nordly-knowledge-rag-v2"))
                 .andExpect(jsonPath("$.mode")
                         .value(KnowledgeRagResponse.MODE))
                 .andExpect(jsonPath("$.truth_label").value("SYNTHETIC TEST"))
                 .andExpect(jsonPath("$.truth_label_en")
                         .value("SYNTHETIC TEST"))
+                .andExpect(jsonPath("$.provider_route").value((Object) null))
+                .andExpect(jsonPath("$.retrieval.corpus_content_sha256")
+                        .value("a".repeat(64)))
+                .andExpect(jsonPath("$.retrieval.index_snapshot")
+                        .value((Object) null))
                 .andExpect(jsonPath("$.receipt.provider_calls").value(0));
 
         verify(service).ask(any());
@@ -111,6 +116,7 @@ class KnowledgeRagApiTest {
                 "SYNTHETIC TEST",
                 "SYNTHETIC TEST",
                 "confirmation_required",
+                null,
                 new KnowledgeRagResponse.SubmittedQuestion(
                         "När syns återbetalningen?",
                         "sv",
@@ -126,6 +132,8 @@ class KnowledgeRagApiTest {
                 new KnowledgeRagResponse.RetrievalResult(
                         KnowledgeRagResponse.BACKEND,
                         "nordly-knowledge-corpus-v2",
+                        "a".repeat(64),
+                        null,
                         "APPROVED",
                         "public_demo",
                         10,

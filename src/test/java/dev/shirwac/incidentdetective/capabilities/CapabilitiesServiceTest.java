@@ -15,6 +15,7 @@ import dev.shirwac.incidentdetective.investigation.tools.ToolName;
 import dev.shirwac.incidentdetective.live.GlobalDailyLiveQuota;
 import dev.shirwac.incidentdetective.live.LiveInvestigationService;
 import dev.shirwac.incidentdetective.live.PromptCacheStrategy;
+import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeCorpus;
 import dev.shirwac.incidentdetective.rag.RagProperties;
 import dev.shirwac.incidentdetective.rag.RunbookIndexReadiness;
 import dev.shirwac.incidentdetective.rag.RunbookIndexStatus;
@@ -60,14 +61,38 @@ class CapabilitiesServiceTest {
                 ai,
                 retrieval(RunbookRetrievalBackend.DETERMINISTIC_FIXTURE),
                 RAG,
+                knowledgeCorpus(),
                 environment,
                 quota(GlobalDailyLiveQuota.Scope.PROCESS_LOCAL),
                 Optional.empty()
         ).describe();
 
-        assertEquals("capabilities-v3", response.contractVersion());
+        assertEquals("capabilities-v4", response.contractVersion());
         assertTrue(response.syntheticOnly());
         assertFalse(response.remediationEnabled());
+        assertEquals("developer_api", response.provider().transport());
+        assertEquals("api_key", response.provider().authenticationMode());
+        assertNull(response.provider().location());
+        assertTrue(response.provider().routingConfigurationComplete());
+        assertEquals("configured", response.provider().credentialStatus());
+        assertEquals("local", response.deployment().platform());
+        assertNull(response.deployment().revision());
+        assertNull(response.deployment().buildGitSha());
+        assertEquals(
+                "nordly-knowledge-manifest-v2",
+                response.knowledgeCorpus().manifestVersion()
+        );
+        assertEquals(
+                "nordly-knowledge-corpus-v2",
+                response.knowledgeCorpus().corpusVersion()
+        );
+        assertEquals(
+                "0123456789abcdef0123456789abcdef"
+                        + "0123456789abcdef0123456789abcdef",
+                response.knowledgeCorpus().corpusContentSha256()
+        );
+        assertEquals(13, response.knowledgeCorpus().eligibleDocumentCount());
+        assertEquals(27, response.knowledgeCorpus().eligibleChunkCount());
         assertEquals(List.of(
                 new ModeCapability(
                         RunMode.RECORDED_REPLAY,
@@ -90,8 +115,7 @@ class CapabilitiesServiceTest {
         ));
 
         assertTrue(response.liveAi().enabledByConfiguration());
-        assertTrue(response.liveAi().credentialsConfigured());
-        assertTrue(response.liveAi().requestConfigured());
+        assertTrue(response.liveAi().requestRoutingConfigured());
         assertTrue(response.liveAi().explicitConfirmationRequired());
         assertEquals("gemini-3.1-flash-lite", response.liveAi().modelId());
         assertEquals(GeminiThinkingLevel.MINIMAL, response.liveAi().thinkingLevel());
@@ -166,14 +190,23 @@ class CapabilitiesServiceTest {
     @Test
     void exposesTheEmbeddingProfileOnlyWhenPgvectorIsActive() {
         GeminiAiProperties ai = new GeminiAiProperties(
-                "configured-but-disabled",
+                null,
                 false,
                 "gemini-3.1-flash-lite",
                 GeminiThinkingLevel.MINIMAL,
-                "gemini-live-v6"
+                "gemini-live-v6",
+                GoogleGenAiProvider.VERTEX_AI,
+                "must-never-be-returned",
+                "europe-west1"
         );
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("rag");
+        environment.setProperty("K_SERVICE", "incident-detective");
+        environment.setProperty("K_REVISION", "incident-detective-00042-abc");
+        environment.setProperty(
+                "INCIDENT_DETECTIVE_BUILD_GIT_SHA",
+                "414264f"
+        );
         RunbookIndexReadiness readiness = mock(RunbookIndexReadiness.class);
         when(readiness.corpusVersion()).thenReturn("runbook-corpus-v1");
         when(readiness.inspect()).thenReturn(new RunbookIndexStatus(12, 12, 12));
@@ -182,6 +215,7 @@ class CapabilitiesServiceTest {
                 ai,
                 retrieval(RunbookRetrievalBackend.PGVECTOR_EXACT_COSINE),
                 RAG,
+                knowledgeCorpus(),
                 environment,
                 quota(GlobalDailyLiveQuota.Scope.DATABASE_GLOBAL),
                 Optional.of(readiness)
@@ -194,6 +228,7 @@ class CapabilitiesServiceTest {
         assertEquals(List.of("rag"), response.retrieval().activeProfiles());
         assertTrue(response.retrieval().vectorDatabaseBackendActive());
         assertEquals(new EmbeddingCapability(
+                "developer_api",
                 "gemini-embedding-2",
                 768,
                 "search-result-v1",
@@ -206,8 +241,18 @@ class CapabilitiesServiceTest {
                 12,
                 12
         ), response.retrieval().indexStatus());
-        assertTrue(response.liveAi().credentialsConfigured());
-        assertFalse(response.liveAi().requestConfigured());
+        assertEquals("vertex_ai", response.provider().transport());
+        assertEquals("adc", response.provider().authenticationMode());
+        assertEquals("europe-west1", response.provider().location());
+        assertTrue(response.provider().routingConfigurationComplete());
+        assertEquals("not_checked", response.provider().credentialStatus());
+        assertEquals("cloud_run", response.deployment().platform());
+        assertEquals(
+                "incident-detective-00042-abc",
+                response.deployment().revision()
+        );
+        assertEquals("414264f", response.deployment().buildGitSha());
+        assertFalse(response.liveAi().requestRoutingConfigured());
         assertEquals(
                 GlobalDailyLiveQuota.Scope.DATABASE_GLOBAL,
                 response.liveAi().budget().dailyQuotaScope()
@@ -226,6 +271,19 @@ class CapabilitiesServiceTest {
                 return scope;
             }
         };
+    }
+
+    private NordlyKnowledgeCorpus knowledgeCorpus() {
+        NordlyKnowledgeCorpus corpus = mock(NordlyKnowledgeCorpus.class);
+        when(corpus.manifestVersion()).thenReturn("nordly-knowledge-manifest-v2");
+        when(corpus.version()).thenReturn("nordly-knowledge-corpus-v2");
+        when(corpus.corpusContentSha256()).thenReturn(
+                "0123456789abcdef0123456789abcdef"
+                        + "0123456789abcdef0123456789abcdef"
+        );
+        when(corpus.eligibleDocumentCount()).thenReturn(13);
+        when(corpus.eligibleChunkCount()).thenReturn(27);
+        return corpus;
     }
 
     private RunbookRetrievalStrategy retrieval(

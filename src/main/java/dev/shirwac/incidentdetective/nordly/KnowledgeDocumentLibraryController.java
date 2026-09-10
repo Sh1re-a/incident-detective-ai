@@ -19,16 +19,22 @@ import org.springframework.web.bind.annotation.RestController;
 public final class KnowledgeDocumentLibraryController {
 
     private final NordlyResourceCatalog resources;
+    private final NordlyKnowledgeCorpus corpus;
 
-    public KnowledgeDocumentLibraryController(NordlyResourceCatalog resources) {
+    public KnowledgeDocumentLibraryController(
+            NordlyResourceCatalog resources,
+            NordlyKnowledgeCorpus corpus
+    ) {
         this.resources = resources;
+        this.corpus = corpus;
     }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(
             summary = "Browse the synthetic Nordly knowledge library",
-            description = "Returns every synthetic document and chunk, including "
-                    + "quarantined examples, with an explicit RAG eligibility decision. "
+            description = "Returns metadata for every synthetic document and chunk "
+                    + "with an explicit RAG eligibility decision. Full text and its "
+                    + "content hash are exposed only for approved public-demo chunks. "
                     + "No embedding, vector search, model call or write action runs."
     )
     @ApiResponse(
@@ -43,7 +49,8 @@ public final class KnowledgeDocumentLibraryController {
     )
     public KnowledgeDocumentLibraryResponse list() {
         return KnowledgeDocumentLibraryResponse.from(
-                resources.knowledgeManifest()
+                resources.knowledgeManifest(),
+                corpus
         );
     }
 }
