@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.nordly;
 
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
 import dev.shirwac.incidentdetective.rag.EmbeddingGateway;
 import dev.shirwac.incidentdetective.rag.EmbeddingResult;
 import dev.shirwac.incidentdetective.rag.RagProperties;
@@ -31,7 +32,8 @@ class NordlyKnowledgeCorpusTest {
             "gemini-embedding-2",
             768,
             "search-result-v1",
-            0.0
+            0.0,
+            GoogleGenAiProvider.DEVELOPER_API
     );
 
     @Autowired
@@ -74,6 +76,7 @@ class NordlyKnowledgeCorpusTest {
         RunbookImportReport second = importer.importMissingOrChanged();
 
         assertEquals(27, first.importedChunks());
+        assertEquals("developer_api", first.providerTransport());
         assertEquals(0, first.skippedChunks());
         assertEquals(0, second.importedChunks());
         assertEquals(27, second.skippedChunks());

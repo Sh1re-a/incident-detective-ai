@@ -2,6 +2,7 @@ package dev.shirwac.incidentdetective.rag;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
 import jakarta.validation.Validation;
 import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeCorpus;
 import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeCorpusImporter;
@@ -38,7 +39,8 @@ class JdbcRunbookVectorStoreIT {
             "gemini-embedding-2",
             768,
             "search-result-v1",
-            0.0
+            0.0,
+            GoogleGenAiProvider.DEVELOPER_API
     );
 
     @Container
@@ -143,6 +145,46 @@ class JdbcRunbookVectorStoreIT {
     }
 
     @Test
+    void neverTreatsDeveloperApiVectorsAsCurrentVertexVectors() {
+        RagProperties vertexProfile = new RagProperties(
+                "gemini-embedding-2",
+                768,
+                "search-result-v1",
+                0.0,
+                GoogleGenAiProvider.VERTEX_AI
+        );
+        RunbookCorpusEntry entry = entry(
+                "provider-bound-vector",
+                "Provider-bound vector",
+                "The same model ID can still use a different provider transport."
+        );
+
+        store.upsert(CORPUS_VERSION, entry, PROFILE, embedding(unitVector(0)));
+
+        assertTrue(store.containsCurrent(CORPUS_VERSION, entry, PROFILE));
+        assertFalse(store.containsCurrent(
+                CORPUS_VERSION,
+                entry,
+                vertexProfile
+        ));
+        assertEquals(0, store.count(CORPUS_VERSION, vertexProfile));
+
+        store.upsert(
+                CORPUS_VERSION,
+                entry,
+                vertexProfile,
+                embedding(unitVector(1))
+        );
+
+        assertEquals(1, store.count(CORPUS_VERSION, PROFILE));
+        assertEquals(1, store.count(CORPUS_VERSION, vertexProfile));
+        assertEquals(2L, JdbcClient.create(dataSource)
+                .sql("SELECT COUNT(*) FROM runbook_embeddings")
+                .query(Long.class)
+                .single());
+    }
+
+    @Test
     void importsTheVersionedCorpusAndReportsEveryChunkCurrentWithoutAProvider() {
         ClasspathRunbookCorpus corpus = new ClasspathRunbookCorpus(
                 JsonMapper.builder()
@@ -185,6 +227,7 @@ class JdbcRunbookVectorStoreIT {
         ).inspect();
 
         assertEquals(12, first.importedChunks());
+        assertEquals("developer_api", first.providerTransport());
         assertEquals(0, first.skippedChunks());
         assertEquals(0, second.importedChunks());
         assertEquals(12, second.skippedChunks());
@@ -234,6 +277,7 @@ class JdbcRunbookVectorStoreIT {
         ).inspect();
 
         assertEquals("nordly-knowledge-corpus-v2", first.corpusVersion());
+        assertEquals("developer_api", first.providerTransport());
         assertEquals(27, first.importedChunks());
         assertEquals(0, second.importedChunks());
         assertEquals(27, second.skippedChunks());

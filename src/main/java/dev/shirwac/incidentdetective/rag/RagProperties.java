@@ -1,6 +1,8 @@
 package dev.shirwac.incidentdetective.rag;
 
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -10,9 +12,13 @@ public record RagProperties(
         @NotBlank String embeddingModel,
         int embeddingDimensions,
         @NotBlank String embeddingFormatVersion,
-        double minimumSimilarity
+        double minimumSimilarity,
+        @NotNull GoogleGenAiProvider providerTransport
 ) {
     public RagProperties {
+        if (providerTransport == null) {
+            throw new IllegalArgumentException("provider transport is required");
+        }
         if (embeddingDimensions != 768) {
             throw new IllegalArgumentException(
                     "the current pgvector schema requires 768 dimensions"

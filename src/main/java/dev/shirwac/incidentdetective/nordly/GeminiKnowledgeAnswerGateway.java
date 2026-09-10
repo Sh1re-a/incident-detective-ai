@@ -14,6 +14,7 @@ import com.google.genai.types.Part;
 import com.google.genai.types.ThinkingConfig;
 import com.google.genai.types.ThinkingLevel;
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
+import dev.shirwac.incidentdetective.ai.GoogleGenAiClientFactory;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
 import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
@@ -45,6 +46,7 @@ final class GeminiKnowledgeAnswerGateway implements KnowledgeAnswerGateway {
     private static final int TIMEOUT_MS = 15_000;
 
     private final GeminiAiProperties properties;
+    private final GoogleGenAiClientFactory clientFactory;
     private final JsonMapper jsonMapper;
     private final String instructions;
     private final Map<String, Object> schema;
@@ -52,9 +54,11 @@ final class GeminiKnowledgeAnswerGateway implements KnowledgeAnswerGateway {
 
     GeminiKnowledgeAnswerGateway(
             GeminiAiProperties properties,
+            GoogleGenAiClientFactory clientFactory,
             JsonMapper jsonMapper
     ) {
         this.properties = properties;
+        this.clientFactory = clientFactory;
         this.jsonMapper = jsonMapper;
         instructions = loadText(PROMPT_RESOURCE);
         schema = loadSchema(SCHEMA_RESOURCE);
@@ -163,22 +167,19 @@ final class GeminiKnowledgeAnswerGateway implements KnowledgeAnswerGateway {
 
     private synchronized Client client() {
         if (client == null) {
-            if (!properties.hasApiKey()) {
+            if (!properties.hasProviderConfiguration()) {
                 throw providerFailure(
                         ModelProviderFailure.UPSTREAM,
-                        "Gemini API key is not configured",
+                        "Google Gen AI provider is not configured",
                         null
                 );
             }
-            client = Client.builder()
-                    .apiKey(properties.geminiApiKey())
-                    .httpOptions(HttpOptions.builder()
+            client = clientFactory.create(HttpOptions.builder()
                             .timeout(TIMEOUT_MS)
                             .retryOptions(HttpRetryOptions.builder()
                                     .attempts(1)
                                     .build())
-                            .build())
-                    .build();
+                            .build());
         }
         return client;
     }

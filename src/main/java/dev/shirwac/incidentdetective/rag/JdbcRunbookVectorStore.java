@@ -19,6 +19,7 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
             AND embedding_model = :embeddingModel
             AND embedding_dimensions = :embeddingDimensions
             AND embedding_format_version = :embeddingFormatVersion
+            AND provider_transport = :providerTransport
             """;
 
     private final JdbcClient jdbc;
@@ -70,6 +71,7 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                     embedding_model,
                     embedding_dimensions,
                     embedding_format_version,
+                    provider_transport,
                     embedding,
                     input_characters,
                     provider_billable_characters,
@@ -89,6 +91,7 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                     :embeddingModel,
                     :embeddingDimensions,
                     :embeddingFormatVersion,
+                    :providerTransport,
                     CAST(:embedding AS vector),
                     :inputCharacters,
                     :providerBillableCharacters,
@@ -100,7 +103,8 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                     evidence_id,
                     embedding_model,
                     embedding_dimensions,
-                    embedding_format_version
+                    embedding_format_version,
+                    provider_transport
                 ) DO UPDATE SET
                     document_id = EXCLUDED.document_id,
                     document_version = EXCLUDED.document_version,
@@ -227,7 +231,11 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                 .param("corpusVersion", corpusVersion)
                 .param("embeddingModel", profile.embeddingModel())
                 .param("embeddingDimensions", profile.embeddingDimensions())
-                .param("embeddingFormatVersion", profile.embeddingFormatVersion());
+                .param("embeddingFormatVersion", profile.embeddingFormatVersion())
+                .param(
+                        "providerTransport",
+                        profile.providerTransport().transport()
+                );
     }
 
     private RunbookSearchHit mapHit(ResultSet resultSet, int rowNumber)

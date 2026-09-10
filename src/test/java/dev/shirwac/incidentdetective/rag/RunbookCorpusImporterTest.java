@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.rag;
 
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
 import jakarta.validation.Validation;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.PropertyNamingStrategies;
@@ -22,7 +23,8 @@ class RunbookCorpusImporterTest {
             "gemini-embedding-2",
             768,
             "search-result-v1",
-            0.0
+            0.0,
+            GoogleGenAiProvider.DEVELOPER_API
     );
 
     @Test
@@ -43,6 +45,7 @@ class RunbookCorpusImporterTest {
         RunbookImportReport report = importer.importMissingOrChanged();
 
         assertEquals(12, report.totalChunks());
+        assertEquals("developer_api", report.providerTransport());
         assertEquals(11, report.importedChunks());
         assertEquals(1, report.skippedChunks());
         assertEquals(11, embeddings.inputs.size());

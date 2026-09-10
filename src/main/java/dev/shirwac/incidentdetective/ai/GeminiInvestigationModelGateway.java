@@ -46,6 +46,7 @@ public final class GeminiInvestigationModelGateway
 
     private static final Duration MAX_PROVIDER_TIMEOUT = Duration.ofSeconds(28);
     private final GeminiAiProperties properties;
+    private final GoogleGenAiClientFactory clientFactory;
     private final GeminiDiagnosisDecoder diagnosisDecoder;
     private final JsonMapper jsonMapper;
     private final String collectInstructions;
@@ -56,11 +57,13 @@ public final class GeminiInvestigationModelGateway
 
     public GeminiInvestigationModelGateway(
             GeminiAiProperties properties,
+            GoogleGenAiClientFactory clientFactory,
             DiagnosisContractProperties diagnosisContract,
             GeminiDiagnosisDecoder diagnosisDecoder,
             JsonMapper jsonMapper
     ) {
         this.properties = properties;
+        this.clientFactory = clientFactory;
         this.diagnosisDecoder = diagnosisDecoder;
         this.jsonMapper = jsonMapper;
         collectInstructions = loadText(
@@ -358,16 +361,15 @@ public final class GeminiInvestigationModelGateway
 
     private synchronized Client client() {
         if (client == null) {
-            if (!properties.hasApiKey()) {
+            if (!properties.hasProviderConfiguration()) {
                 throw new ModelProviderException(
                         ModelProviderFailure.UPSTREAM,
-                        "Gemini API key is not configured"
+                        "Google Gen AI provider is not configured"
                 );
             }
-            client = Client.builder()
-                    .apiKey(properties.geminiApiKey())
-                    .httpOptions(requestHttpOptions(MAX_PROVIDER_TIMEOUT))
-                    .build();
+            client = clientFactory.create(
+                    requestHttpOptions(MAX_PROVIDER_TIMEOUT)
+            );
         }
         return client;
     }

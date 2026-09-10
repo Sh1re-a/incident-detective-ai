@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.rag;
 
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
 import dev.shirwac.incidentdetective.domain.scenario.InitialSymptom;
 import dev.shirwac.incidentdetective.domain.scenario.Scenario;
 import dev.shirwac.incidentdetective.domain.scenario.TimeWindow;
@@ -27,7 +28,8 @@ class PgvectorRunbookRetrievalStrategyTest {
             "gemini-embedding-2",
             768,
             "search-result-v1",
-            0.42
+            0.42,
+            GoogleGenAiProvider.DEVELOPER_API
     );
 
     @Test

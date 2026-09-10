@@ -4,6 +4,7 @@ import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
 import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.GeminiPromptContracts;
 import dev.shirwac.incidentdetective.ai.GeminiThinkingLevel;
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
 import dev.shirwac.incidentdetective.rag.EmbeddingGateway;
 import dev.shirwac.incidentdetective.rag.EmbeddingResult;
 import dev.shirwac.incidentdetective.rag.RagProperties;
@@ -39,7 +40,8 @@ class KnowledgeRagServiceTest {
             "gemini-embedding-2",
             768,
             "search-result-v1",
-            0.662
+            0.662,
+            GoogleGenAiProvider.DEVELOPER_API
     );
     private static final NordlyKnowledgeRagProperties KNOWLEDGE_PROFILE =
             new NordlyKnowledgeRagProperties(3, 0.68);

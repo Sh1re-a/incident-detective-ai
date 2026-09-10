@@ -87,6 +87,7 @@ public final class RunbookCorpusImporter {
                 properties.embeddingModel(),
                 properties.embeddingDimensions(),
                 properties.embeddingFormatVersion(),
+                properties.providerTransport().transport(),
                 corpus.entries().size(),
                 imported,
                 skipped,

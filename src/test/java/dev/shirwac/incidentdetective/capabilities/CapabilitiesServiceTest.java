@@ -2,6 +2,7 @@ package dev.shirwac.incidentdetective.capabilities;
 
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
 import dev.shirwac.incidentdetective.ai.GeminiThinkingLevel;
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.EmbeddingCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ModeCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ToolBudgetCapability;
@@ -40,7 +41,8 @@ class CapabilitiesServiceTest {
             "gemini-embedding-2",
             768,
             "search-result-v1",
-            0.6620781500197453
+            0.6620781500197453,
+            GoogleGenAiProvider.DEVELOPER_API
     );
 
     @Test

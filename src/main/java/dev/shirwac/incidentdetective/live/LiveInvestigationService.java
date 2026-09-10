@@ -474,10 +474,10 @@ public final class LiveInvestigationService {
                     "Live AI is disabled by server configuration"
             );
         }
-        if (!properties.hasApiKey()) {
+        if (!properties.hasProviderConfiguration()) {
             throw new LiveInvestigationException(
                     LiveInvestigationFailure.API_KEY_MISSING,
-                    "Gemini API key is missing"
+                    "Google Gen AI provider configuration is missing"
             );
         }
     }

@@ -96,6 +96,7 @@ public final class NordlyKnowledgeCorpusImporter {
                 properties.embeddingModel(),
                 properties.embeddingDimensions(),
                 properties.embeddingFormatVersion(),
+                properties.providerTransport().transport(),
                 corpus.eligibleChunkCount(),
                 imported,
                 skipped,

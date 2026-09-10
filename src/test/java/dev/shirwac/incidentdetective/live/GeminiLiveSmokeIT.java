@@ -31,8 +31,8 @@ class GeminiLiveSmokeIT {
     void runsOneExplicitlyEnabledRealGeminiInvestigation() {
         assertTrue(properties.liveEnabled(),
                 "Set INCIDENT_DETECTIVE_LIVE_AI_ENABLED=true first");
-        assertTrue(properties.hasApiKey(),
-                "Set GEMINI_API_KEY in the ignored local secrets file first");
+        assertTrue(properties.hasProviderConfiguration(),
+                "Configure the selected Google Gen AI provider first");
 
         LiveInvestigationResult result = service.investigate(
                 scenarioId,
