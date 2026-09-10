@@ -2,6 +2,11 @@ package dev.shirwac.incidentdetective.rag;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import jakarta.validation.Validation;
+import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeCorpus;
+import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeCorpusImporter;
+import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeIndexReadiness;
+import dev.shirwac.incidentdetective.nordly.NordlyResourceCatalog;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -11,7 +16,12 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -130,6 +140,110 @@ class JdbcRunbookVectorStoreIT {
                 store.search(CORPUS_VERSION, PROFILE, unitVector(0), 1, -1)
                         .getFirst().entry().text()
         );
+    }
+
+    @Test
+    void importsTheVersionedCorpusAndReportsEveryChunkCurrentWithoutAProvider() {
+        ClasspathRunbookCorpus corpus = new ClasspathRunbookCorpus(
+                JsonMapper.builder()
+                        .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                        .build(),
+                Validation.buildDefaultValidatorFactory().getValidator()
+        );
+        EmbeddingGateway deterministicEmbeddings = new EmbeddingGateway() {
+            @Override
+            public EmbeddingResult embedQuery(String query) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public EmbeddingResult embedDocument(String title, String text) {
+                int activeIndex = Math.floorMod(title.hashCode(), 768);
+                return new EmbeddingResult(
+                        unitVector(activeIndex),
+                        title.length() + text.length(),
+                        null,
+                        null,
+                        0
+                );
+            }
+        };
+        RunbookCorpusImporter importer = new RunbookCorpusImporter(
+                corpus,
+                store,
+                deterministicEmbeddings,
+                PROFILE,
+                Clock.fixed(Instant.parse("2026-09-03T08:00:00Z"), ZoneOffset.UTC)
+        );
+
+        RunbookImportReport first = importer.importMissingOrChanged();
+        RunbookImportReport second = importer.importMissingOrChanged();
+        RunbookIndexStatus status = new RunbookIndexReadiness(
+                corpus,
+                store,
+                PROFILE
+        ).inspect();
+
+        assertEquals(12, first.importedChunks());
+        assertEquals(0, first.skippedChunks());
+        assertEquals(0, second.importedChunks());
+        assertEquals(12, second.skippedChunks());
+        assertTrue(status.ready());
+        assertEquals(12, status.indexedChunks());
+        assertEquals(12, status.currentChunks());
+        assertEquals(12, status.expectedChunks());
+    }
+
+    @Test
+    void importsNordlyIntoASeparateVersionWithApprovedDocumentsOnly() {
+        JsonMapper mapper = JsonMapper.builder()
+                .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                .build();
+        NordlyKnowledgeCorpus corpus = new NordlyKnowledgeCorpus(
+                new NordlyResourceCatalog(mapper)
+        );
+        EmbeddingGateway deterministicEmbeddings = new EmbeddingGateway() {
+            @Override
+            public EmbeddingResult embedQuery(String query) {
+                return embedding(unitVector(0));
+            }
+
+            @Override
+            public EmbeddingResult embedDocument(String title, String text) {
+                return embedding(unitVector(Math.floorMod(title.hashCode(), 768)));
+            }
+        };
+        NordlyKnowledgeCorpusImporter importer =
+                new NordlyKnowledgeCorpusImporter(
+                        corpus,
+                        store,
+                        deterministicEmbeddings,
+                        PROFILE,
+                        Clock.fixed(
+                                Instant.parse("2026-09-03T08:00:00Z"),
+                                ZoneOffset.UTC
+                        )
+                );
+
+        RunbookImportReport first = importer.importMissingOrChanged();
+        RunbookImportReport second = importer.importMissingOrChanged();
+        RunbookIndexStatus status = new NordlyKnowledgeIndexReadiness(
+                corpus,
+                store,
+                PROFILE
+        ).inspect();
+
+        assertEquals("nordly-knowledge-corpus-v1", first.corpusVersion());
+        assertEquals(18, first.importedChunks());
+        assertEquals(0, second.importedChunks());
+        assertEquals(18, second.skippedChunks());
+        assertTrue(status.ready());
+        assertEquals(18, store.count(corpus.version(), PROFILE));
+        assertFalse(store.documentIds(corpus.version(), PROFILE)
+                .contains("kb-legacy-refund-playbook"));
+        assertFalse(store.documentIds(corpus.version(), PROFILE)
+                .contains("kb-untrusted-shortcuts"));
+        assertEquals(0, store.count("runbook-corpus-v1", PROFILE));
     }
 
     private static RunbookCorpusEntry entry(

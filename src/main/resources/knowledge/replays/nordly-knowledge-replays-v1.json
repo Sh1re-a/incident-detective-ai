@@ -1,0 +1,207 @@
+{
+  "collection_version": "nordly-knowledge-replays-v1",
+  "replays": [
+    {
+      "contract_version": "nordly-knowledge-replay-v1",
+      "run_id": "nordly-replay-duplicate-authorization-v1",
+      "mode": "recorded_replay",
+      "truth_label": "FÖRINSPELAD SYNTETISK DEMO · INGEN MODELL- ELLER VECTORSÖKNING KÖRS NU",
+      "model_backed": false,
+      "current_vector_search": false,
+      "question_id": "duplicate-authorization",
+      "ranked_matches": [
+        {
+          "rank": 1,
+          "similarity": null,
+          "document_id": "kb-payment-authorizations",
+          "chunk_id": "reservation-vs-capture"
+        },
+        {
+          "rank": 2,
+          "similarity": null,
+          "document_id": "kb-payment-authorizations",
+          "chunk_id": "duplicate-reservation-support-check"
+        }
+      ],
+      "answer": {
+        "status": "answered",
+        "summary_sv": "Nej, inte nödvändigtvis. Två synliga reservationer kan komma från ett nytt betalningsförsök även om Nordly bara har gjort en slutlig debitering. Support måste kontrollera orderns betalningsstatus och capture-ID innan de bekräftar en dubbeldebitering.",
+        "summary_en": "Not necessarily. Two visible authorizations can result from a payment retry even when Nordly captured only one final charge. Support must check the order payment state and capture IDs before confirming a duplicate charge.",
+        "claims": [
+          {
+            "text_sv": "En kortreservation är inte samma sak som en slutlig debitering.",
+            "text_en": "A card authorization is not the same as a final captured charge.",
+            "citation_ids": [
+              "nordly-evidence-payment-reservation-vs-capture"
+            ]
+          },
+          {
+            "text_sv": "Support måste kontrollera betalningsstatus och capture-ID innan en dubbeldebitering bekräftas.",
+            "text_en": "Support must check the payment state and capture IDs before confirming a duplicate charge.",
+            "citation_ids": [
+              "nordly-evidence-duplicate-reservation-check"
+            ]
+          }
+        ]
+      },
+      "verification": {
+        "schema_pass": true,
+        "citations_seen": 2,
+        "approved_documents_only": true,
+        "claim_support_pass": true,
+        "action_within_scope": true,
+        "overall_outcome": "answered_with_grounded_citations"
+      },
+      "receipt": {
+        "tool_calls": [],
+        "write_tools_available": false,
+        "action_executed": false,
+        "latency_ms": null,
+        "total_tokens": null,
+        "estimated_cost_usd": null,
+        "cost_status": "not_incurred"
+      },
+      "limitations": [
+        "Detta är en validerad, lokalt lagrad replay och inte ett nytt AI-svar.",
+        "Ingen embedding eller vectorsökning körs när endpointen anropas; därför visas ingen similarity-score.",
+        "Nordlys nya kunskapskorpus är ännu inte kopplad till det befintliga pgvector-indexet."
+      ]
+    },
+    {
+      "contract_version": "nordly-knowledge-replay-v1",
+      "run_id": "nordly-replay-refund-timing-v1",
+      "mode": "recorded_replay",
+      "truth_label": "FÖRINSPELAD SYNTETISK DEMO · INGEN MODELL- ELLER VECTORSÖKNING KÖRS NU",
+      "model_backed": false,
+      "current_vector_search": false,
+      "question_id": "refund-timing",
+      "ranked_matches": [
+        {
+          "rank": 1,
+          "similarity": null,
+          "document_id": "kb-returns-refunds",
+          "chunk_id": "refund-timing-card"
+        }
+      ],
+      "answer": {
+        "status": "answered",
+        "summary_sv": "När en behörig supportmedarbetare har godkänt återbetalningen skickar Nordly den samma arbetsdag. Kundens bank visar normalt beloppet inom 2–5 bankdagar. Support bör kontrollera återbetalningsreferensen om det tar längre tid.",
+        "summary_en": "After an authorized support agent approves the refund, Nordly submits it the same business day. The customer's bank normally shows the amount within 2–5 banking days. Support should verify the refund reference if it takes longer.",
+        "claims": [
+          {
+            "text_sv": "Nordly skickar en godkänd kortåterbetalning samma arbetsdag.",
+            "text_en": "Nordly submits an approved card refund on the same business day.",
+            "citation_ids": [
+              "nordly-evidence-refund-timing-card"
+            ]
+          },
+          {
+            "text_sv": "Kundens bank visar normalt beloppet inom 2–5 bankdagar.",
+            "text_en": "The customer's bank normally shows the amount within 2–5 banking days.",
+            "citation_ids": [
+              "nordly-evidence-refund-timing-card"
+            ]
+          }
+        ]
+      },
+      "verification": {
+        "schema_pass": true,
+        "citations_seen": 1,
+        "approved_documents_only": true,
+        "claim_support_pass": true,
+        "action_within_scope": true,
+        "overall_outcome": "answered_with_grounded_citations"
+      },
+      "receipt": {
+        "tool_calls": [],
+        "write_tools_available": false,
+        "action_executed": false,
+        "latency_ms": null,
+        "total_tokens": null,
+        "estimated_cost_usd": null,
+        "cost_status": "not_incurred"
+      },
+      "limitations": [
+        "Detta är en validerad, lokalt lagrad replay och inte ett nytt AI-svar.",
+        "Svaret beskriver den syntetiska Nordly-policyn och är inte information från en riktig butik eller bank.",
+        "Endpointen kan förklara processen men kan inte läsa ett kundkonto eller utföra en återbetalning."
+      ]
+    },
+    {
+      "contract_version": "nordly-knowledge-replay-v1",
+      "run_id": "nordly-replay-refund-customer-action-v1",
+      "mode": "recorded_replay",
+      "truth_label": "FÖRINSPELAD SYNTETISK DEMO · INGEN MODELL- ELLER VECTORSÖKNING KÖRS NU",
+      "model_backed": false,
+      "current_vector_search": false,
+      "question_id": "refund-customer-action",
+      "ranked_matches": [],
+      "answer": {
+        "status": "refused",
+        "summary_sv": "Nej. Den här AI:n har inga skrivverktyg och får inte genomföra återbetalningar. En behörig människa måste kontrollera ärendet och använda Nordlys autentiserade supportsystem.",
+        "summary_en": "No. This AI has no write tools and cannot issue refunds. An authorized human must review the case and use Nordly's authenticated support system.",
+        "claims": []
+      },
+      "verification": {
+        "schema_pass": true,
+        "citations_seen": 0,
+        "approved_documents_only": true,
+        "claim_support_pass": true,
+        "action_within_scope": false,
+        "overall_outcome": "refused_out_of_scope_action"
+      },
+      "receipt": {
+        "tool_calls": [],
+        "write_tools_available": false,
+        "action_executed": false,
+        "latency_ms": null,
+        "total_tokens": null,
+        "estimated_cost_usd": null,
+        "cost_status": "not_incurred"
+      },
+      "limitations": [
+        "Begäran stoppades vid behörighetsgränsen; ingen retrieval, modell eller åtgärd kördes.",
+        "Systemet saknar medvetet verktyg för refund, orderändring, deploy och rollback.",
+        "En människa måste fatta och genomföra ekonomiska beslut i rätt verksamhetssystem."
+      ]
+    },
+    {
+      "contract_version": "nordly-knowledge-replay-v1",
+      "run_id": "nordly-replay-unsupported-gift-card-extension-v1",
+      "mode": "recorded_replay",
+      "truth_label": "FÖRINSPELAD SYNTETISK DEMO · INGEN MODELL- ELLER VECTORSÖKNING KÖRS NU",
+      "model_backed": false,
+      "current_vector_search": false,
+      "question_id": "unsupported-gift-card-extension",
+      "ranked_matches": [],
+      "answer": {
+        "status": "insufficient_evidence",
+        "summary_sv": "Jag kan inte svara säkert. Den publicerade Nordly-korpusen innehåller ingen godkänd regel om att förlänga presentkort från 24 till 36 månader. Frågan behöver lämnas till en behörig medarbetare i stället för att AI:n gissar.",
+        "summary_en": "I cannot answer safely. The published Nordly corpus has no approved rule for extending a gift card from 24 to 36 months. An authorized employee must handle the question instead of the AI guessing.",
+        "claims": []
+      },
+      "verification": {
+        "schema_pass": true,
+        "citations_seen": 0,
+        "approved_documents_only": true,
+        "claim_support_pass": true,
+        "action_within_scope": true,
+        "overall_outcome": "abstained_insufficient_evidence"
+      },
+      "receipt": {
+        "tool_calls": [],
+        "write_tools_available": false,
+        "action_executed": false,
+        "latency_ms": null,
+        "total_tokens": null,
+        "estimated_cost_usd": null,
+        "cost_status": "not_incurred"
+      },
+      "limitations": [
+        "Den inspelade retrievalbilden innehåller ingen godkänd match för frågan.",
+        "Systemet visar avstående i stället för en obelagd policy.",
+        "Ingen modell, embedding, vectorsökning eller verksamhetsåtgärd kördes för replayen."
+      ]
+    }
+  ]
+}

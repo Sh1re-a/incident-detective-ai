@@ -1,0 +1,50 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary_sv", "summary_en", "claims"],
+  "properties": {
+    "summary_sv": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 700
+    },
+    "summary_en": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 700
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text_sv", "text_en", "citation_ids"],
+        "properties": {
+          "text_sv": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "text_en": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "citation_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          }
+        }
+      }
+    }
+  }
+}
