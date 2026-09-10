@@ -5,6 +5,7 @@ import dev.shirwac.incidentdetective.ai.GeminiThinkingLevel;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.EmbeddingCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ModeCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ToolBudgetCapability;
+import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.VectorIndexCapability;
 import dev.shirwac.incidentdetective.investigation.tools.RetrieveRunbooksArguments;
 import dev.shirwac.incidentdetective.investigation.tools.RetrieveRunbooksResult;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalBackend;
@@ -14,6 +15,8 @@ import dev.shirwac.incidentdetective.live.GlobalDailyLiveQuota;
 import dev.shirwac.incidentdetective.live.LiveInvestigationService;
 import dev.shirwac.incidentdetective.live.PromptCacheStrategy;
 import dev.shirwac.incidentdetective.rag.RagProperties;
+import dev.shirwac.incidentdetective.rag.RunbookIndexReadiness;
+import dev.shirwac.incidentdetective.rag.RunbookIndexStatus;
 import dev.shirwac.incidentdetective.replay.RecordedReplayService;
 import dev.shirwac.incidentdetective.replay.RunMode;
 import org.junit.jupiter.api.Test;
@@ -21,12 +24,15 @@ import org.springframework.mock.env.MockEnvironment;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class CapabilitiesServiceTest {
 
@@ -53,10 +59,11 @@ class CapabilitiesServiceTest {
                 retrieval(RunbookRetrievalBackend.DETERMINISTIC_FIXTURE),
                 RAG,
                 environment,
-                quota(GlobalDailyLiveQuota.Scope.PROCESS_LOCAL)
+                quota(GlobalDailyLiveQuota.Scope.PROCESS_LOCAL),
+                Optional.empty()
         ).describe();
 
-        assertEquals("capabilities-v2", response.contractVersion());
+        assertEquals("capabilities-v3", response.contractVersion());
         assertTrue(response.syntheticOnly());
         assertFalse(response.remediationEnabled());
         assertEquals(List.of(
@@ -120,6 +127,15 @@ class CapabilitiesServiceTest {
                 response.generatedCases().truthLabel()
         );
         assertEquals(
+                List.of(
+                        "payment_timeout",
+                        "catalog_cache_invalidation",
+                        "order_event_backlog",
+                        "order_idempotency_failure"
+                ),
+                response.generatedCases().incidentFamilies()
+        );
+        assertEquals(
                 List.of("diagnostic", "insufficient_evidence"),
                 response.generatedCases().evidenceModes()
         );
@@ -136,6 +152,7 @@ class CapabilitiesServiceTest {
         assertEquals(List.of("replay"), response.retrieval().activeProfiles());
         assertFalse(response.retrieval().vectorDatabaseBackendActive());
         assertNull(response.retrieval().activeEmbeddingProfile());
+        assertNull(response.retrieval().indexStatus());
         assertEquals(
                 PromptCacheStrategy.PROVIDER_IMPLICIT,
                 response.promptCache().strategy()
@@ -155,13 +172,17 @@ class CapabilitiesServiceTest {
         );
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("rag");
+        RunbookIndexReadiness readiness = mock(RunbookIndexReadiness.class);
+        when(readiness.corpusVersion()).thenReturn("runbook-corpus-v1");
+        when(readiness.inspect()).thenReturn(new RunbookIndexStatus(12, 12, 12));
 
         CapabilitiesResponse response = new CapabilitiesService(
                 ai,
                 retrieval(RunbookRetrievalBackend.PGVECTOR_EXACT_COSINE),
                 RAG,
                 environment,
-                quota(GlobalDailyLiveQuota.Scope.DATABASE_GLOBAL)
+                quota(GlobalDailyLiveQuota.Scope.DATABASE_GLOBAL),
+                Optional.of(readiness)
         ).describe();
 
         assertEquals(
@@ -176,6 +197,13 @@ class CapabilitiesServiceTest {
                 "search-result-v1",
                 0.6620781500197453
         ), response.retrieval().activeEmbeddingProfile());
+        assertEquals(new VectorIndexCapability(
+                true,
+                "runbook-corpus-v1",
+                12,
+                12,
+                12
+        ), response.retrieval().indexStatus());
         assertTrue(response.liveAi().credentialsConfigured());
         assertFalse(response.liveAi().requestConfigured());
         assertEquals(

@@ -40,7 +40,7 @@ public record CapabilitiesResponse(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         PromptCacheCapability promptCache
 ) {
-    public static final String CONTRACT_VERSION = "capabilities-v2";
+    public static final String CONTRACT_VERSION = "capabilities-v3";
 
     public CapabilitiesResponse {
         modes = List.copyOf(modes);
@@ -139,6 +139,8 @@ public record CapabilitiesResponse(
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             boolean requestLocalOnly,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            List<String> incidentFamilies,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             List<String> evidenceModes,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             List<String> noiseLevels,
@@ -146,6 +148,7 @@ public record CapabilitiesResponse(
             List<ToolName> allowedTools
     ) {
         public GeneratedCasesCapability {
+            incidentFamilies = List.copyOf(incidentFamilies);
             evidenceModes = List.copyOf(evidenceModes);
             noiseLevels = List.copyOf(noiseLevels);
             allowedTools = List.copyOf(allowedTools);
@@ -185,11 +188,32 @@ public record CapabilitiesResponse(
                     description = "Active embedding configuration, or null when "
                             + "fixture retrieval is active."
             )
-            EmbeddingCapability activeEmbeddingProfile
+            EmbeddingCapability activeEmbeddingProfile,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    nullable = true,
+                    description = "Current corpus/index readiness reported by the "
+                            + "active pgvector backend, or null for fixture retrieval."
+            )
+            VectorIndexCapability indexStatus
     ) {
         public RetrievalCapability {
             activeProfiles = List.copyOf(activeProfiles);
         }
+    }
+
+    public record VectorIndexCapability(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean ready,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String corpusVersion,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "0")
+            long indexedChunks,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "0")
+            long currentChunks,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "0")
+            int expectedChunks
+    ) {
     }
 
     public record EmbeddingCapability(

@@ -35,7 +35,7 @@ class CapabilitiesApiTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("application/json"))
                 .andExpect(jsonPath("$.contract_version")
-                        .value("capabilities-v2"))
+                        .value("capabilities-v3"))
                 .andExpect(jsonPath("$.synthetic_only").value(true))
                 .andExpect(jsonPath("$.remediation_enabled").value(false))
                 .andExpect(jsonPath("$.modes[*].mode").value(contains(
@@ -95,6 +95,13 @@ class CapabilitiesApiTest {
                 ).value(false))
                 .andExpect(jsonPath("$.generated_cases.request_local_only")
                         .value(true))
+                .andExpect(jsonPath("$.generated_cases.incident_families")
+                        .value(contains(
+                                "payment_timeout",
+                                "catalog_cache_invalidation",
+                                "order_event_backlog",
+                                "order_idempotency_failure"
+                        )))
                 .andExpect(jsonPath("$.generated_cases.evidence_modes")
                         .value(contains("diagnostic", "insufficient_evidence")))
                 .andExpect(jsonPath("$.generated_cases.noise_levels")
@@ -105,6 +112,8 @@ class CapabilitiesApiTest {
                         "$.retrieval.vector_database_backend_active"
                 ).value(false))
                 .andExpect(jsonPath("$.retrieval.active_embedding_profile")
+                        .value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.retrieval.index_status")
                         .value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.prompt_cache.strategy")
                         .value("provider_implicit"))

@@ -10,9 +10,11 @@ import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.PromptCac
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.RetrievalCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ToolBudgetCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ToolCapability;
+import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.VectorIndexCapability;
 import dev.shirwac.incidentdetective.generated.GeneratedCaseFactory;
 import dev.shirwac.incidentdetective.generated.GeneratedCaseRunResult;
 import dev.shirwac.incidentdetective.generated.GeneratedEvidenceMode;
+import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
 import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalBackend;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalStrategy;
@@ -22,6 +24,8 @@ import dev.shirwac.incidentdetective.live.LiveInvestigationLimits;
 import dev.shirwac.incidentdetective.live.LiveInvestigationService;
 import dev.shirwac.incidentdetective.live.PromptCacheStrategy;
 import dev.shirwac.incidentdetective.rag.RagProperties;
+import dev.shirwac.incidentdetective.rag.RunbookIndexReadiness;
+import dev.shirwac.incidentdetective.rag.RunbookIndexStatus;
 import dev.shirwac.incidentdetective.replay.RecordedReplayService;
 import dev.shirwac.incidentdetective.replay.RunMode;
 import org.springframework.core.env.Environment;
@@ -30,6 +34,7 @@ import org.springframework.stereotype.Service;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public final class CapabilitiesService {
@@ -39,19 +44,22 @@ public final class CapabilitiesService {
     private final RagProperties rag;
     private final Environment environment;
     private final GlobalDailyLiveQuota dailyQuota;
+    private final Optional<RunbookIndexReadiness> indexReadiness;
 
     public CapabilitiesService(
             GeminiAiProperties ai,
             RunbookRetrievalStrategy retrieval,
             RagProperties rag,
             Environment environment,
-            GlobalDailyLiveQuota dailyQuota
+            GlobalDailyLiveQuota dailyQuota,
+            Optional<RunbookIndexReadiness> indexReadiness
     ) {
         this.ai = ai;
         this.retrieval = retrieval;
         this.rag = rag;
         this.environment = environment;
         this.dailyQuota = dailyQuota;
+        this.indexReadiness = indexReadiness;
     }
 
     public CapabilitiesResponse describe() {
@@ -136,6 +144,9 @@ public final class CapabilitiesService {
                 LiveInvestigationService.GENERATED_TRUTH_LABEL,
                 false,
                 true,
+                Arrays.stream(GeneratedIncidentFamily.values())
+                        .map(GeneratedIncidentFamily::wireValue)
+                        .toList(),
                 Arrays.stream(GeneratedEvidenceMode.values())
                         .map(GeneratedEvidenceMode::wireValue)
                         .toList(),
@@ -157,13 +168,30 @@ public final class CapabilitiesService {
                         rag.minimumSimilarity()
                 )
                 : null;
+        VectorIndexCapability index = pgvectorActive
+                ? indexReadiness.map(this::indexCapability).orElse(null)
+                : null;
         return new RetrievalCapability(
                 retrieval.backend(),
                 effectiveProfiles(),
                 retrieval.safeModeDescription(),
                 retrieval.limitation(),
                 pgvectorActive,
-                embedding
+                embedding,
+                index
+        );
+    }
+
+    private VectorIndexCapability indexCapability(
+            RunbookIndexReadiness readiness
+    ) {
+        RunbookIndexStatus status = readiness.inspect();
+        return new VectorIndexCapability(
+                status.ready(),
+                readiness.corpusVersion(),
+                status.indexedChunks(),
+                status.currentChunks(),
+                status.expectedChunks()
         );
     }
 

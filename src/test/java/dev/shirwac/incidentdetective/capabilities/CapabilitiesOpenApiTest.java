@@ -55,7 +55,7 @@ class CapabilitiesOpenApiTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.CapabilitiesResponse"
                                 + ".properties.contract_version.enum"
-                ).value(contains("capabilities-v2")))
+                ).value(contains("capabilities-v3")))
                 .andExpect(jsonPath(
                         "$.components.schemas.ToolCapability.properties.name.enum"
                 ).value(contains(
@@ -70,6 +70,26 @@ class CapabilitiesOpenApiTest {
                 ).value(contains(
                         "deterministic_fixture",
                         "pgvector_exact_cosine"
+                )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.RetrievalCapability.required"
+                ).value(containsInAnyOrder(
+                        "backend",
+                        "active_profiles",
+                        "mode_description",
+                        "limitation",
+                        "vector_database_backend_active",
+                        "active_embedding_profile",
+                        "index_status"
+                )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.VectorIndexCapability.required"
+                ).value(containsInAnyOrder(
+                        "ready",
+                        "corpus_version",
+                        "indexed_chunks",
+                        "current_chunks",
+                        "expected_chunks"
                 )))
                 .andExpect(jsonPath(
                         "$.components.schemas.PromptCacheCapability"
@@ -90,6 +110,10 @@ class CapabilitiesOpenApiTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.GeneratedCasesCapability"
                                 + ".properties.truth_label"
+                ).exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.GeneratedCasesCapability"
+                                + ".properties.incident_families"
                 ).exists())
                 .andExpect(jsonPath(
                         "$.components.schemas.LiveAiCapability"

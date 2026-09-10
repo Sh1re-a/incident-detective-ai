@@ -37,6 +37,10 @@ public final class RunbookIndexReadiness {
         );
     }
 
+    public String corpusVersion() {
+        return corpus.version();
+    }
+
     public RunbookIndexStatus requireReady() {
         RunbookIndexStatus status = inspect();
         if (!status.ready()) {

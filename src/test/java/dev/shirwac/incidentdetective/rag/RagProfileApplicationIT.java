@@ -1,8 +1,12 @@
 package dev.shirwac.incidentdetective.rag;
 
+import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse;
+import dev.shirwac.incidentdetective.capabilities.CapabilitiesService;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalStrategy;
 import dev.shirwac.incidentdetective.live.GlobalDailyLiveQuota;
 import dev.shirwac.incidentdetective.live.JdbcGlobalDailyLiveQuota;
+import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeCorpus;
+import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeIndexReadiness;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +58,15 @@ class RagProfileApplicationIT {
     @Autowired
     private GlobalDailyLiveQuota dailyLiveQuota;
 
+    @Autowired
+    private CapabilitiesService capabilities;
+
+    @Autowired
+    private NordlyKnowledgeCorpus nordlyKnowledgeCorpus;
+
+    @Autowired
+    private NordlyKnowledgeIndexReadiness nordlyKnowledgeIndexReadiness;
+
     @Test
     void startsOnlyTheExplicitRagStackAndMigratesPgvector() {
         assertInstanceOf(PgvectorRunbookRetrievalStrategy.class, retrieval);
@@ -67,6 +80,22 @@ class RagProfileApplicationIT {
         assertEquals(0L, jdbc.sql("SELECT COUNT(*) FROM runbook_embeddings")
                 .query(Long.class)
                 .single());
+        assertEquals(10, nordlyKnowledgeCorpus.eligibleDocumentCount());
+        assertEquals(18, nordlyKnowledgeCorpus.eligibleChunkCount());
+        RunbookIndexStatus nordlyIndex = nordlyKnowledgeIndexReadiness.inspect();
+        assertFalse(nordlyIndex.ready());
+        assertEquals(0, nordlyIndex.indexedChunks());
+        assertEquals(0, nordlyIndex.currentChunks());
+        assertEquals(18, nordlyIndex.expectedChunks());
+        CapabilitiesResponse.VectorIndexCapability index = capabilities
+                .describe()
+                .retrieval()
+                .indexStatus();
+        assertFalse(index.ready());
+        assertEquals("runbook-corpus-v1", index.corpusVersion());
+        assertEquals(0, index.indexedChunks());
+        assertEquals(0, index.currentChunks());
+        assertEquals(12, index.expectedChunks());
 
         GlobalDailyLiveQuota.Decision first = dailyLiveQuota.tryConsume(2);
         GlobalDailyLiveQuota.Decision second = dailyLiveQuota.tryConsume(2);
