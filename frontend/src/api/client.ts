@@ -1,102 +1,166 @@
 import type {
-  ApiProblem,
+  AdkAgentTurnRequest,
+  AdkAgentTurnResponse,
+  ApiProblemResponse,
+  CapabilitiesResponse,
+  GeneratedCaseLiveRequest,
+  GeneratedCaseRunResult,
+  DemoWorldResponse,
+  KnowledgeRagRequest,
+  KnowledgeRagResponse,
+  KnowledgeDocumentLibraryResponse,
+  KnowledgeReplayResponse,
+  LiveInvestigationRequest,
   LiveInvestigationResult,
   RecordedReplayResult,
+  RetrievalEvalProofResponse,
   ScenarioCatalogResponse,
-} from "./types";
+} from "./generated";
 
-export class ApiError extends Error {
-  readonly problem: ApiProblem;
-
-  constructor(problem: ApiProblem) {
-    super(problem.detail || problem.title);
-    this.name = "ApiError";
-    this.problem = problem;
+export class IncidentApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = "IncidentApiError";
   }
 }
 
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-  if (response.ok) {
-    return (await response.json()) as T;
+async function getJson<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set("Accept", "application/json");
+
+  const response = await fetch(path, {
+    ...init,
+    headers,
+  });
+
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as
+      | ApiProblemResponse
+      | null;
+
+    throw new IncidentApiError(
+      problem?.detail ?? `Request failed with status ${response.status}.`,
+      response.status,
+      problem?.code,
+    );
   }
 
-  const fallback: ApiProblem = {
-    title: "Request failed",
-    status: response.status,
-    detail: "The server could not complete this request.",
-  };
-
-  try {
-    const problem = (await response.json()) as Partial<ApiProblem>;
-    throw new ApiError({
-      ...fallback,
-      ...problem,
-      status: response.status,
-    });
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(fallback);
-  }
+  return response.json() as Promise<T>;
 }
 
-export async function getScenarios(
+export function getCapabilities(signal?: AbortSignal) {
+  return getJson<CapabilitiesResponse>("/api/v1/capabilities", { signal });
+}
+
+export function getScenarios(signal?: AbortSignal) {
+  return getJson<ScenarioCatalogResponse>("/api/v1/scenarios", { signal });
+}
+
+export function getRetrievalEvalProof(signal?: AbortSignal) {
+  return getJson<RetrievalEvalProofResponse>(
+    "/api/v1/proof/evals/retrieval",
+    { signal },
+  );
+}
+
+export function getDemoWorld(signal?: AbortSignal) {
+  return getJson<DemoWorldResponse>("/api/v1/demo-world", { signal });
+}
+
+export function getKnowledgeDocuments(signal?: AbortSignal) {
+  return getJson<KnowledgeDocumentLibraryResponse>(
+    "/api/v1/knowledge/documents",
+    { signal },
+  );
+}
+
+export function runKnowledgeReplay(
+  questionId: string,
   signal?: AbortSignal,
-): Promise<ScenarioCatalogResponse> {
-  return requestJson<ScenarioCatalogResponse>("/api/v1/scenarios", { signal });
-}
-
-export async function runRecordedReplay(
-  scenarioId: string,
-  signal?: AbortSignal,
-): Promise<RecordedReplayResult> {
-  return requestJson<RecordedReplayResult>(
-    `/api/v1/scenarios/${encodeURIComponent(scenarioId)}/runs/recorded-replay`,
+) {
+  return getJson<KnowledgeReplayResponse>(
+    `/api/v1/knowledge/questions/${encodeURIComponent(questionId)}/runs/recorded-replay`,
     { method: "POST", signal },
   );
 }
 
-export async function runLiveInvestigation(
-  scenarioId: string,
+export function runKnowledgeRag(
+  request: KnowledgeRagRequest,
   signal?: AbortSignal,
-): Promise<LiveInvestigationResult> {
-  return requestJson<LiveInvestigationResult>(
-    `/api/v1/scenarios/${encodeURIComponent(scenarioId)}/runs/live-ai`,
+) {
+  return getJson<KnowledgeRagResponse>(
+    "/api/v1/knowledge/questions/runs/rag",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ confirm_live_ai: true }),
+      body: JSON.stringify(request),
       signal,
     },
   );
 }
 
-export function toPublicErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    switch (error.problem.code) {
-      case "LIVE_AI_DISABLED":
-      case "LIVE_AI_NOT_CONFIGURED":
-        return "Live AI is not available right now. The recorded investigation is still ready.";
-      case "LIVE_AI_RATE_LIMITED":
-        return "Live AI is busy or has reached its public demo limit. Wait a moment or use the recorded investigation.";
-      case "LIVE_INVESTIGATION_TIMEOUT":
-      case "MODEL_PROVIDER_TIMEOUT":
-        return "The live investigation reached its time limit. No automatic retry was made.";
-      case "MALFORMED_MODEL_RESPONSE":
-      case "INVALID_MODEL_TOOL_ARGUMENTS":
-        return "The model response was rejected because it did not match the safe contract.";
-      case "MODEL_PROVIDER_ERROR":
-        return "The model provider could not complete this run. No automatic retry was made.";
-      default:
-        return error.problem.detail;
-    }
-  }
+export function runRecordedReplay(
+  scenarioId: string,
+  signal?: AbortSignal,
+) {
+  return getJson<RecordedReplayResult>(
+    `/api/v1/scenarios/${encodeURIComponent(scenarioId)}/runs/recorded-replay`,
+    { method: "POST", signal },
+  );
+}
 
-  if (error instanceof DOMException && error.name === "AbortError") {
-    return "The request was cancelled.";
-  }
+export function runLiveInvestigation(
+  scenarioId: string,
+  signal?: AbortSignal,
+) {
+  const body: LiveInvestigationRequest = { confirm_live_ai: true };
 
-  return "The application could not reach the investigation API.";
+  return getJson<LiveInvestigationResult>(
+    `/api/v1/scenarios/${encodeURIComponent(scenarioId)}/runs/live-ai`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    },
+  );
+}
+
+export function runGeneratedCase(
+  request: Omit<GeneratedCaseLiveRequest, "confirm_live_ai">,
+  signal?: AbortSignal,
+) {
+  const body: GeneratedCaseLiveRequest = {
+    ...request,
+    confirm_live_ai: true,
+  };
+
+  return getJson<GeneratedCaseRunResult>(
+    "/api/v1/generated-cases/runs/live-ai",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    },
+  );
+}
+
+export function runAgentTurn(
+  request: AdkAgentTurnRequest,
+  signal?: AbortSignal,
+) {
+  return getJson<AdkAgentTurnResponse>("/api/v1/agent/turns", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+    signal,
+  });
 }

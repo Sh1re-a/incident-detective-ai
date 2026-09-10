@@ -1,612 +1,420 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import App from "./App";
+import type { DemoWorldResponse, KnowledgeRagResponse } from "./api/generated";
 
-import { App } from "./App";
-import type { ApiProblem, LiveInvestigationResult } from "./api/types";
-import {
-  liveResult,
-  recordedResult,
-  scenario,
-  secondScenario,
-} from "./test/fixtures";
+const salaryQuestion = "Kan jag få reda på vad någon på Nordly har i lön?";
 
-describe("Incident Detective experience", () => {
-  it("keeps a recorded replay truthfully labelled and shows its proof", async () => {
-    installApiMock();
-    const user = userEvent.setup();
-    render(<App />);
+const demoWorld: DemoWorldResponse = {
+  contract_version: "nordly-demo-world-v1",
+  truth_label: "FIKTIVT FÖRETAG · VERKLIG JAVA/RAG-IMPLEMENTATION",
+  truth_label_en: "FICTIONAL COMPANY · REAL JAVA/RAG IMPLEMENTATION",
+  company: {
+    id: "nordly-commerce",
+    display_name: "Nordly Commerce AB",
+    storefront_name: "Nordly Market",
+    description: "En helt fiktiv nordisk e-handel.",
+    description_en: "A completely fictional Nordic e-commerce company.",
+    markets: ["Sverige"],
+    markets_en: ["Sweden"],
+    industry: "Nordisk designhandel online",
+    industry_en: "Nordic design retail online",
+  },
+  services: [],
+  questions: [],
+  rag_examples: [
+    {
+      id: "safe-refund-timing",
+      category: "SAFE",
+      prompt_sv: "Min återbetalning verkar ha tagit semester – hur länge brukar banken behöva?",
+      prompt_en: "My refund seems to have gone on holiday – how long does the bank normally need?",
+      expected_boundary: "rag",
+    },
+    {
+      id: "blocked-employee-compensation",
+      category: "EMPLOYEE_COMPENSATION",
+      prompt_sv: salaryQuestion,
+      prompt_en: "Can I find out how much someone at Nordly is paid?",
+      expected_boundary: "blocked_before_provider",
+    },
+  ],
+  featured_scenario_id: "checkout-orders-at-risk-v1",
+  corpus: {
+    version: "nordly-knowledge-corpus-v1",
+    document_count: 12,
+    chunk_count: 20,
+    approved_documents: 10,
+    deprecated_documents: 1,
+    untrusted_documents: 1,
+  },
+};
 
-    await screen.findByRole("heading", { name: "Start the investigation" });
-    await user.click(
-      screen.getByRole("button", { name: "Play free recorded investigation" }),
-    );
+const blockedResponse: KnowledgeRagResponse = {
+  contract_version: "nordly-knowledge-rag-v1",
+  run_id: "rag-run-test-1",
+  mode: "live_rag",
+  truth_label: "FIKTIV DATA · VERKLIG BACKEND",
+  truth_label_en: "FICTIONAL DATA · REAL BACKEND",
+  outcome: "refused",
+  question: { text: "[MASKERAD]", locale: "sv", redacted: true },
+  safety: {
+    decision: "BLOCK",
+    reason_code: "EMPLOYEE_COMPENSATION_REQUEST",
+    summary_sv:
+      "Frågan stoppades före AI eftersom en persons lön eller ersättning är privat personalinformation.",
+    summary_en:
+      "The question was stopped before AI because an employee's compensation is private personnel information.",
+  },
+  phases: [
+    { id: "safety", status: "blocked", executed: true, summary_sv: "Stoppad.", summary_en: "Stopped.", latency_ms: 1 },
+    { id: "eligibility_filter", status: "skipped", executed: false, summary_sv: "Inte kört.", summary_en: "Not run.", latency_ms: null },
+    { id: "query_embedding", status: "skipped", executed: false, summary_sv: "Inte kört.", summary_en: "Not run.", latency_ms: null },
+    { id: "vector_search", status: "skipped", executed: false, summary_sv: "Inte kört.", summary_en: "Not run.", latency_ms: null },
+    { id: "bounded_context", status: "skipped", executed: false, summary_sv: "Inte kört.", summary_en: "Not run.", latency_ms: null },
+    { id: "generation", status: "skipped", executed: false, summary_sv: "Inte kört.", summary_en: "Not run.", latency_ms: null },
+    { id: "java_verification", status: "skipped", executed: false, summary_sv: "Inte kört.", summary_en: "Not run.", latency_ms: null },
+  ],
+  retrieval: {
+    backend: "pgvector_exact_cosine",
+    corpus_version: "nordly-knowledge-corpus-v1",
+    required_lifecycle: "APPROVED",
+    required_access_scope: "public_demo",
+    eligible_document_count: 10,
+    eligible_chunk_count: 18,
+    current_vector_search: false,
+    top_k: 4,
+    minimum_similarity: 0.7,
+    query_embedding: {
+      executed_in_this_run: false,
+      provider: null,
+      model_id: null,
+      dimensions: null,
+      latency_ms: null,
+      input_characters: null,
+      provider_billable_characters: null,
+      provider_input_tokens: null,
+    },
+    ranked_matches: [],
+  },
+  answer: null,
+  verification: {
+    schema_pass: true,
+    citations_within_retrieved_context: true,
+    approved_documents_only: true,
+    output_pii_scan_pass: true,
+    output_policy_scan_pass: true,
+    no_write_capability: true,
+    overall_outcome: "refused_before_provider",
+  },
+  receipt: {
+    provider_calls: 0,
+    embedding_calls: 0,
+    generation_calls: 0,
+    write_tools_available: false,
+    action_executed: false,
+    total_latency_ms: 10,
+    model_id: null,
+    provider_response_id: null,
+    token_usage: null,
+    estimated_cost_usd: null,
+    cost_status: "not_incurred",
+    cost_basis: "No provider was called.",
+  },
+  error: null,
+  limitations: [],
+};
 
-    expect(
-      await screen.findByText(
-        "Simulated incident — recorded deterministic replay.",
-        { exact: true },
-      ),
-    ).toBeVisible();
-    expect(
-      screen.queryByText("Simulated incident — real AI investigation.", {
-        exact: true,
-      }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText("Payment Timeout Config")).toBeVisible();
-    expect(screen.getByText("Matched")).toBeVisible();
-  });
+const safeQuestion = demoWorld.rag_examples[0].prompt_sv;
 
-  it("moves focus to the completed diagnosis on request", async () => {
-    installApiMock();
-    const user = userEvent.setup();
-    render(<App />);
+const confirmationResponse: KnowledgeRagResponse = {
+  ...blockedResponse,
+  run_id: "rag-confirm-test-1",
+  outcome: "confirmation_required",
+  question: { text: safeQuestion, locale: "sv", redacted: false },
+  safety: {
+    decision: "ALLOW",
+    reason_code: "NONE",
+    summary_sv: "Frågan passerade säkerhetsgränsen.",
+    summary_en: "The question passed the safety boundary.",
+  },
+  phases: blockedResponse.phases.map((phase) =>
+    phase.id === "safety"
+      ? {
+          ...phase,
+          status: "completed" as const,
+          summary_sv: "Godkänd.",
+          summary_en: "Allowed.",
+        }
+      : phase,
+  ),
+  verification: {
+    ...blockedResponse.verification,
+    overall_outcome: "confirmation_required_before_provider",
+  },
+};
 
-    await user.click(
-      await screen.findByRole("button", {
-        name: "Play free recorded investigation",
-      }),
-    );
-    await user.click(await screen.findByRole("button", { name: "View diagnosis" }));
-
-    expect(document.getElementById("investigation-result")).toHaveFocus();
-  });
-
-  it("opens returned evidence and closes it with Escape", async () => {
-    installApiMock();
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(
-      await screen.findByRole("button", {
-        name: "Play free recorded investigation",
-      }),
-    );
-    await screen.findByText("Simulated incident — recorded deterministic replay.", {
-      exact: true,
-    });
-    const evidenceSummary = await screen.findByText(
-      "Checkout failure ratio reached 18.4 percent.",
-    );
-    const evidenceButton = evidenceSummary.closest("button");
-    expect(evidenceButton).not.toBeNull();
-    await user.click(evidenceButton!);
-
-    const drawer = screen.getByRole("dialog", { name: "Evidence detail" });
-    expect(within(drawer).getByText("0.184")).toBeVisible();
-    expect(within(drawer).getByText(metricEvidenceId())).toBeVisible();
-
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog", { name: "Evidence detail" })).not.toBeInTheDocument();
-  });
-
-  it("shows replay metadata as no model call", async () => {
-    installApiMock();
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(
-      await screen.findByRole("button", {
-        name: "Play free recorded investigation",
-      }),
-    );
-    await screen.findByText("Simulated incident — recorded deterministic replay.", {
-      exact: true,
-    });
-    await user.click(screen.getByRole("tab", { name: "Engineering View" }));
-
-    expect(screen.getAllByText("No model called").length).toBeGreaterThanOrEqual(3);
-    expect(screen.getByRole("heading", { name: "Recorded trace events" })).toBeVisible();
-    expect(
-      screen.getByText("1 recorded trace event; no tool was called now"),
-    ).toBeVisible();
-    expect(screen.getByText("Recorded events", { exact: true })).toBeVisible();
-    expect(screen.queryByText("Tool calls", { exact: true })).not.toBeInTheDocument();
-    expect(screen.getAllByText("100% this run").length).toBeGreaterThanOrEqual(2);
-    expect(
-      screen.getByText(/They are not an eval-set accuracy claim/),
-    ).toBeVisible();
-  });
-
-  it("requires confirmation before showing a successful live result", async () => {
-    const fetchMock = installApiMock();
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(
-      await screen.findByRole("button", { name: "Run live AI" }),
-    );
-    const dialog = screen.getByRole("dialog", {
-      name: "Run a live AI investigation?",
-    });
-    expect(within(dialog).getByText(/may use a small amount of API credit/)).toBeVisible();
-    await user.click(within(dialog).getByRole("button", { name: "Confirm live run" }));
-
-    expect(
-      await screen.findByText("Simulated incident — real AI investigation.", {
-        exact: true,
-      }),
-    ).toBeVisible();
-
-    const liveCall = fetchMock.mock.calls.find(([url]) =>
-      String(url).endsWith("/runs/live-ai"),
-    );
-    expect(liveCall?.[1]).toMatchObject({
-      method: "POST",
-      body: JSON.stringify({ confirm_live_ai: true }),
-    });
-
-    await user.click(screen.getByRole("tab", { name: "Engineering View" }));
-    expect(screen.getByText("Affected service")).toBeVisible();
-    expect(screen.getByText("gemini-3.5-flash-lite")).toBeVisible();
-    expect(screen.getByText("$0.002994")).toBeVisible();
-    expect(screen.getByText(/estimate, not a provider invoice/)).toBeVisible();
-    expect(screen.getByText("Investigation model estimate")).toBeVisible();
-    expect(screen.getByText("800 cached tokens")).toBeVisible();
-    expect(screen.getByText("$0.000216")).toBeVisible();
-    expect(screen.getByText("2 / 3 max")).toBeVisible();
-    expect(screen.getByText("2 / 8 max")).toBeVisible();
-    expect(screen.getByText(/20.2% of prompt input/)).toBeVisible();
-    await user.click(screen.getByText("Retrieval metadata"));
-    expect(screen.getByText("pgvector_exact_cosine")).toBeVisible();
-    expect(screen.getByText("gemini-embedding-2")).toBeVisible();
-    expect(screen.getByText("0.662078")).toBeVisible();
-    expect(screen.getByText("Rank 1 · cosine 0.7783")).toBeVisible();
-    expect(screen.getByText("Not reported")).toBeVisible();
-    expect(screen.getByText(/Embedding retrieval cost is not included/)).toBeVisible();
-  });
-
-  it("does not present a missing live estimate as no model call", async () => {
-    const liveWithoutEstimate: LiveInvestigationResult = {
-      ...liveResult,
-      estimated_cost_usd: null,
-      model_cost_breakdown: null,
-      estimated_cost_basis: "No paid list-price estimate is configured for this model.",
-    };
-    installApiMock({ liveResponse: liveWithoutEstimate });
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(await screen.findByRole("button", { name: "Run live AI" }));
-    await user.click(screen.getByRole("button", { name: "Confirm live run" }));
-    await screen.findByText("Simulated incident — real AI investigation.", {
-      exact: true,
-    });
-    await user.click(screen.getByRole("tab", { name: "Engineering View" }));
-
-    expect(screen.getByText("Estimate unavailable")).toBeVisible();
-    expect(
-      screen.getByText(/This does not mean the run cost \$0/),
-    ).toBeVisible();
-    expect(screen.queryByText("No model called")).not.toBeInTheDocument();
-  });
-
-  it("does not turn missing provider cache metadata into zero", async () => {
-    const liveWithoutCacheReport: LiveInvestigationResult = {
-      ...liveResult,
-      token_usage: liveResult.token_usage
-        ? {
-            ...liveResult.token_usage,
-            cached_input_tokens: null,
-            uncached_input_tokens: null,
-          }
-        : null,
-      prompt_cache: {
-        strategy: "provider_implicit",
-        provider_reported_model_calls: 0,
-        model_call_count: liveResult.model_call_count,
-        cached_input_tokens: null,
-        cache_hit_observed: false,
+const answeredResponse: KnowledgeRagResponse = {
+  contract_version: "nordly-knowledge-rag-v1",
+  run_id: "nordly-rag-live-test-1",
+  mode: "live_rag",
+  truth_label: "FIKTIV DATA · VERKLIG BACKEND",
+  truth_label_en: "FICTIONAL DATA · REAL BACKEND",
+  outcome: "answered",
+  question: { text: safeQuestion, locale: "sv", redacted: false },
+  safety: {
+    decision: "ALLOW",
+    reason_code: "NONE",
+    summary_sv: "Frågan passerade säkerhetsgränsen.",
+    summary_en: "The question passed the safety boundary.",
+  },
+  phases: [
+    { id: "safety", status: "completed", executed: true, summary_sv: "Godkänd.", summary_en: "Allowed.", latency_ms: null },
+    { id: "eligibility_filter", status: "completed", executed: true, summary_sv: "Dokument valda.", summary_en: "Documents selected.", latency_ms: 72 },
+    { id: "query_embedding", status: "completed", executed: true, summary_sv: "Embedding skapad.", summary_en: "Embedding created.", latency_ms: 649 },
+    { id: "vector_search", status: "completed", executed: true, summary_sv: "Sökning klar.", summary_en: "Search complete.", latency_ms: 39 },
+    { id: "bounded_context", status: "completed", executed: true, summary_sv: "Kontext byggd.", summary_en: "Context built.", latency_ms: null },
+    { id: "generation", status: "completed", executed: true, summary_sv: "Svar skapat.", summary_en: "Answer created.", latency_ms: 8957 },
+    { id: "java_verification", status: "completed", executed: true, summary_sv: "Verifierat.", summary_en: "Verified.", latency_ms: 9 },
+  ],
+  retrieval: {
+    backend: "pgvector_exact_cosine",
+    corpus_version: "nordly-knowledge-corpus-v1",
+    required_lifecycle: "APPROVED",
+    required_access_scope: "public_demo",
+    eligible_document_count: 10,
+    eligible_chunk_count: 18,
+    current_vector_search: true,
+    top_k: 3,
+    minimum_similarity: 0.68,
+    query_embedding: {
+      executed_in_this_run: true,
+      provider: "google_genai",
+      model_id: "gemini-embedding-2",
+      dimensions: 768,
+      latency_ms: 649,
+      input_characters: 83,
+      provider_billable_characters: null,
+      provider_input_tokens: null,
+    },
+    ranked_matches: [
+      {
+        rank: 1,
+        similarity: 0.7591068970891182,
+        status: "APPROVED",
+        document_id: "kb-returns-refunds",
+        chunk_id: "refund-timing-card",
+        document_version: "2.0",
+        title: "Returns and card refunds",
+        section_heading: "When an approved card refund appears",
+        owner_team: "Customer Operations",
+        source_ref: "nordly://knowledge/kb-returns-refunds/2.0#refund-timing-card",
+        evidence_id: "nordly-evidence-refund-timing-card",
+        display_summary_sv: "Godkända kortåterbetalningar syns normalt inom två till fem bankdagar.",
+        display_summary_en: "Approved card refunds normally appear within two to five banking days.",
+        text: "Approved card refunds are sent to the payment provider the same business day. The bank normally displays the amount within two to five banking days.",
       },
-      model_cost_breakdown: liveResult.model_cost_breakdown
-        ? {
-            ...liveResult.model_cost_breakdown,
-            cached_input_usd: null,
-            observed_cache_savings_usd: null,
-          }
-        : null,
-      model_calls: liveResult.model_calls.map((call) => ({
-        ...call,
-        token_usage: call.token_usage
-          ? {
-              ...call.token_usage,
-              cached_input_tokens: null,
-              uncached_input_tokens: null,
-            }
-          : null,
-      })),
-    };
-    installApiMock({ liveResponse: liveWithoutCacheReport });
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(await screen.findByRole("button", { name: "Run live AI" }));
-    await user.click(screen.getByRole("button", { name: "Confirm live run" }));
-    await user.click(await screen.findByRole("tab", { name: "Engineering View" }));
-
-    expect(screen.getByText("No provider-reported hit")).toBeVisible();
-    expect(screen.getByText(/missing cache data is not shown as zero/)).toBeVisible();
-    expect(screen.queryByText(/0 cached tokens/)).not.toBeInTheDocument();
-    const costBreakdown = screen
-      .getByRole("heading", { name: "Paid-list cost breakdown" })
-      .parentElement;
-    expect(costBreakdown).not.toBeNull();
-    expect(within(costBreakdown!).getAllByText("Not reported")).toHaveLength(2);
-  });
-
-  it("keeps keyboard focus inside the live confirmation dialog", async () => {
-    installApiMock();
-    const user = userEvent.setup();
-    render(<App />);
-
-    const liveButton = await screen.findByRole("button", { name: "Run live AI" });
-    await user.click(liveButton);
-    const dialog = screen.getByRole("dialog", {
-      name: "Run a live AI investigation?",
-    });
-    const cancel = within(dialog).getByRole("button", { name: "Cancel" });
-    const confirm = within(dialog).getByRole("button", { name: "Confirm live run" });
-
-    expect(cancel).toHaveFocus();
-    await user.tab({ shift: true });
-    expect(confirm).toHaveFocus();
-    await user.tab();
-    expect(cancel).toHaveFocus();
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog", {
-      name: "Run a live AI investigation?",
-    })).not.toBeInTheDocument();
-    expect(liveButton).toHaveFocus();
-  });
-
-  it("keeps a live timeout visible until the visitor chooses replay", async () => {
-    const timeoutProblem: ApiProblem = {
-      title: "Model provider timed out",
-      status: 504,
-      detail: "Gemini did not respond within the bounded timeout.",
-      code: "MODEL_PROVIDER_TIMEOUT",
-    };
-    const fetchMock = installApiMock({ liveProblem: timeoutProblem });
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(
-      await screen.findByRole("button", { name: "Run live AI" }),
-    );
-    await user.click(
-      screen.getByRole("button", { name: "Confirm live run" }),
-    );
-
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("reached its time limit");
-    expect(callsEndingWith(fetchMock, "/runs/recorded-replay")).toHaveLength(0);
-
-    await user.click(
-      within(alert).getByRole("button", {
-        name: "Try the recorded investigation",
-      }),
-    );
-    expect(
-      await screen.findByText(
-        "Simulated incident — recorded deterministic replay.",
-        { exact: true },
-      ),
-    ).toBeVisible();
-    expect(callsEndingWith(fetchMock, "/runs/recorded-replay")).toHaveLength(1);
-  });
-
-  it("presents a rejected live answer as rejected", async () => {
-    const rejectedResult: LiveInvestigationResult = {
-      ...liveResult,
-      status: "verification_failed",
-      diagnosis: {
-        ...liveResult.diagnosis,
-        root_cause_code: "INVENTORY_SCHEMA_MISMATCH",
-        claims: [
-          {
-            ...liveResult.diagnosis.claims[0],
-            claim_value_code: "INVENTORY_SCHEMA_MISMATCH",
-            evidence_ids: ["model-invented-evidence-id"],
-          },
-        ],
+    ],
+  },
+  answer: {
+    status: "answered",
+    summary_sv:
+      "När en kortåterbetalning har godkänts skickas den till betalningsleverantören samma arbetsdag, och banken brukar visa beloppet inom två till fem bankdagar.",
+    summary_en:
+      "Once a card refund has been approved, it is sent to the payment provider the same business day, and the bank normally displays it within two to five banking days.",
+    claims: [
+      {
+        text_sv: "Nordly skickar godkända kortåterbetalningar samma arbetsdag.",
+        text_en: "Nordly sends approved card refunds the same business day.",
+        citation_ids: ["nordly-evidence-refund-timing-card"],
       },
-      comparison: {
-        ...liveResult.comparison,
-        root_cause_correct: false,
+      {
+        text_sv: "Banken behöver normalt två till fem bankdagar.",
+        text_en: "The bank normally needs two to five banking days.",
+        citation_ids: ["nordly-evidence-refund-timing-card"],
       },
-      verification: {
-        ...liveResult.verification,
-        citation_validity: {
-          valid: false,
-          unknown_evidence_ids: ["model-invented-evidence-id"],
-        },
-        evidence_precision: {
-          applicable: true,
-          supported_triples: 0,
-          total_triples: 1,
-          score: 0,
-          citation_support: [
-            {
-              claim_code: "root_cause",
-              claim_value_code: "INVENTORY_SCHEMA_MISMATCH",
-              evidence_id: "model-invented-evidence-id",
-              supported: false,
-            },
-          ],
-        },
-        diagnosis_correctness: {
-          ...liveResult.verification.diagnosis_correctness,
-          root_cause_correct: false,
-        },
-        hard_errors: ["unknown_evidence_id"],
-      },
-    };
-    installApiMock({ liveResponse: rejectedResult });
-    const user = userEvent.setup();
-    render(<App />);
+    ],
+  },
+  verification: {
+    schema_pass: true,
+    citations_within_retrieved_context: true,
+    approved_documents_only: true,
+    output_pii_scan_pass: true,
+    output_policy_scan_pass: true,
+    no_write_capability: true,
+    overall_outcome: "answered_with_verified_retrieved_citations",
+  },
+  receipt: {
+    provider_calls: 2,
+    embedding_calls: 1,
+    generation_calls: 1,
+    write_tools_available: false,
+    action_executed: false,
+    total_latency_ms: 9745,
+    model_id: "gemini-3.1-flash-lite",
+    provider_response_id: "provider-response-test",
+    token_usage: {
+      input_tokens: 271,
+      cached_input_tokens: null,
+      uncached_input_tokens: null,
+      candidate_output_tokens: 270,
+      thinking_output_tokens: null,
+      output_tokens: 270,
+      tool_use_prompt_tokens: null,
+      total_tokens: 541,
+    },
+    estimated_cost_usd: 0.00047275,
+    cost_status: "estimated_generation_only",
+    cost_basis: "Generation list-price estimate only.",
+  },
+  error: null,
+  limitations: ["Synthetic content."],
+};
 
-    await user.click(
-      await screen.findByRole("button", { name: "Run live AI" }),
-    );
-    await user.click(
-      screen.getByRole("button", { name: "Confirm live run" }),
-    );
+function jsonResponse(body: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => body,
+  } as Response;
+}
 
-    expect(await screen.findByText("Rejected by verifier")).toBeVisible();
-    expect(screen.getByText("Did not match")).toBeVisible();
-    expect(screen.getByRole("button", { name: /Evidence unavailable/ })).toBeDisabled();
-  });
-
-  it("does not call a weakly supported diagnosis verified", async () => {
-    const weakProofResult: LiveInvestigationResult = {
-      ...liveResult,
-      verification: {
-        ...liveResult.verification,
-        evidence_precision: {
-          applicable: true,
-          supported_triples: 0,
-          total_triples: 1,
-          score: 0,
-          citation_support: [
-            {
-              claim_code: "root_cause",
-              claim_value_code: "PAYMENT_TIMEOUT_CONFIG",
-              evidence_id: metricEvidenceId(),
-              supported: false,
-            },
-          ],
-        },
-      },
-    };
-    installApiMock({ liveResponse: weakProofResult });
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(await screen.findByRole("button", { name: "Run live AI" }));
-    await user.click(screen.getByRole("button", { name: "Confirm live run" }));
-
-    expect(
-      await screen.findByText("Diagnosis matched · verification incomplete"),
-    ).toBeVisible();
-    expect(screen.queryByText("Verified for this run")).not.toBeInTheDocument();
-    expect(screen.getByText("0/1 direct")).toBeVisible();
-    expect(screen.getByText(/not direct support/)).toBeVisible();
-  });
-
-  it("does not call incomplete claim coverage verified", async () => {
-    const incompleteResult: LiveInvestigationResult = {
-      ...liveResult,
-      verification: {
-        ...liveResult.verification,
-        claim_coverage: {
-          applicable: true,
-          matched_claim_count: 4,
-          reference_claim_count: 5,
-          score: 0.8,
-        },
-      },
-    };
-    installApiMock({ liveResponse: incompleteResult });
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(await screen.findByRole("button", { name: "Run live AI" }));
-    await user.click(screen.getByRole("button", { name: "Confirm live run" }));
-
-    expect(
-      await screen.findByText("Diagnosis matched · verification incomplete"),
-    ).toBeVisible();
-    expect(screen.queryByText("Verified for this run")).not.toBeInTheDocument();
-    expect(screen.getByText("4/5 key facts")).toBeVisible();
-
-    await user.click(screen.getByRole("tab", { name: "Engineering View" }));
-    expect(screen.getByText("80% this run")).toBeVisible();
-    expect(screen.getByText("4/5 hidden-reference claims matched")).toBeVisible();
-  });
-
-  it("clears the old result and runs the selected second scenario", async () => {
-    const fetchMock = installApiMock();
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(
-      await screen.findByRole("button", {
-        name: "Play free recorded investigation",
-      }),
-    );
-    expect(await screen.findByText("Verified for this run")).toBeVisible();
-
-    await user.click(
-      screen.getByRole("button", { name: /Some carts fail before payment/ }),
-    );
-
-    expect(screen.queryByText("Verified for this run")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Some carts fail before payment" }),
-    ).toBeVisible();
-    expect(screen.getByText("Diagnosis not opened")).toBeVisible();
-
-    await user.click(
-      screen.getByRole("button", { name: "Play free recorded investigation" }),
-    );
-    expect(await screen.findByText("Verified for this run")).toBeVisible();
-
-    const replayCalls = callsEndingWith(fetchMock, "/runs/recorded-replay");
-    expect(replayCalls).toHaveLength(2);
-    expect(String(replayCalls[1]?.[0])).toContain(
-      "/api/v1/scenarios/checkout-cart-segment-failures-v1/runs/recorded-replay",
-    );
-  });
-
-  it("presents insufficient evidence as a safe abstention", async () => {
-    const abstentionResult: LiveInvestigationResult = {
-      ...liveResult,
-      diagnosis: {
-        status: "insufficient_evidence",
-        root_cause_code: null,
-        affected_service: null,
-        business_summary:
-          "Checkout failures are visible, but the available evidence does not prove one cause.",
-        technical_summary:
-          "A provider response is still required to distinguish between plausible causes.",
-        claims: [
-          {
-            claim_code: "missing_evidence",
-            claim_value_code: "PAYMENT_PROVIDER_RESPONSE",
-            display_text: "The payment provider response is missing.",
-            evidence_ids: [],
-          },
-        ],
-        safe_next_step: {
-          summary: "Collect the missing provider response before approving any change.",
-          requires_human_approval: true,
-        },
-      },
-      verification: {
-        ...liveResult.verification,
-        evidence_precision: {
-          applicable: false,
-          supported_triples: 0,
-          total_triples: 0,
-          score: null,
-          citation_support: [],
-        },
-        claim_coverage: {
-          applicable: false,
-          matched_claim_count: 0,
-          reference_claim_count: 0,
-          score: null,
-        },
-        diagnosis_correctness: {
-          evaluated: true,
-          diagnosis_applicable: false,
-          root_cause_correct: false,
-          affected_service_correct: false,
-          abstention_correct: true,
-        },
-      },
-      comparison: {
-        expected_status: "insufficient_evidence",
-        expected_root_cause_code: null,
-        expected_affected_service: null,
-        root_cause_correct: false,
-        affected_service_correct: false,
-        abstention_correct: true,
-      },
-    };
-    installApiMock({ liveResponse: abstentionResult });
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(await screen.findByRole("button", { name: "Run live AI" }));
-    await user.click(screen.getByRole("button", { name: "Confirm live run" }));
-
-    expect(await screen.findByText("Safe abstention")).toBeVisible();
-    expect(screen.queryByText("Verified for this run")).not.toBeInTheDocument();
-    expect(
-      screen.getByText("Collect the missing provider response before approving any change."),
-    ).toBeVisible();
-
-    await user.click(screen.getByRole("tab", { name: "Engineering View" }));
-    expect(screen.getByText("Correct abstention")).toBeVisible();
-    expect(screen.getAllByText("Not applicable").length).toBeGreaterThanOrEqual(2);
-  });
-
-  it("explains the learning project and supports keyboard view navigation", async () => {
-    installApiMock();
-    const user = userEvent.setup();
-    render(<App />);
-
-    expect(
-      await screen.findByText(/A four-week learning project by Shirwac Abib/),
-    ).toBeVisible();
-    expect(screen.getByText(/Evals and deployment are still in progress/)).toBeVisible();
-
-    const storyTab = screen.getByRole("tab", { name: "Story View" });
-    storyTab.focus();
-    await user.keyboard("{ArrowRight}");
-
-    const engineeringTab = screen.getByRole("tab", { name: "Engineering View" });
-    expect(engineeringTab).toHaveFocus();
-    expect(engineeringTab).toHaveAttribute("aria-selected", "true");
-    expect(
-      screen.getByRole("heading", { name: "Run a case before inspecting its trace" }),
-    ).toBeVisible();
-  });
-
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
 });
 
-interface ApiMockOptions {
-  liveProblem?: ApiProblem;
-  liveResponse?: LiveInvestigationResult;
-}
+describe("Nordly PASS A and B", () => {
+  it("loads its two visible questions from the backend-owned demo world", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(demoWorld)));
 
-function installApiMock(options: ApiMockOptions = {}) {
-  const fetchMock = vi.fn(async (
-    input: RequestInfo | URL,
-    _init?: RequestInit,
-  ) => {
-    const url = String(input);
-    if (url === "/api/v1/scenarios") {
-      return jsonResponse({ scenarios: [scenario, secondScenario] });
-    }
-    if (url.endsWith("/runs/recorded-replay")) {
-      if (url.includes(secondScenario.scenario_id)) {
-        return jsonResponse({
-          ...recordedResult,
-          scenario_id: secondScenario.scenario_id,
-          scenario: secondScenario,
-        });
-      }
-      return jsonResponse(recordedResult);
-    }
-    if (url.endsWith("/runs/live-ai")) {
-      if (options.liveProblem) {
-        return jsonResponse(options.liveProblem, options.liveProblem.status);
-      }
-      return jsonResponse(options.liveResponse ?? liveResult);
-    }
-    return jsonResponse({ title: "Not found", detail: "Not found" }, 404);
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: /återbetalning verkar ha tagit semester/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: salaryQuestion })).toBeVisible();
+    expect(screen.getByRole("button", { name: "SV" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
-}
+  it("shows only real backend phases and zero-use receipt after a blocked salary question", async () => {
+    let releaseRag: ((response: Response) => void) | undefined;
+    const ragResponse = new Promise<Response>((resolve) => {
+      releaseRag = resolve;
+    });
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const path = String(input);
+        if (path.includes("/runs/rag")) return ragResponse;
+        return jsonResponse(demoWorld);
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: salaryQuestion }));
+    await user.click(screen.getByRole("button", { name: "Skicka" }));
+
+    expect(screen.getByText("Nordly skickar frågan…")).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveFocus(),
+    );
+    releaseRag?.(jsonResponse(blockedResponse));
+
+    expect(await screen.findByRole("heading", { name: "Bra. Systemet stannade." })).toBeVisible();
+    expect(screen.getByText(/privat personalinformation/i)).toBeVisible();
+    expect(screen.getByText("[MASKERAD]")).toBeVisible();
+    expect(screen.queryByText(salaryQuestion)).not.toBeInTheDocument();
+    expect(screen.getAllByText("Semantisk sökning")[0]).toBeVisible();
+
+    const aiCalls = screen.getByText("AI-anrop").parentElement;
+    expect(aiCalls).not.toBeNull();
+    expect(within(aiCalls as HTMLElement).getByText("0")).toBeVisible();
+
+    const embeddings = screen.getByText("Embeddings").parentElement;
+    expect(embeddings).not.toBeNull();
+    expect(within(embeddings as HTMLElement).getByText("0")).toBeVisible();
   });
-}
 
-function callsEndingWith(
-  fetchMock: ReturnType<typeof vi.fn>,
-  suffix: string,
-) {
-  return fetchMock.mock.calls.filter(([url]) => String(url).endsWith(suffix));
-}
+  it("requires explicit consent, waits honestly, then reveals the full returned AI chain", async () => {
+    let ragCall = 0;
+    let releaseLive: ((response: Response) => void) | undefined;
+    const liveResponse = new Promise<Response>((resolve) => {
+      releaseLive = resolve;
+    });
 
-function metricEvidenceId(): string {
-  return "cpt-v1-metric-checkout-failure-rate";
-}
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const path = String(input);
+      if (!path.includes("/runs/rag")) return jsonResponse(demoWorld);
+      ragCall += 1;
+      return ragCall === 1 ? jsonResponse(confirmationResponse) : liveResponse;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: safeQuestion }));
+    await user.click(screen.getByRole("button", { name: "Skicka" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Frågan får försöka gå vidare." }),
+    ).toBeVisible();
+    expect(screen.getByText(/0 AI-anrop hittills/i)).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Kör hela AI-flödet" })).toHaveFocus(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Kör hela AI-flödet" }));
+
+    expect(screen.getByText("Det bekräftade backendanropet är skickat…")).toBeVisible();
+    expect(screen.queryByText("Frågans betydelse blev en vektor.")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveFocus(),
+    );
+
+    releaseLive?.(jsonResponse(answeredResponse));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Nordly svarade från hämtad företagskunskap.",
+      }),
+    ).toBeVisible();
+    expect(screen.getByText(/banken brukar visa beloppet inom två till fem bankdagar/i)).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Returns and card refunds" })).toBeVisible();
+    expect(screen.getByText(/semantisk likhet:/i)).toHaveTextContent("75,9 %");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", {
+          name: "Nordly svarade från hämtad företagskunskap.",
+        }),
+      ).toHaveFocus(),
+    );
+
+    const liveRequest = fetchMock.mock.calls.find(([, init]) =>
+      String((init as RequestInit | undefined)?.body).includes('"confirm_live_ai":true'),
+    );
+    expect(liveRequest).toBeDefined();
+    expect(String((liveRequest?.[1] as RequestInit).body)).toContain(safeQuestion);
+
+    await user.click(screen.getByRole("button", { name: "Se hur svaret togs fram" }));
+
+    expect(screen.getByRole("heading", { name: "Från fråga till kontrollerat svar." })).toBeVisible();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Från fråga till kontrollerat svar." }),
+      ).toHaveFocus(),
+    );
+    expect(screen.getByRole("heading", { name: "Frågans betydelse blev en vektor." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Liknande betydelse hittades i pgvector." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "RAG byggde ett litet källpaket." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Gemini formulerade svaret." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Java kontrollerade innan visning." })).toBeVisible();
+    expect(screen.getByText(/inte AI:ns dolda tankar/i)).toBeVisible();
+
+    await user.click(screen.getByText("Tekniskt körningskvitto"));
+    expect(screen.getByText("gemini-3.1-flash-lite")).toBeVisible();
+    expect(screen.getByText(/embeddingkostnaden ingår inte/i)).toBeVisible();
+  });
+});
