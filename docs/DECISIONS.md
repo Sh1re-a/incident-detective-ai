@@ -1,7 +1,7 @@
 # Tekniska beslut
 
 - **Status:** levande beslutslogg; varje beslut har egen status
-- **Senast uppdaterad:** 26 augusti 2026
+- **Senast uppdaterad:** 10 september 2026
 
 Besluten ska hålla Incident Detective litet, förklarbart och mätbart. En föreslagen riktning blir accepterad när den är granskad eller implementerad. Därefter ändras den bara när ny evidens eller ett verkligt blockerande problem motiverar det, och ändringen dokumenteras här i stället för att döljas i implementationen.
 
@@ -29,11 +29,11 @@ Frontend, backend, scenariofixtures, verifierare och små opt-in-testspår ligge
 
 **Status:** Accepted, 25 augusti 2026
 
-Story/Engineering View byggs med React, TypeScript och Vite. API, tool contracts och verifiering byggs med Java 21, Spring Boot, Spring MVC, Jakarta Validation och Jackson.
+Det mänskliga portalgränssnittet byggs med React, TypeScript och Vite. API, tool contracts, ADK-integration och verifiering byggs med Java 21, Spring Boot, Spring MVC, Jakarta Validation och Jackson.
 
 **Varför:** Shirwac kan redan Java och vill använda projektet för att bli bättre på Spring Boot samtidigt som AI-systemet byggs. Den officiella Gemini-SDK:n fungerar i Java, så ett extra backend-runtime behövs inte i kärnan.
 
-**Konsekvens:** Delade begrepp måste kontraktstestas mellan TypeScript och Java; de får inte utvecklas som två oberoende sanningar. Spring Boot 4 använder Jackson 3 och den sealed `Evidence`-hierarkin round-trip-testas. Python ingår inte i kärnarkitekturen.
+**Konsekvens:** Delade begrepp måste kontraktstestas mellan TypeScript och Java; de får inte utvecklas som två oberoende sanningar. Spring Boot 4 använder Jackson 3 och den sealed `Evidence`-hierarkin round-trip-testas. Google ADK används genom Java-SDK:n. Python ingår inte i kärnarkitekturen och läggs bara till om en senare, konkret deploymentförmåga kräver det.
 
 ## DEC-004 – Fyra separata domänkontrakt
 
@@ -63,7 +63,7 @@ Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. D
 
 **Varför:** Beteende, latency och kostnad ska vara möjliga att förstå och mäta.
 
-**Konsekvens:** Systemet måste kunna avstå med `insufficient_evidence` i stället för att fortsätta leta utan gräns.
+**Konsekvens:** Systemet måste kunna avstå med `insufficient_evidence` i stället för att fortsätta leta utan gräns. Detta beslut beskriver det ursprungliga liveflödet. Den separata ADK-endpointens striktare tvåagentsflöde och tvåanropsgräns dokumenteras i DEC-019.
 
 ## DEC-007 – En leverantör, function calling och structured output
 
@@ -85,6 +85,8 @@ PostgreSQL/pgvector används för en fristående korpus med 10 ostrukturerade ru
 
 **Konsekvens:** Import är ett explicit och idempotent kommando; vanlig uppstart gör inga embedding-anrop. RAG-profilen vägrar retrieval om antal eller innehållshash inte matchar aktuell korpus och faller aldrig tyst tillbaka till keyword matching. Runbookresultat visar dokument-, chunk- och versionsmetadata samt rank, similarity, embeddingmodell, innehållshash, korpusversion och retrieval-backend. Tröskeln kalibreras endast på development. Retrieval v1 gav 5/5 development och 4/5 held-out Hit@4, medan tre no-match-fall gav 3/3. Den missade held-out-frågan och unsafe top-1 behålls som öppet kvalitetsproblem.
 
+`capabilities-v3` rapporterar nu samma readinesskontroll som aktuell backendstatus: korpusversion samt indexed/current/expected chunks. Det bevisar att indexet är redo, men aldrig att en enskild AI-körning använde RAG; det senare kräver ett faktiskt `retrieve_runbooks`-event.
+
 ## DEC-009 – Fyra separata verifieringsdimensioner
 
 **Status:** Accepted, updated 26 augusti 2026
@@ -100,11 +102,11 @@ Verifieraren mäter separat:
 
 **Konsekvens:** Publikt claim-coverage-resultat visar bara antal och score, aldrig vilka facitclaims som saknas. Låg coverage är ett kvalitetsmått, inte ett hårt kontraktsfel. `affected_service` mäts separat och ett enda sammanslaget “correct”-värde räcker inte.
 
-## DEC-010 – Story View och Engineering View, inte chain-of-thought
+## DEC-010 – Människosvar och post-run-kvitto, inte chain-of-thought
 
-**Status:** Accepted, 25 augusti 2026
+**Status:** Accepted, updated 10 september 2026
 
-Story View prioriterar affärspåverkan, tidslinje, rotorsak, bevis och nästa steg. Engineering View visar säkra tool events, evidence IDs, schemas, versions- och körmetadata. Privat chain-of-thought sparas eller visas inte. Recorded replay får spela upp en tydligt märkt färdig verktygssekvens; liveflödet visar inga påhittade tool events medan requesten pågår.
+Portalens huvudlager prioriterar affärspåverkan, rotorsak, bevis och ett säkert nästa steg. `Så byggdes svaret` visar endast backendregistrerade agentnamn, tool events, evidence IDs, versionsdata, workflow-kvitto och Java-verifiering efter avslutad request. Privat chain-of-thought sparas eller visas inte. Recorded replay får spela upp en tydligt märkt färdig sekvens; liveflödet visar inga påhittade events medan requesten pågår.
 
 **Varför:** Två målgrupper behöver olika detaljnivå, men ingen behöver modellens privata resonemang.
 
@@ -126,23 +128,25 @@ korpus, embeddingprofil, tröskel eller scorer ändras.
 
 ## DEC-012 – JSON-loggar och OpenTelemetry först
 
-**Status:** Accepted design, not implemented, updated 26 augusti 2026
+**Status:** Accepted and partially implemented, updated 1 september 2026
 
-Systemet ska använda strukturerade JSON-loggar och OpenTelemetry för API-, tool- och verifieringsspår. Detta är ännu inte implementerat. Langfuse läggs bara till om ett konkret gap finns efter kärnflödet.
+Liveflödet använder nu manuella OpenTelemetry-spans för `investigation → collect → tool/retrieval → synthesize → verify`. När tracing är aktiverat kan de ligga under Spring MVC:s inkommande API-span. Micrometer är fortsatt applikationens metrics-API, medan Spring Boots OTel-bridge används för tracing. OTLP span-export finns som runtime-capability men både SDK och span-export är uttryckligen avstängda lokalt som standard; OTLP-export för metrics och logs är också avstängd. OTel-exportern använder JDK:s HTTP-sändare så att Google GenAI kan behålla sin sammanhållna OkHttp 4/Okio-stack utan dubbla `okhttp3`-klasser. Strukturerade JSON-loggar är ännu inte implementerade. Langfuse läggs bara till om ett konkret gap finns efter kärnflödet.
 
 **Varför:** Observability ska förklara beteende utan att bli ett eget projekt.
 
-**Konsekvens:** Telemetrin ska använda en uttrycklig allowlist. API-nycklar, råa prompts, providerresponser, full evidenstext, tool arguments, `GroundTruth` och privat chain-of-thought får inte loggas. Trace-strukturen ska minst kunna följas som API → collect → tool → synthesize → verify, och test ska visa att saneringen gäller. Observability får inte beskrivas som implementerad innan både spans och sanering har verifierats.
+**Konsekvens:** De manuella domänspannen använder en uttrycklig attribut-allowlist utan generic attribute-API. API-nycklar, råa prompts, providerresponser, full evidenstext, tool arguments, summaries, `GroundTruth` och privat chain-of-thought kan inte skickas in till denna instrumentering. Domänspannen registrerar inte exception messages eller stack traces; fel reduceras till en begränsad `error.type`. Ett in-process OpenTelemetry-test verifierar spanparenting, allowlisten och frånvaron av hemliga teststrängar. Den nuvarande claimen är därför en testad live-span-slice — inte strukturerade JSON-loggar, exporterad end-to-end-observability, replay tracing eller en färdig collector/dashboard.
+
+Spring Boot rekommenderar Micrometer Observation/Tracing som applikations-API och stödjer OTel/OTLP genom Actuator. Den manuella instrumenteringen är därför begränsad till domänspans som ramverket inte kan förstå självt; vanliga HTTP- och databasspans lämnas till ramverks-/agentinstrumentering. GenAI-semantic-convention-fält används bara för säkra metadata som operation, modellnamn, toolnamn och tokenantal — aldrig för input/output-messages, tool arguments eller retrieval query text.
 
 ## DEC-013 – Cloud Run med server-side secrets
 
-**Status:** Proposed; external deploy requires later approval
+**Status:** Proposed, updated 10 september 2026; external deploy requires later approval
 
 Slutcontainern ska deployas till Cloud Run. Hemligheter finns endast på serversidan. Manuell, verifierad deploy kommer före eventuell GitHub Actions/OIDC-automatisering.
 
 **Varför:** Projektet ska bevisa verklig driftsättning utan att CI/CD blir det första problemet.
 
-**Konsekvens:** Ingen deploy görs i grundfasen. Extern deploy och publik åtkomst kräver uttryckligt klartecken.
+**Konsekvens:** Den kombinerade frontend-/backendcontainern verifieras lokalt först. Den aktuella Phase 1/2-revisionen deployas inte i denna uppgift. En eventuell äldre publik Cloud Run-revision är separat evidens och får inte användas som bevis för att aktuell kod är live. Cloud-resurser, Vertex AI, ny revision och publik trafik kräver separata uttryckliga beslut.
 
 ## DEC-014 – Publikt portfolio-repo utan licens
 
@@ -152,7 +156,7 @@ Projektgrunden publiceras i [Sh1re-a/incident-detective-ai](https://github.com/S
 
 **Varför:** Projektet är ett icke-kommersiellt portfolio- och utbildningsprojekt som ska kunna visas på GitHub och senare användas som ett sanningsenligt arbetsprov.
 
-**Konsekvens:** Projektgrunden och dess Git-historik blir offentligt läsbara. Live-demo, mätresultat och deployment är fortfarande separata, ännu inte genomförda steg.
+**Konsekvens:** Projektgrunden och dess Git-historik blir offentligt läsbara. Live-demo, mätresultat, en äldre deployment och den aktuella arbetsrevisionens deployment är separata evidenslägen. Ingen revision får kallas live utan att dess exakta Git-SHA och runtime har verifierats.
 
 ## DEC-015 – Recorded replay stoppar trasiga fixtures
 
@@ -168,7 +172,7 @@ Recorded replay använder versionshanterad, betrodd demodata. Hela fixturepakete
 
 **Status:** Accepted, 25 augusti 2026
 
-Det lokala Spring Boot-API:t dokumenteras med springdoc OpenAPI och Swagger UI. OpenAPI-schemat använder samma `snake_case` som verkliga JSON-svar, beskriver evidence-varianterna med explicita wire-värden och visar nu både `recorded_replay` och den uttryckligen bekräftade `live_ai`-endpointen.
+Det lokala Spring Boot-API:t dokumenteras med springdoc OpenAPI och Swagger UI. OpenAPI-schemat använder samma `snake_case` som verkliga JSON-svar, beskriver evidence-varianterna med explicita wire-värden och omfattar replay, live-RAG, genererade incidenter och den uttryckligen bekräftade ADK-endpointen `/api/v1/agent/turns`.
 
 **Varför:** Swagger ska hjälpa mig och en teknisk granskare att förstå och prova det API som faktiskt finns. Ett schema med andra fältnamn, dolt facit eller planerade funktioner skulle ge falsk trygghet.
 
@@ -178,7 +182,7 @@ Det lokala Spring Boot-API:t dokumenteras med springdoc OpenAPI och Swagger UI. 
 
 **Status:** Accepted, 25 augusti 2026
 
-Tokenanvändningen kommer från leverantörens verkliga responsmetadata. `estimated_cost_usd` beräknas modellberoende från Googles betalda standardlistpris som kontrollerades 25 augusti 2026. Svaret innehåller även `estimated_cost_basis` och säger att faktisk free-tier-debitering kan vara 0 USD.
+Tokenanvändningen kommer från leverantörens verkliga responsmetadata. `estimated_cost_usd` beräknas modellberoende från Googles betalda standardlistpris som kontrollerades 31 augusti 2026. Svaret innehåller även `estimated_cost_basis` och säger att faktisk free-tier-debitering kan vara 0 USD.
 
 **Varför:** Applikationen kan inte säkert avgöra kontots billingnivå från ett modellsvar. Ett omärkt listpris skulle därför se ut som en faktisk debitering.
 
@@ -193,3 +197,13 @@ Recorded replay är det kostnadsfria standardläget. Varje livekörning kräver 
 **Varför:** En publik portfolio-demo ska kunna provas utan att en besökstopp, dubbla klick eller automatiska retries skapar okontrollerad modellkostnad. Replay gör samtidigt kärnberättelsen tillgänglig även när livekapaciteten är upptagen.
 
 **Konsekvens:** Gränsen är lokal för varje process och är därför inte ett komplett publikt missbruksskydd. En framtida Cloud Run-deploy ska hålla `min-instances=0`, begränsa `max-instances` och kompletteras med budgetlarm innan den kallas kostnadssäkrad. Exakta molngränser verifieras vid deployment; de är inte genomförda nu.
+
+## DEC-019 – Tvåagentsflöde i Google ADK for Java
+
+**Status:** Accepted and implemented in the current working revision, 10 september 2026
+
+ADK-endpointen använder ett `SequentialAgent` med exakt två barn i fast ordning. `nordly_evidence_agent` har ensam tillgång till ett sammansatt read-only tool och måste returnera en tool call utan diagnos eller berättande text. ADK:s strukturerade `FunctionResponse` lämnas direkt vidare i eventströmmen till `nordly_diagnosis_agent`, som saknar tools och endast får formulera en typad diagnoskandidat från den överlämnade evidensen. Båda barnen har `maxSteps = 1`, hela körningen har `maxLlmCalls = 2` och agent transfer till parent eller peer är avstängd.
+
+**Varför:** Separationen visar ett verkligt multi-agentmönster utan att skapa fri agency. Evidensinsamling och formulering får olika behörigheter, samtidigt som ordning, kostnad och failure modes förblir begripliga.
+
+**Konsekvens:** `nordly-adk-turn-v2` returnerar ett workflow-kvitto med förväntad och observerad agentordning, handofftyp, slutlig författare och completionstatus. Deterministisk Java-kod är enda release gate och kontrollerar ordning, direkt evidensöverlämning, tool-gräns, slutlig författare, exakt två modellanrop, schema, citationer och faktastöd. Ett underkänt villkor ger `verification_failed` och diagnosen hålls inne. Ingen agent kan skriva, genomföra remediation eller visa privat chain-of-thought. En säkerhetsblockerad request stoppar före ADK, Gemini, tools och embeddings och returnerar noll i kontrollkvittot.

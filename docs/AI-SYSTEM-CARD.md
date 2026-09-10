@@ -4,11 +4,11 @@
 - **Ägare:** Shirwac Abib
 - **Status:** Portfolio- och utbildningsprojekt under aktiv utveckling
 - **Datagräns:** Endast syntetisk incidentdata
-- **Senast uppdaterad:** 26 augusti 2026
+- **Senast uppdaterad:** 10 september 2026
 
 ## Syfte och avsedd användning
 
-Incident Detective visar hur ett avgränsat AI-system kan undersöka en syntetisk mjukvaruincident. Modellen får samla evidens genom fyra typade read-only tools, lämna en strukturerad diagnos och rekommendera ett säkert nästa steg. Resultatet verifieras sedan med vanlig Java-kod mot ett dolt syntetiskt facit.
+Incident Detective visar hur ett avgränsat AI-system kan undersöka en syntetisk mjukvaruincident. Java 21 och Spring Boot äger API, säkerhetsgräns, budgetar och slutlig verifiering. Google ADK for Java kör ett `SequentialAgent` med två barn i fast ordning: en evidensagent med ett sammansatt read-only tool och en tool-fri diagnosagent. Resultatet får visas först när vanlig Java-kod har verifierat både ADK-spåret och diagnosen mot ett dolt syntetiskt facit.
 
 Systemet är byggt för demonstration, lärande och reproducerbar utvärdering. Det är inte anslutet till riktiga företagsmiljöer och är inte ett produktionssystem för incidenthantering.
 
@@ -23,21 +23,22 @@ Systemet är byggt för demonstration, lärande och reproducerbar utvärdering. 
 
 ## Begränsad AI-agency
 
-Modellen kan endast välja mellan `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks`. Verktygen är skrivskyddade. State machinen begränsar collection-rundor, modellanrop, tool calls och tid. Den sista synthesize-rundan saknar tools och följs endast av deterministisk verifiering. Modellen kan svara `insufficient_evidence`. Ett föreslaget nästa steg kräver alltid mänskligt godkännande.
+ADK-flödet har två modellsteg och en hård gräns på två modellanrop. `nordly_evidence_agent` kan anropa `inspect_incident_evidence` exakt en gång. Java delar då upp anropet i avgränsade läsningar av metrics, loggar, traces och eventuellt runbooks genom RAG. Den strukturerade `FunctionResponse` som ADK registrerar lämnas direkt vidare till `nordly_diagnosis_agent`, som saknar tools. Agenterna får inte byta ordning, delegera, skriva eller genomföra remediation. Java kontrollerar agentordning, evidensöverlämning, tool-gräns, slutlig författare, schema, citationer och faktastöd innan svaret släpps. Modellen kan svara `insufficient_evidence`, och ett föreslaget nästa steg kräver alltid mänskligt godkännande.
 
 ## Verifierad status just nu
 
 | Område | Status | Evidens |
 |---|---|---|
 | Syntetisk datagräns | Verifierat | Scenariofixtures, evidens och runbooks är skapade för projektet; inga riktiga företagsloggar används. |
-| Begränsad agency | Verifierat | Fyra read-only tools, bounded state machine och ingen remediationväg. |
+| Begränsad agency | Verifierad lokalt i aktuell revision | Google ADK Java `SequentialAgent`, två namngivna barn, två modellanrop som hard cap, ett sammansatt read-only tool hos evidensagenten och noll tools hos diagnosagenten. Providerfria trajectory-tester ingår och backendens fullsvit passerade med 318 tester. |
+| Workflow-kvitto | Implementerat i aktuell arbetsrevision | Kontrakt `nordly-adk-turn-v2` redovisar förväntad/observerad agentordning, direkt ADK `FunctionResponse`-överlämning, slutlig författare och Java-verifieringens separata beslut. |
 | Structured output | Verifierat | Java-validering och deterministisk verifiering hanterar schema, citationer, evidensstöd och facit separat. |
 | Runbook-RAG | Byggt och delvis verifierat | PostgreSQL/pgvector, 10 dokument/12 chunks, Gemini embeddings, hash-readiness och explicit import fungerar lokalt. |
 | Retrieval-kvalitet | Mätt, förbättring krävs | Development Hit@4 5/5; held-out 4/5; no-match 3/3. Unsafe legacy-runbook var top-1 i det missade held-out-fallet. |
 | Prompt-injection-säkerhet | Inte verifierat | Den osäkra runbooken hämtades rank 1 i adversarial-fallet. Ett separat synthesis-test återstår. |
 | Diagnoskvalitet | Verifierad per körning, inte aggregerad | Schema, citationer, stöd, coverage och correctness returneras per replay/live-run. Full modellaccuracy är inte mätt. |
-| Observability | Inte byggt | Run metadata finns, men strukturerade JSON-loggar och OpenTelemetry-spans återstår. |
-| Deployment | Inte verifierat | GitHub och lokal demo finns; ingen Cloud Run-version är deployad. |
+| Observability | Avgränsad OpenTelemetry-slice byggd och testad | Liveflödet har sanerade spans för `investigation → collect → tool/retrieval → synthesize → verify`. Lokal standard är no-op och OTLP span-export är separat opt-in. Strukturerade JSON-loggar, collector/dashboard och exporterad end-to-end-trace är inte verifierade. |
+| Deployment | Aktuell revision inte deployad i denna uppgift | Den kombinerade frontend-/backendcontainern är lokalt verifierad. En äldre publik Cloud Run-revision kan finnas, men den bevisar inte att den aktuella Phase 1/2-koden är live. Cloud Run, Vertex AI och publik trafik är separata nästa beslut. |
 
 ## Riskregister
 
@@ -47,10 +48,10 @@ Modellen kan endast välja mellan `get_metrics`, `search_logs`, `get_trace` och 
 | R-02 | En runbook innehåller indirekt prompt injection | Runbooks behandlas som data, tools är read-only och modellen saknar åtgärdsbehörighet | Tvinga in den redan hämtade adversarial chunken i synthesis och kontrollera output/approval |
 | R-03 | Retrieval returnerar relevant-looking men fel text | Development-only tröskel, exact cosine, rank/similarity/hash och no-match-test | Förbättra corpus/query-kontrakt i en ny benchmarkversion utan held-out-tuning |
 | R-04 | Indexet är gammalt eller ofullständigt | Retrieval kontrollerar både antal och innehållshash före query-embedding | Behåll stale/missing-index-tester i CI |
-| R-05 | Modellen använder för många eller okända verktyg | Dynamisk tillåtelselista från återstående budget, atomisk preflight, per-tool-gränser, totalbudget och hard timeout | Behåll negativa kontraktstester i CI |
-| R-06 | Schema, citation eller facit underkänns men presenteras som korrekt | Deterministisk verifiering och separat `verification_failed` | Behåll negativa kontraktstester och visa ett verkligt failure case |
+| R-05 | Fel agent använder tools, agenterna körs i fel ordning eller budgeten överskrids | Fast `SequentialAgent`-ordning, två modellanrop som hard cap, exakt ett tillåtet tool hos evidensagenten, tool-fri diagnosagent och Java-kontroll av det observerade ADK-spåret | Behåll trajectory-tester och fullsvit som ändringsgrind |
+| R-06 | Schema, citation, evidensöverlämning eller facit underkänns men presenteras som korrekt | Deterministisk Java-verifierare är enda release gate; ett underkänt hårt villkor ger `verification_failed` och diagnosen hålls inne | Behåll negativa kontraktstester och visa ett verkligt failure case |
 | R-07 | Publik användning orsakar kostnad eller överbelastning | Replay som standard, explicit livebekräftelse, lokal concurrency/rolling rate limit, timeout och ett dagstak vars scope exponeras; `rag` använder en atomisk PostgreSQL-räknare | Cloud Run max-instances och providerbudgetlarm före deploy |
-| R-08 | Hemligheter eller onödiga data hamnar i telemetry | Nyckelfilen ignoreras av Git; publika payloads utesluter `GroundTruth` | Implementera och testa en allowlist för JSON-loggar/OpenTelemetry |
+| R-08 | Hemligheter eller onödiga data hamnar i telemetry | Nyckelfilen ignoreras av Git; publika payloads utesluter `GroundTruth`; OpenTelemetry-spans använder en testad attribut-allowlist utan generic attribute-API | Bygg samma allowlistprincip för framtida strukturerade JSON-loggar och granska exporterad telemetry innan en extern collector ansluts |
 | R-09 | Leverantören är långsam eller otillgänglig | Sanerade providerfel, kontrollerad timeout, mätt låg-latensstandard och ingen tyst replay | Mäta stabilitet; historiken innehåller timeout även om de två senaste RAG-smokesen slutfördes |
 | R-10 | Evalresultat överanpassas | Development och held-out hålls isär; tröskeln fryses före held-out | Versionshantera framtida dataset och ändra aldrig v1 efter resultatet |
 
@@ -58,6 +59,7 @@ Modellen kan endast välja mellan `get_metrics`, `search_logs`, `get_trace` och 
 
 - `insufficient_evidence` är ett giltigt avstående, inte ett tekniskt fel.
 - `verification_failed` betyder att en strukturerad diagnos underkändes efter modellen.
+- `blocked_before_ai` betyder att Java stoppade input före ADK Runner, Gemini, tools och embeddings; kvittot ska då visa noll anrop och noll actions.
 - Providerfel och timeout visas som explicita fel. Systemet märker aldrig en replay som liveutredning.
 - Rate limit returnerar ett tydligt svar och klienten gör inga automatiska live-retries.
 - Inget felutfall genomför eller påstår att remediation har utförts.
@@ -70,9 +72,11 @@ Varje evalrapport ska identifiera dataset, korpus, embeddingprofil, modell/promp
 
 ## Observability och dataminimering
 
-Planerade spans följer `investigation → collect → tool/retrieval → synthesize → verify`. En framtida allowlist får innehålla run ID, scenario ID, fas, toolnamn, evidence IDs, antal, durationer, versionsmetadata och sanerad felkategori. Den får inte innehålla API-nycklar, rå providerrespons, dolt `GroundTruth`, fulla råprompter, full evidenstext, osanerade tool arguments eller privat chain-of-thought.
+Det implementerade ursprungliga liveflödet följer `investigation → collect → tool/retrieval → synthesize → verify`. ADK-endpointens `events[]`, `workflow` och `verification_event` är i stället ett sanerat post-run-kvitto från den aktuella requesten. Ingen av vyerna sparar eller visar privat chain-of-thought. Attribut kan endast sättas genom en fast kod-allowlist med serverkontrollerade ID:n, enums, booleska gränser, antal, durationer, tokenantal och aggregerade verifieringsutfall. Retrievalspanen kan visa om `pgvector_exact_cosine` faktiskt var aktivt samt matchantal, embeddingdimension och embeddinglatency. Den visar aldrig querytext, dokumentinnehåll eller evidence IDs.
 
-OpenTelemetry är ännu planerat och får inte beskrivas som implementerat innan spans och sanering har testats.
+I de manuella domänspannen saknar API-nycklar, råa prompts, providerrespons, dolt `GroundTruth`, full evidenstext, tool arguments, summaries och privat chain-of-thought helt attributväg. Dessa spans registrerar inte heller exception messages eller stack traces; endast en liten sanerad `error.type`-kategori används. Ett in-process-test verifierar både spanträdet och att hemliga teststrängar inte förekommer i domänspannens attribut eller events.
+
+OpenTelemetry är no-op som lokal standard genom `INCIDENT_DETECTIVE_OTEL_ENABLED=false`, och OTLP span-export kräver dessutom ett separat `INCIDENT_DETECTIVE_OTEL_EXPORT_ENABLED=true`. OTLP-export för metrics och logs är avstängd; Micrometer är fortsatt källa för applikationsmetrics. Det finns ännu inget verifierat collector-/dashboardflöde, ingen strukturerad JSON-loggning och ingen observability-claim för replayflödet.
 
 ## Ramverk som referens, inte certifiering
 
