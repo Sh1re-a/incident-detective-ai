@@ -5,6 +5,7 @@ import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.GeminiPromptContracts;
 import dev.shirwac.incidentdetective.ai.GeminiThinkingLevel;
 import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
+import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
 import dev.shirwac.incidentdetective.rag.EmbeddingGateway;
 import dev.shirwac.incidentdetective.rag.EmbeddingResult;
 import dev.shirwac.incidentdetective.rag.RagProperties;
@@ -15,19 +16,26 @@ import dev.shirwac.incidentdetective.rag.RunbookVectorStore;
 import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -62,6 +70,7 @@ class KnowledgeRagServiceTest {
     );
     private final RunbookVectorStore store = mock(RunbookVectorStore.class);
     private final EmbeddingGateway embeddings = mock(EmbeddingGateway.class);
+    private final LiveAiRunGuard liveRunGuard = mock(LiveAiRunGuard.class);
     private final KnowledgeAnswerGateway answers = mock(
             KnowledgeAnswerGateway.class
     );
@@ -72,6 +81,11 @@ class KnowledgeRagServiceTest {
         when(corpus.corpusContentSha256()).thenReturn(CORPUS_SHA256);
         when(corpus.eligibleDocumentCount()).thenReturn(10);
         when(corpus.eligibleChunkCount()).thenReturn(18);
+        when(liveRunGuard.runConfirmed(anyBoolean(), any())).thenAnswer(
+                invocation -> invocation
+                        .<Supplier<KnowledgeRagResponse>>getArgument(1)
+                        .get()
+        );
     }
 
     @Test
@@ -100,7 +114,7 @@ class KnowledgeRagServiceTest {
         assertNull(response.retrieval().queryEmbedding().provider());
         assertNull(response.retrieval().queryEmbedding().dimensions());
         assertEquals("blocked", response.phases().getFirst().status());
-        verifyNoInteractions(readiness, store, embeddings, answers);
+        verifyNoInteractions(readiness, store, embeddings, answers, liveRunGuard);
     }
 
     @Test
@@ -125,7 +139,7 @@ class KnowledgeRagServiceTest {
         assertFalse(response.question().text().contains("NORD-2048"));
         assertEquals(0, response.receipt().providerCalls());
         assertNull(response.providerRoute());
-        verifyNoInteractions(readiness, store, embeddings, answers);
+        verifyNoInteractions(readiness, store, embeddings, answers, liveRunGuard);
     }
 
     @Test
@@ -144,7 +158,7 @@ class KnowledgeRagServiceTest {
         assertEquals(0, response.receipt().providerCalls());
         assertNull(response.providerRoute());
         assertFalse(response.retrieval().currentVectorSearch());
-        verifyNoInteractions(readiness, store, embeddings, answers);
+        verifyNoInteractions(readiness, store, embeddings, answers, liveRunGuard);
     }
 
     @Test
@@ -158,7 +172,7 @@ class KnowledgeRagServiceTest {
         assertNull(response.providerRoute());
         assertNull(response.retrieval().indexSnapshot());
         assertEquals("LIVE_AI_CONFIRMATION_REQUIRED", response.error().code());
-        verifyNoInteractions(readiness, store, embeddings, answers);
+        verifyNoInteractions(readiness, store, embeddings, answers, liveRunGuard);
     }
 
     @Test
@@ -179,10 +193,45 @@ class KnowledgeRagServiceTest {
         assertEquals(17, response.retrieval().indexSnapshot().currentChunks());
         assertEquals(18, response.retrieval().indexSnapshot().expectedChunks());
         verifyNoInteractions(embeddings, store, answers);
+        verifyNoInteractions(liveRunGuard);
     }
 
     @Test
-    void abstainsWithoutGenerationWhenNoSimilarityPassesTheThreshold() {
+    void doesNotEnterTheGuardWhenProviderConfigurationIsMissing() {
+        GeminiAiProperties missingProvider = new GeminiAiProperties(
+                null,
+                true,
+                "gemini-3.1-flash-lite",
+                GeminiThinkingLevel.MINIMAL,
+                GeminiPromptContracts.LIVE_PROMPT_VERSION
+        );
+
+        KnowledgeRagResponse response = service(missingProvider).ask(
+                request("När syns en godkänd återbetalning?", true)
+        );
+
+        assertEquals("unavailable", response.outcome());
+        assertEquals("RAG_EMBEDDING_NOT_CONFIGURED", response.error().code());
+        verifyNoInteractions(readiness, store, embeddings, answers, liveRunGuard);
+    }
+
+    @Test
+    void doesNotEnterTheGuardWhenIndexReadinessCannotBeRead() {
+        when(readiness.inspect()).thenThrow(
+                new DataAccessResourceFailureException("database unavailable")
+        );
+
+        KnowledgeRagResponse response = service(LIVE_AI).ask(
+                request("När syns en godkänd återbetalning?", true)
+        );
+
+        assertEquals("unavailable", response.outcome());
+        assertEquals("RAG_DATABASE_UNAVAILABLE", response.error().code());
+        verifyNoInteractions(store, embeddings, answers, liveRunGuard);
+    }
+
+    @Test
+    void passesProviderFlowThroughGuardAndAbstainsWithoutStrongSimilarity() {
         when(readiness.inspect()).thenReturn(new RunbookIndexStatus(18, 18, 18));
         when(embeddings.embedQuery(anyString())).thenReturn(embedding());
         when(store.search(
@@ -217,6 +266,26 @@ class KnowledgeRagServiceTest {
                 .contains("USD price is not estimated"));
         assertTrue(response.retrieval().currentVectorSearch());
         verifyNoInteractions(answers);
+        verify(liveRunGuard).runConfirmed(eq(true), any());
+    }
+
+    @Test
+    void guardFailurePreventsEveryProviderBearingInteraction() {
+        when(readiness.inspect()).thenReturn(new RunbookIndexStatus(18, 18, 18));
+        RuntimeException rejected = new RuntimeException("guard rejected");
+        doThrow(rejected).when(liveRunGuard).runConfirmed(anyBoolean(), any());
+
+        RuntimeException thrown = assertThrows(
+                RuntimeException.class,
+                () -> service(LIVE_AI).ask(
+                        request("När syns en godkänd återbetalning?", true)
+                )
+        );
+
+        assertSame(rejected, thrown);
+        verify(readiness).inspect();
+        verify(liveRunGuard).runConfirmed(eq(true), any());
+        verifyNoInteractions(embeddings, store, answers);
     }
 
     @Test
@@ -297,7 +366,7 @@ class KnowledgeRagServiceTest {
         assertEquals("LIVE_AI_DISABLED", response.error().code());
         assertEquals(0, response.receipt().providerCalls());
         assertNull(response.providerRoute());
-        verifyNoInteractions(readiness, store, embeddings, answers);
+        verifyNoInteractions(readiness, store, embeddings, answers, liveRunGuard);
     }
 
     @Test
@@ -417,6 +486,7 @@ class KnowledgeRagServiceTest {
                 RAG_PROFILE,
                 KNOWLEDGE_PROFILE,
                 aiProperties,
+                liveRunGuard,
                 answers,
                 new KnowledgeOutputVerifier(),
                 new GeminiCostEstimator()

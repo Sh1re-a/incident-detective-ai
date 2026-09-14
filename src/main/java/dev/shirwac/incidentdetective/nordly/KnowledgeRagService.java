@@ -5,6 +5,7 @@ import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.GoogleGenAiProviderRoute;
 import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
+import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
 import dev.shirwac.incidentdetective.rag.EmbeddingGateway;
 import dev.shirwac.incidentdetective.rag.EmbeddingResult;
 import dev.shirwac.incidentdetective.rag.RagProperties;
@@ -63,6 +64,7 @@ public final class KnowledgeRagService {
     private final RagProperties ragProperties;
     private final NordlyKnowledgeRagProperties knowledgeProperties;
     private final GeminiAiProperties aiProperties;
+    private final LiveAiRunGuard liveRunGuard;
     private final KnowledgeAnswerGateway answerGateway;
     private final KnowledgeOutputVerifier verifier;
     private final GeminiCostEstimator costEstimator;
@@ -76,6 +78,7 @@ public final class KnowledgeRagService {
             RagProperties ragProperties,
             NordlyKnowledgeRagProperties knowledgeProperties,
             GeminiAiProperties aiProperties,
+            LiveAiRunGuard liveRunGuard,
             KnowledgeAnswerGateway answerGateway,
             KnowledgeOutputVerifier verifier,
             GeminiCostEstimator costEstimator
@@ -88,6 +91,7 @@ public final class KnowledgeRagService {
         this.ragProperties = ragProperties;
         this.knowledgeProperties = knowledgeProperties;
         this.aiProperties = aiProperties;
+        this.liveRunGuard = liveRunGuard;
         this.answerGateway = answerGateway;
         this.verifier = verifier;
         this.costEstimator = costEstimator;
@@ -278,6 +282,31 @@ public final class KnowledgeRagService {
                     )
             );
         }
+        return liveRunGuard.runConfirmed(
+                request.confirmLiveAi(),
+                () -> runProviderFlow(
+                        runId,
+                        runStarted,
+                        request,
+                        submittedQuestion,
+                        safetyResponse,
+                        phases,
+                        indexStatus,
+                        eligibilityStarted
+                )
+        );
+    }
+
+    private KnowledgeRagResponse runProviderFlow(
+            String runId,
+            long runStarted,
+            KnowledgeRagRequest request,
+            KnowledgeRagResponse.SubmittedQuestion submittedQuestion,
+            KnowledgeRagResponse.SafetyDecision safetyResponse,
+            List<KnowledgeRagResponse.PhaseEvent> phases,
+            RunbookIndexStatus indexStatus,
+            long eligibilityStarted
+    ) {
         phases.add(phase(
                 "eligibility_filter",
                 "completed",
