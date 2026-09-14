@@ -7,8 +7,10 @@ import com.google.adk.models.BaseLlmConnection;
 import com.google.adk.models.LlmRequest;
 import com.google.adk.models.LlmResponse;
 import com.google.genai.types.Content;
+import com.google.genai.types.FinishReason;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionCallingConfigMode;
+import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.Part;
 import dev.shirwac.incidentdetective.ai.CollectionToolCall;
 import dev.shirwac.incidentdetective.ai.GeminiPromptContracts;
@@ -210,6 +212,184 @@ class AdkAgentRuntimeTest {
     }
 
     @Test
+    void releaseGateRejectsErrorAndInterruptedEventMutations() {
+        GeneratedCase generated = generatedCase();
+        AdkAgentRuntime runtime = runtime(boundedTools(generated));
+        List<Event> events = validEvents(runtime, generated);
+
+        Event errorCode = events.getFirst().toBuilder()
+                .errorCode(new FinishReason(FinishReason.Known.SAFETY))
+                .build();
+        Event errorMessage = events.getFirst().toBuilder()
+                .errorMessage("test-only provider failure")
+                .build();
+        Event interrupted = events.getFirst().toBuilder()
+                .interrupted(true)
+                .build();
+
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, 0, errorCode),
+                "runtime_event_error"
+        );
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, 0, errorMessage),
+                "runtime_event_error"
+        );
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, 0, interrupted),
+                "runtime_event_interrupted"
+        );
+    }
+
+    @Test
+    void releaseGateRejectsMissingOrNonStopTerminalFinishReasonMutations() {
+        GeneratedCase generated = generatedCase();
+        AdkAgentRuntime runtime = runtime(boundedTools(generated));
+        List<Event> events = validEvents(runtime, generated);
+        int terminalIndex = events.size() - 1;
+
+        Event missing = events.get(terminalIndex).toBuilder()
+                .finishReason(null)
+                .build();
+        Event maxTokens = events.get(terminalIndex).toBuilder()
+                .finishReason(new FinishReason(FinishReason.Known.MAX_TOKENS))
+                .build();
+
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, terminalIndex, missing),
+                "invalid_terminal_finish_reason"
+        );
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, terminalIndex, maxTokens),
+                "invalid_terminal_finish_reason"
+        );
+    }
+
+    @Test
+    void releaseGateRejectsEvidenceNarrativeMixedWithFunctionCall() {
+        GeneratedCase generated = generatedCase();
+        AdkAgentRuntime runtime = runtime(boundedTools(generated));
+        List<Event> events = validEvents(runtime, generated);
+        FunctionCall call = events.getFirst().functionCalls().getFirst();
+        Event mixed = events.getFirst().toBuilder()
+                .content(Content.builder()
+                        .role("model")
+                        .parts(
+                                Part.fromText("Untrusted evidence narrative."),
+                                Part.builder().functionCall(call).build()
+                        )
+                        .build())
+                .build();
+
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, 0, mixed),
+                "evidence_narrative_with_function_call"
+        );
+    }
+
+    @Test
+    void releaseGateRejectsDiagnosisFunctionActivityMutations() {
+        GeneratedCase generated = generatedCase();
+        AdkAgentRuntime runtime = runtime(boundedTools(generated));
+        List<Event> events = validEvents(runtime, generated);
+        int diagnosisIndex = events.size() - 1;
+        Event diagnosis = events.get(diagnosisIndex);
+        FunctionCall call = FunctionCall.builder()
+                .id("diagnosis-call")
+                .name(AdkAgentRuntime.TOOL_NAME)
+                .args(Map.of())
+                .build();
+        FunctionResponse response = FunctionResponse.builder()
+                .id("diagnosis-response")
+                .name(AdkAgentRuntime.TOOL_NAME)
+                .response(Map.of("status", "test-only"))
+                .build();
+        Event withCall = diagnosis.toBuilder()
+                .content(Content.builder()
+                        .role("model")
+                        .parts(
+                                Part.fromText(DIAGNOSIS_JSON),
+                                Part.builder().functionCall(call).build()
+                        )
+                        .build())
+                .build();
+        Event withResponse = diagnosis.toBuilder()
+                .content(Content.builder()
+                        .role("model")
+                        .parts(
+                                Part.fromText(DIAGNOSIS_JSON),
+                                Part.builder().functionResponse(response).build()
+                        )
+                        .build())
+                .build();
+
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, diagnosisIndex, withCall),
+                "diagnosis_function_activity"
+        );
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, diagnosisIndex, withResponse),
+                "diagnosis_function_activity"
+        );
+    }
+
+    @Test
+    void releaseGateFailsClosedForUnknownOrMissingFunctionNames() {
+        GeneratedCase generated = generatedCase();
+        AdkAgentRuntime runtime = runtime(boundedTools(generated));
+        List<Event> events = validEvents(runtime, generated);
+        FunctionCall originalCall = events.getFirst().functionCalls().getFirst();
+        FunctionResponse originalResponse = events.get(1)
+                .functionResponses()
+                .getFirst();
+        Event unknownCall = functionCallEvent(
+                events.getFirst(),
+                originalCall.toBuilder().name("unknown_read_tool").build()
+        );
+        Event missingCall = functionCallEvent(
+                events.getFirst(),
+                originalCall.toBuilder().clearName().build()
+        );
+        Event unknownResponse = functionResponseEvent(
+                events.get(1),
+                originalResponse.toBuilder().name("unknown_read_tool").build()
+        );
+        Event missingResponse = functionResponseEvent(
+                events.get(1),
+                originalResponse.toBuilder().clearName().build()
+        );
+
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, 0, unknownCall),
+                "unexpected_or_missing_function_name"
+        );
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, 0, missingCall),
+                "unexpected_or_missing_function_name"
+        );
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, 1, unknownResponse),
+                "unexpected_or_missing_function_name"
+        );
+        assertReleaseGateRejects(
+                runtime,
+                replacing(events, 1, missingResponse),
+                "unexpected_or_missing_function_name"
+        );
+    }
+
+    @Test
     void finalTextNeverUsesEvidenceAgentNarrative() {
         AdkAgentRuntime runtime = runtime(mock(InvestigationToolExecutor.class));
         Event evidenceNarrative = textEvent(
@@ -348,6 +528,65 @@ class AdkAgentRuntimeTest {
                 .reduce("", (left, right) -> left + "\n" + right);
     }
 
+    private List<Event> validEvents(
+            AdkAgentRuntime runtime,
+            GeneratedCase generated
+    ) {
+        List<Event> events = runtime.run(
+                generated,
+                "Inspect the alert using read-only evidence.",
+                new SequencedFakeLlm()
+        ).events();
+        assertTrue(runtime.validateTrajectory(events).valid());
+        return events;
+    }
+
+    private List<Event> replacing(
+            List<Event> events,
+            int index,
+            Event replacement
+    ) {
+        List<Event> mutated = new ArrayList<>(events);
+        mutated.set(index, replacement);
+        return List.copyOf(mutated);
+    }
+
+    private Event functionCallEvent(Event original, FunctionCall call) {
+        return original.toBuilder()
+                .content(Content.builder()
+                        .role("model")
+                        .parts(Part.builder().functionCall(call).build())
+                        .build())
+                .build();
+    }
+
+    private Event functionResponseEvent(
+            Event original,
+            FunctionResponse response
+    ) {
+        return original.toBuilder()
+                .content(Content.builder()
+                        .role("tool")
+                        .parts(Part.builder()
+                                .functionResponse(response)
+                                .build())
+                        .build())
+                .build();
+    }
+
+    private void assertReleaseGateRejects(
+            AdkAgentRuntime runtime,
+            List<Event> events,
+            String expectedViolation
+    ) {
+        AdkAgentRuntime.TrajectoryValidation trajectory =
+                runtime.validateTrajectory(events);
+
+        assertFalse(trajectory.valid());
+        assertFalse(trajectory.completedInOrder());
+        assertTrue(trajectory.violations().contains(expectedViolation));
+    }
+
     private Event textEvent(String author, String text) {
         return Event.builder()
                 .id("event-" + author)
@@ -389,6 +628,7 @@ class AdkAgentRuntimeTest {
                                                 .build())
                                         .build())
                                 .build())
+                        .finishReason(new FinishReason(FinishReason.Known.STOP))
                         .modelVersion("gemini-test-version")
                         .build());
             }
@@ -398,6 +638,7 @@ class AdkAgentRuntimeTest {
                                 .role("model")
                                 .parts(Part.fromText(DIAGNOSIS_JSON))
                                 .build())
+                        .finishReason(new FinishReason(FinishReason.Known.STOP))
                         .modelVersion("gemini-test-version")
                         .build());
             }

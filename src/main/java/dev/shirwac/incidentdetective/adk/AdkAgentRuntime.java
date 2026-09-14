@@ -13,6 +13,7 @@ import com.google.adk.runner.InMemoryRunner;
 import com.google.adk.sessions.Session;
 import com.google.adk.tools.Annotations;
 import com.google.adk.tools.FunctionTool;
+import com.google.genai.types.FinishReason;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionCallingConfig;
 import com.google.genai.types.FunctionCallingConfigMode;
@@ -226,12 +227,43 @@ public final class AdkAgentRuntime {
         boolean transferBoundaryValid = true;
         boolean toolAuthorsValid = true;
         boolean diagnosisToolFree = true;
+        boolean eventErrorsAbsent = true;
+        boolean interruptionsAbsent = true;
+        boolean terminalFinishReasonsValid = true;
+        boolean evidenceCallContentValid = true;
+        boolean diagnosisFunctionActivityObserved = false;
         for (int index = 0; index < events.size(); index++) {
             Event event = events.get(index);
             if (event.actions().transferToAgent().isPresent()) {
                 transferBoundaryValid = false;
             }
-            for (FunctionCall call : event.functionCalls()) {
+            if (event.errorCode().isPresent()
+                    || event.errorMessage().isPresent()) {
+                eventErrorsAbsent = false;
+            }
+            if (event.interrupted().orElse(false)) {
+                interruptionsAbsent = false;
+            }
+            if (event.finalResponse()
+                    && !event.finishReason()
+                            .map(reason -> reason.knownEnum()
+                                    == FinishReason.Known.STOP)
+                            .orElse(false)) {
+                terminalFinishReasonsValid = false;
+            }
+            List<FunctionCall> eventCalls = event.functionCalls();
+            List<FunctionResponse> eventResponses = event.functionResponses();
+            String text = visibleText(event);
+            if (EVIDENCE_AGENT_NAME.equals(event.author())
+                    && !eventCalls.isEmpty()
+                    && !text.isBlank()) {
+                evidenceCallContentValid = false;
+            }
+            if (DIAGNOSIS_AGENT_NAME.equals(event.author())
+                    && (!eventCalls.isEmpty() || !eventResponses.isEmpty())) {
+                diagnosisFunctionActivityObserved = true;
+            }
+            for (FunctionCall call : eventCalls) {
                 calls.add(new IndexedCall(index, event.author(), call));
                 if (!EVIDENCE_AGENT_NAME.equals(event.author())) {
                     toolAuthorsValid = false;
@@ -240,7 +272,7 @@ public final class AdkAgentRuntime {
                     diagnosisToolFree = false;
                 }
             }
-            for (FunctionResponse response : event.functionResponses()) {
+            for (FunctionResponse response : eventResponses) {
                 responses.add(new IndexedResponse(index, event.author(), response));
                 if (!EVIDENCE_AGENT_NAME.equals(event.author())) {
                     toolAuthorsValid = false;
@@ -249,16 +281,19 @@ public final class AdkAgentRuntime {
                     diagnosisToolFree = false;
                 }
             }
-            String text = visibleText(event);
             if (event.finalResponse() && !text.isBlank()) {
                 finalTexts.add(new IndexedFinalText(index, event.author(), text));
             }
         }
 
         boolean exactToolCount = calls.size() == 1 && responses.size() == 1;
+        boolean functionNamesValid = calls.stream()
+                .allMatch(call -> expectedFunctionName(call.call().name()))
+                && responses.stream().allMatch(response -> expectedFunctionName(
+                        response.response().name()
+                ));
         boolean exactToolName = exactToolCount
-                && TOOL_NAME.equals(calls.getFirst().call().name().orElse(""))
-                && TOOL_NAME.equals(responses.getFirst().response().name().orElse(""));
+                && functionNamesValid;
         boolean toolBoundaryValid = exactToolName
                 && toolAuthorsValid
                 && diagnosisToolFree;
@@ -272,11 +307,18 @@ public final class AdkAgentRuntime {
                         .mapToInt(IndexedResponse::index)
                         .max()
                         .orElse(-1);
+        boolean eventIntegrityValid = eventErrorsAbsent
+                && interruptionsAbsent
+                && terminalFinishReasonsValid
+                && evidenceCallContentValid
+                && !diagnosisFunctionActivityObserved
+                && functionNamesValid;
         boolean completedInOrder = agentSequenceValid
                 && evidenceHandoffValid
                 && toolBoundaryValid
                 && finalAuthorValid
-                && transferBoundaryValid;
+                && transferBoundaryValid
+                && eventIntegrityValid;
 
         List<String> violations = new ArrayList<>();
         if (!agentSequenceValid) {
@@ -293,6 +335,24 @@ public final class AdkAgentRuntime {
         }
         if (!transferBoundaryValid) {
             violations.add("agent_transfer_observed");
+        }
+        if (!eventErrorsAbsent) {
+            violations.add("runtime_event_error");
+        }
+        if (!interruptionsAbsent) {
+            violations.add("runtime_event_interrupted");
+        }
+        if (!terminalFinishReasonsValid) {
+            violations.add("invalid_terminal_finish_reason");
+        }
+        if (!evidenceCallContentValid) {
+            violations.add("evidence_narrative_with_function_call");
+        }
+        if (diagnosisFunctionActivityObserved) {
+            violations.add("diagnosis_function_activity");
+        }
+        if (!functionNamesValid) {
+            violations.add("unexpected_or_missing_function_name");
         }
         return new TrajectoryValidation(
                 WORKFLOW_TYPE,
@@ -334,6 +394,15 @@ public final class AdkAgentRuntime {
         String callId = call.id().orElse("");
         String responseId = response.id().orElse("");
         return !callId.isBlank() && callId.equals(responseId);
+    }
+
+    private boolean expectedFunctionName(
+            java.util.Optional<String> functionName
+    ) {
+        return functionName
+                .filter(name -> !name.isBlank())
+                .filter(TOOL_NAME::equals)
+                .isPresent();
     }
 
     public List<AdkAgentTurnResponse.RuntimeEvent> projectEvents(
