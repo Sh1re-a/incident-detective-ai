@@ -9,6 +9,10 @@ import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
 import dev.shirwac.incidentdetective.domain.diagnosis.SafeNextStep;
 import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeFinding;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeId;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeOutcome;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeReceipt;
 import dev.shirwac.incidentdetective.generated.GeneratedCase;
 import dev.shirwac.incidentdetective.generated.GeneratedCaseRequest;
 import dev.shirwac.incidentdetective.generated.GeneratedEvidenceMode;
@@ -236,6 +240,47 @@ class IncidentLabResponsePresenterTest {
         );
         assertNull(result.localizedPresentations().en()
                 .actionReceipt().proposedNextStep());
+    }
+
+    @Test
+    void withheldStillHighlightsLogsObservedByTheReadOnlyProbe() {
+        String logEvidenceId = logs.getFirst().evidenceId();
+        AdkAgentTurnResponse response = agentTurn(
+                diagnosed(alarm.evidenceIds().getFirst()),
+                false
+        );
+        when(response.diagnosticProbe()).thenReturn(new DiagnosticProbeReceipt(
+                generated.scenario().scenarioId(),
+                DiagnosticProbeId.SERVICE_HEALTH,
+                DiagnosticProbeOutcome.OBSERVED,
+                "One request-local error log was observed.",
+                List.of(new DiagnosticProbeFinding(
+                        "service_health",
+                        "PAYMENT_ADAPTER",
+                        "degraded",
+                        "The read-only probe cited one backend log.",
+                        List.of(logEvidenceId)
+                )),
+                false
+        ));
+
+        IncidentLabResponsePresenter.Presentation result = presenter.present(
+                generated.scenario(),
+                logs,
+                alarm,
+                response
+        );
+
+        assertEquals(IncidentLabRunResponse.AnswerState.WITHHELD,
+                result.answerState());
+        assertFalse(alarm.evidenceIds().contains(logEvidenceId));
+        assertTrue(result.developerResponse().highlightedLogEvidenceIds()
+                .contains(logEvidenceId));
+        assertEquals(
+                result.developerResponse().highlightedLogEvidenceIds(),
+                result.localizedPresentations().en()
+                        .developerResponse().highlightedLogEvidenceIds()
+        );
     }
 
     @Test

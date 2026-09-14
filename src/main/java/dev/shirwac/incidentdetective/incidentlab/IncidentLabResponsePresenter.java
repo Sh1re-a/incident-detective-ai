@@ -194,7 +194,7 @@ final class IncidentLabResponsePresenter {
                         diagnosis.rootCauseCode(),
                         diagnosis.affectedService(),
                         claims,
-                        highlightedLogs(backendLogs, alarm, claims),
+                        highlightedLogs(backendLogs, alarm, claims, agentTurn),
                         missingEvidenceCodes(diagnosis),
                         List.of(),
                         nextRead
@@ -244,7 +244,7 @@ final class IncidentLabResponsePresenter {
                         null,
                         null,
                         claims,
-                        highlightedLogs(backendLogs, alarm, claims),
+                        highlightedLogs(backendLogs, alarm, claims, agentTurn),
                         missingCodes,
                         List.of(),
                         nextRead
@@ -286,7 +286,12 @@ final class IncidentLabResponsePresenter {
                         null,
                         null,
                         List.of(),
-                        highlightedLogs(backendLogs, alarm, List.of()),
+                        highlightedLogs(
+                                backendLogs,
+                                alarm,
+                                List.of(),
+                                agentTurn
+                        ),
                         List.of(),
                         failures,
                         nextRead
@@ -362,7 +367,7 @@ final class IncidentLabResponsePresenter {
                         diagnosis.rootCauseCode(),
                         diagnosis.affectedService(),
                         claims,
-                        highlightedLogs(backendLogs, alarm, claims),
+                        highlightedLogs(backendLogs, alarm, claims, agentTurn),
                         missingEvidenceCodes(diagnosis),
                         List.of(),
                         nextRead
@@ -414,7 +419,7 @@ final class IncidentLabResponsePresenter {
                         null,
                         null,
                         claims,
-                        highlightedLogs(backendLogs, alarm, claims),
+                        highlightedLogs(backendLogs, alarm, claims, agentTurn),
                         missingCodes,
                         List.of(),
                         nextRead
@@ -456,7 +461,12 @@ final class IncidentLabResponsePresenter {
                         null,
                         null,
                         List.of(),
-                        highlightedLogs(backendLogs, alarm, List.of()),
+                        highlightedLogs(
+                                backendLogs,
+                                alarm,
+                                List.of(),
+                                agentTurn
+                        ),
                         List.of(),
                         failures,
                         nextRead
@@ -557,11 +567,17 @@ final class IncidentLabResponsePresenter {
     private List<String> highlightedLogs(
             List<LogEvidence> backendLogs,
             SignalAlarmReceipt alarm,
-            List<IncidentLabRunResponse.VerifiedClaim> claims
+            List<IncidentLabRunResponse.VerifiedClaim> claims,
+            AdkAgentTurnResponse agentTurn
     ) {
         Set<String> cited = new LinkedHashSet<>(alarm.evidenceIds());
         claims.stream().flatMap(claim -> claim.evidenceIds().stream())
                 .forEach(cited::add);
+        if (agentTurn != null && agentTurn.diagnosticProbe() != null) {
+            agentTurn.diagnosticProbe().findings().stream()
+                    .flatMap(finding -> finding.evidenceIds().stream())
+                    .forEach(cited::add);
+        }
         return backendLogs.stream()
                 .map(LogEvidence::evidenceId)
                 .filter(cited::contains)
