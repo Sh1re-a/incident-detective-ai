@@ -154,6 +154,12 @@ public final class GeminiIncidentPlannerGateway
                     "Incident planning provider call failed",
                     exception
             );
+        } catch (IllegalStateException exception) {
+            throw failure(
+                    IncidentPlannerFailure.NOT_CONFIGURED,
+                    "Google Gen AI client could not be initialized",
+                    exception
+            );
         } catch (RuntimeException exception) {
             throw failure(
                     IncidentPlannerFailure.MALFORMED_RESPONSE,

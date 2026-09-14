@@ -12,6 +12,7 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 class GeminiIncidentPlannerGatewayTest {
@@ -57,6 +58,28 @@ class GeminiIncidentPlannerGatewayTest {
                 exception.failure()
         );
         verifyNoInteractions(clientFactory);
+    }
+
+    @Test
+    void clientInitializationFailureIsNotReportedAsMalformedModelOutput() {
+        GeminiIncidentPlannerGateway gateway = gateway(properties(
+                "test-only-key",
+                true
+        ));
+        when(clientFactory.create(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new IllegalStateException("ADC unavailable"));
+
+        IncidentPlannerException exception = assertThrows(
+                IncidentPlannerException.class,
+                () -> gateway.propose(new IncidentPlanningRequest(
+                        "Simulera timeout i Nordlys betalningsflöde."
+                ))
+        );
+
+        assertEquals(
+                IncidentPlannerFailure.NOT_CONFIGURED,
+                exception.failure()
+        );
     }
 
     private GeminiIncidentPlannerGateway gateway(
