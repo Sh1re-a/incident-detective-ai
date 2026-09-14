@@ -134,7 +134,7 @@ class GeneratedCaseGenerationServiceTest {
     }
 
     @Test
-    void requestDefaultsOnlyTheIncidentFamily() {
+    void requestDefaultsTheIncidentFamilyAndAllowsAutoEvidenceSelection() {
         GeneratedCaseGenerationRequest request = new GeneratedCaseGenerationRequest(
                 null,
                 null,
@@ -144,14 +144,18 @@ class GeneratedCaseGenerationServiceTest {
 
         assertEquals(GeneratedIncidentFamily.PAYMENT_TIMEOUT,
                 request.incidentFamily());
-        assertThrows(
-                NullPointerException.class,
-                () -> new GeneratedCaseGenerationRequest(
+        GeneratedCaseGenerationService service = service(() -> 44L);
+        GeneratedCaseGeneration auto = service.generate(
+                new GeneratedCaseGenerationRequest(
                         null,
                         GeneratedIncidentFamily.PAYMENT_TIMEOUT,
                         null,
                         GeneratedNoiseLevel.NONE
                 )
+        );
+        assertEquals(
+                GeneratedEvidenceMode.INSUFFICIENT_EVIDENCE,
+                auto.receipt().evidenceMode()
         );
         assertThrows(
                 NullPointerException.class,
@@ -162,6 +166,32 @@ class GeneratedCaseGenerationServiceTest {
                         null
                 )
         );
+    }
+
+    @Test
+    void autoEvidenceSelectionIsReplayableFromTheReturnedReceipt() {
+        GeneratedCaseGenerationService service = service(() -> 45L);
+        GeneratedCaseGeneration auto = service.generate(
+                new GeneratedCaseGenerationRequest(
+                        null,
+                        GeneratedIncidentFamily.PAYMENT_TIMEOUT,
+                        null,
+                        GeneratedNoiseLevel.LOW
+                )
+        );
+        GeneratedCaseGeneration replay = service.generate(
+                new GeneratedCaseGenerationRequest(
+                        auto.receipt().seed(),
+                        auto.receipt().incidentFamily(),
+                        auto.receipt().evidenceMode(),
+                        auto.receipt().noiseLevel()
+                )
+        );
+
+        assertEquals(GeneratedEvidenceMode.DIAGNOSTIC,
+                auto.receipt().evidenceMode());
+        assertEquals(auto.generatedCase(), replay.generatedCase());
+        assertEquals(auto.receipt().variant(), replay.receipt().variant());
     }
 
     private GeneratedCaseGenerationService service(

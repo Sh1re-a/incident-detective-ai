@@ -24,7 +24,13 @@ public final class GeneratedCaseGenerationService {
     ) {
         Objects.requireNonNull(request, "request must not be null");
         GeneratedCaseSeed seed = seeds.resolve(request.seed());
-        GeneratedCaseRequest replayRequest = request.replayRequest(seed);
+        GeneratedEvidenceMode evidenceMode = request.evidenceMode() == null
+                ? autoEvidenceMode(seed.value())
+                : request.evidenceMode();
+        GeneratedCaseRequest replayRequest = request.replayRequest(
+                seed,
+                evidenceMode
+        );
         GeneratedCase generatedCase = cases.create(replayRequest);
         GeneratedCaseReceipt receipt = GeneratedCaseReceipt.from(
                 GeneratedCaseFactory.GENERATOR_VERSION,
@@ -33,5 +39,12 @@ public final class GeneratedCaseGenerationService {
                 generatedCase
         );
         return new GeneratedCaseGeneration(generatedCase, receipt);
+    }
+
+    /** Three diagnostic variants for every one deliberately incomplete case. */
+    private GeneratedEvidenceMode autoEvidenceMode(long seed) {
+        return (seed & 3L) == 0L
+                ? GeneratedEvidenceMode.INSUFFICIENT_EVIDENCE
+                : GeneratedEvidenceMode.DIAGNOSTIC;
     }
 }
