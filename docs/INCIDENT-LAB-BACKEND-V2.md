@@ -1,7 +1,8 @@
 # Incident Lab Backend v2
 
-Status: implemented locally; 443 tests passed and 2 opt-in tests skipped;
-post-v7 live validation pending
+Status: backend hardening gate passed locally; 480 unit/API/contract tests and
+6 database integration tests passed; 2 cost-bearing opt-in tests were
+intentionally skipped by the full suite
 
 Scope: synthetic Nordly incidents, local backend first
 
@@ -22,16 +23,27 @@ Implemented and verified locally:
 - embeddings and pgvector retrieval with explicit receipts;
 - business, developer and action receipts derived from verified backend state;
 - strict Java release control for supported, insufficient and withheld answers;
+- fail-closed reconciliation between ADK events and the model/tool/read/embedding
+  counters shown in the public receipt;
+- machine-readable provenance that separates current execution from recorded
+  fixtures;
 - OpenAPI coverage for optional inputs and safe failure responses;
-- the full Maven suite: 443 passed, zero failures, two opt-in live/eval tests
-  skipped.
+- current contracts `capabilities-v5`, `incident-lab-plan-v1`,
+  `incident-lab-run-v3`, `nordly-adk-turn-v4` and
+  `nordly-knowledge-rag-v3`;
+- the full Maven suite: 480 unit/API/contract tests passed, 6 database
+  integration tests passed and 2 explicit cost-bearing opt-in tests skipped.
 
-Live evidence is intentionally split from test evidence. One pre-v7 run crossed
-Gemini, ADK, embeddings and pgvector and was safely withheld by Java. A later
-post-v7 request returned HTTP 502, but its response body was not retained, so
-the exact safe backend code and the reached workflow stage remain unknown. No
-automatic retry was made. A captured post-v7 live run is therefore the only
-remaining backend acceptance item before frontend integration.
+Live evidence is intentionally split from test evidence. A real planner request
+returned the captured HTTP 502 code `MODEL_PROVIDER_ERROR`; no retry or fallback
+was made. A separate direct canonical run returned HTTP 200 after crossing real
+Google ADK, two Gemini model calls, a Gemini embedding and pgvector retrieval.
+Java withheld the candidate because its factual conclusion did not match the
+generated synthetic case. This proves the bounded path and fail-closed release
+behavior, not provider stability or diagnosis accuracy. The paid run preceded
+the final receipt-highlight and hardening patches, which are covered by the
+post-change automated suite; it was not repeated merely to manufacture a green
+demo. See `INCIDENT-LAB-V2-LIVE-SMOKE-2026-09-14.md`.
 
 ## Product outcome
 
@@ -70,18 +82,27 @@ supported answer states are therefore:
 ## Backend flow
 
 ```text
-free-text request
+planning request
     -> pre-AI safety gate
-    -> Gemini incident proposal
+    -> one Gemini incident proposal
     -> Java canonical plan
+    -> synchronous plan receipt
+
+human/UI selects the returned canonical plan
+    -> separate confirmed run request
+    -> Java revalidates the plan
     -> backend case generator
     -> deterministic alarm rule
     -> ADK evidence agent
-    -> bounded backend reads and pgvector retrieval
+    -> bounded backend reads and optional pgvector retrieval
     -> tool-free diagnosis agent
     -> Java schema, citation, support and ground-truth verification
-    -> business response + developer response + receipts
+    -> synchronous business response + developer response + receipts
 ```
+
+Neither request streams. A future frontend may animate the returned ordered
+receipt after completion, but it must not present speculative progress as live
+backend events.
 
 ## Delivery order
 
@@ -180,8 +201,7 @@ Java returns a neutral explanation and the failed verification checks.
 
 ### Phase E — four alarm families
 
-Incident Lab currently runs only payment timeout. Enable the remaining family
-only after its own deterministic symptom rule and tests exist.
+All four families have their own deterministic, observable alarm rule and tests.
 
 | Family | Alarm signal | Example rule |
 | --- | --- | --- |
@@ -242,8 +262,9 @@ These identifiers must never be model-generated.
 
 - Focused tests pass after every phase.
 - The full Maven suite passes once after integration.
-- One real Gemini planner call and one real ADK run are captured as a local
-  smoke receipt.
+- One real Gemini planner attempt and one separate real ADK run are captured as
+  local smoke receipts, including safe failure bodies. They are never rewritten
+  as one successful end-to-end request.
 - OpenAPI documents every status and nullable field truthfully.
 
 ## Explicitly deferred
@@ -256,3 +277,5 @@ These identifiers must never be model-generated.
 - frontend redesign.
 
 Those are separate decisions after this local backend contract is approved.
+The current working revision is local and is not proved deployed to Cloud Run
+or Vertex AI.

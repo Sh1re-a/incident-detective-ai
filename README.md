@@ -29,26 +29,30 @@ remediation.
 | Structured output | Diagnosen måste följa ett strikt JSON-schema och valideras som Java-typer. |
 | RAG och embeddings | Runbooks och Nordlys separat styrda företagskorpus bäddas in med Gemini embeddings och lagras i PostgreSQL/pgvector. Metrics, logs och traces hålls bakom typade tools. Restricted, deprecated och untrusted företagsdokument utesluts före embedding. |
 | Providergräns | Samma Google Gen AI-klientfabrik stödjer Developer API med API-nyckel och Vertex AI med ADC. Providertransport ingår i vektorindexets identitet. |
-| Eval | Varje körning graderas deterministiskt för schema, citationer, evidensstöd, claim coverage och korrekt diagnos. En liten opt-in RAG-eval mäter riktig embedding- och pgvectorretrieval i testspåret. |
+| Eval | Varje incidentutredning har en deterministisk release gate för schema, citationer, evidensstöd och korrekt diagnos. Kunskaps-RAG verifierar schema, källmedlemskap, dokumentåtkomst och utdataregler, men påstår inte semantisk entailment. En liten opt-in RAG-eval mäter riktig embedding- och pgvectorretrieval i testspåret. |
 | Observability | Resultatet innehåller latency, model/tool calls, nullable tokenusage, cacheobservation och listprisestimat. Sanerade fel och Micrometer-mått finns. |
 
 Projektet innehåller medvetet **inte** ett generellt agentramverk eller en stor
 benchmarkplattform. Den tidigare offline diagnosis-evalmotorn togs bort eftersom
 den gjorde projektet svårare att förstå utan att förbättra själva demon.
 
-## Så fungerar en livekörning
+## Så fungerar Incident Lab
 
-1. Klienten väljer ett katalogscenario eller genererar ett request-lokalt
-   Payment Timeout-fall och bekräftar live-AI.
-2. Gemini får scenariot, aktuell tool-budget och en allowlist med tillåtna tools.
-3. Backend kör modellens function calls och samlar endast tool-returnerad evidens.
-4. Runbooktoolen använder den aktiva retrieval-backenden: fixture i standardläge
-   eller Gemini embeddings och pgvector i `rag`-profilen.
-5. Gemini gör en separat tool-fri synthesis till ett strikt diagnosschema.
-6. Java verifierar svaret mot sedd evidens och öppnar dolt `GroundTruth` först
-   efter sista modellanropet.
-7. API:t returnerar tool events, evidens, diagnos, separata verifieringsmått och
-   körmetadata till frontend.
+1. Klienten skickar en fri men syntetiskt avgränsad instruktion till
+   `/api/v1/incident-lab/plans` och bekräftar live-AI.
+2. Gemini föreslår ett incidentfall; Java kanoniserar eller avvisar förslaget.
+3. Klienten skickar endast den godkända planen vidare till
+   `/api/v1/incident-lab/runs` med en ny livebekräftelse.
+4. Backend genererar request-lokala loggar, metrics och traces och avgör med en
+   deterministisk regel om ett larm faktiskt har löst ut.
+5. Först efter ett larm kör Google ADK evidensagenten och därefter den tool-fria
+   diagnosagenten. Det enda agentverktyget gör avgränsade read-only-läsningar;
+   runbooksteget kan använda Gemini embeddings och pgvector i `rag`-profilen.
+6. Java verifierar eventordning, anropsräknare, schema, citationer, direkt
+   evidensstöd och syntetiskt facit innan någon diagnos får släppas.
+7. API:t returnerar ett färdigt, synkront post-run-kvitto. Frontend får spela upp
+   det i efterhand, men inte kalla uppspelningen streaming eller hitta på steg
+   medan requesten pågår.
 
 Detta är en observerbar evidence chain, inte modellens privata chain-of-thought.
 
@@ -58,12 +62,14 @@ Backendens publika demo-API omfattar:
 
 | Metod | Path | Syfte |
 |---|---|---|
-| `GET` | `/api/v1/capabilities` | Aktiv modell-, retrieval-, cache- och budgetkonfiguration utan credentials. |
+| `GET` | `/api/v1/capabilities` | Konfigurerat modellmål, retrieval-, cache-, budget-, deployment- och index-readiness utan credentials. Faktiskt observerad modell hör till ett specifikt run-kvitto. |
 | `GET` | `/api/v1/demo-world` | Nordlys syntetiska företagsvärld och korpusöversikt. |
 | `GET` | `/api/v1/knowledge/documents` | Read-only dokumentbibliotek med lifecycle, åtkomstbeslut och innehållshashar. |
 | `POST` | `/api/v1/knowledge/questions/runs/rag` | Fri, säkerhetsgrindad fråga genom embeddings, pgvector, avgränsad kontext och Java-verifiering. |
 | `POST` | `/api/v1/knowledge/questions/{questionId}/runs/recorded-replay` | Providerfri kunskapsreplay. |
-| `POST` | `/api/v1/agent/turns` | Kontrollerat tvåagentsflöde med Google ADK och post-run-kvitto. |
+| `POST` | `/api/v1/incident-lab/plans` | Säkerhetsgrindad AI-plan som Java avgränsar till ett syntetiskt incidentförslag. |
+| `POST` | `/api/v1/incident-lab/runs` | Genererar syntetisk telemetri, avgör larm och kör det kontrollerade ADK-flödet när larmet löser ut. |
+| `POST` | `/api/v1/agent/turns` | Lägre teknisk bevisyta för det kontrollerade tvåagentsflödet med Google ADK och post-run-kvitto. |
 | `GET` | `/api/v1/scenarios` | Säkra scenariosammanfattningar utan facit eller evidensinventarium. |
 | `POST` | `/api/v1/scenarios/{scenarioId}/runs/recorded-replay` | Stabil providerfri referenskörning. |
 | `POST` | `/api/v1/scenarios/{scenarioId}/runs/live-ai` | Explicit bekräftad Gemini-utredning. |
@@ -74,7 +80,8 @@ Swagger finns lokalt på `http://localhost:8080/swagger-ui.html` och OpenAPI på
 `http://localhost:8080/v3/api-docs`.
 
 Frontend ska generera typer från aktuell OpenAPI. Se
-[frontendkontraktet](./docs/FRONTEND-API-HANDOFF.md) och
+[frontendkontraktet](./docs/FRONTEND-API-HANDOFF.md),
+[backendens verifierade hardening-gate](./docs/BACKEND-HARDENING-GATE-2026-09-14.md) och
 [API-genomgången](./docs/API-WALKTHROUGH.md). Den fiktiva företagssanningen,
 dokumentkartan och säkerhetsgränsen beskrivs i
 [Nordly company knowledge](./docs/NORDLY-COMPANY-KNOWLEDGE.md).
@@ -183,12 +190,12 @@ stabilitetsbevis.
 
 Huvudresan är:
 
-`Scenario → körläge → tool/evidence trace → verifierad diagnos`
+`AI-plan → syntetiskt larm → avgränsad ADK-utredning → verifierat kvitto`
 
 Tekniska fördjupningar visar RAG/retrieval samt runtime/tokens/cache/fel. UI:t
 ska skilja mellan **Current run**, **Current backend** och **Historical eval**.
-Det ska aldrig skapa egna modellnamn, budgetar, confidence scores eller
-chain-of-thought.
+Det ska aldrig skapa egna loggar, larm, modellnamn, agentsteg, budgetar,
+confidence scores, deploymentstatus eller chain-of-thought.
 
 ## Möjliga senare utbyggnader
 

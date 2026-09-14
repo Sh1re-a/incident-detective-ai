@@ -4,11 +4,11 @@
 - **Ägare:** Shirwac Abib
 - **Status:** Portfolio- och utbildningsprojekt under aktiv utveckling
 - **Datagräns:** Endast syntetisk incidentdata
-- **Senast uppdaterad:** 10 september 2026
+- **Senast uppdaterad:** 14 september 2026
 
 ## Syfte och avsedd användning
 
-Incident Detective visar hur ett avgränsat AI-system kan undersöka en syntetisk mjukvaruincident. Java 21 och Spring Boot äger API, säkerhetsgräns, budgetar och slutlig verifiering. Google ADK for Java kör ett `SequentialAgent` med två barn i fast ordning: en evidensagent med ett sammansatt read-only tool och en tool-fri diagnosagent. Resultatet får visas först när vanlig Java-kod har verifierat både ADK-spåret och diagnosen mot ett dolt syntetiskt facit.
+Incident Detective visar hur ett avgränsat AI-system kan undersöka en syntetisk mjukvaruincident. Java 21 och Spring Boot äger API, säkerhetsgräns, budgetar och slutlig verifiering. Google ADK for Java kör ett `SequentialAgent` med två barn i fast ordning: en evidensagent med ett sammansatt read-only tool och en tool-fri diagnosagent. En diagnos får släppas först när vanlig Java-kod har verifierat ADK-spåret, svarets struktur, dess direkta evidensstöd och dess faktamatchning mot det request-lokala syntetiska facit. Publik text projiceras därefter av Java; rå modellprosa och det privata facitobjektet lämnar inte backend.
 
 Systemet är byggt för demonstration, lärande och reproducerbar utvärdering. Det är inte anslutet till riktiga företagsmiljöer och är inte ett produktionssystem för incidenthantering.
 
@@ -30,17 +30,18 @@ ADK-flödet har två modellsteg och en hård gräns på två modellanrop. `nordl
 | Område | Status | Evidens |
 |---|---|---|
 | Syntetisk datagräns | Verifierat | Scenariofixtures, evidens och runbooks är skapade för projektet; inga riktiga företagsloggar används. |
-| Begränsad agency | Verifierad lokalt i aktuell revision | Google ADK Java `SequentialAgent`, två namngivna barn, två modellanrop som hard cap, ett sammansatt read-only tool hos evidensagenten och noll tools hos diagnosagenten. Providerfria trajectory-tester ingår och backendens fullsvit passerade med 330 tester. |
-| Workflow-kvitto | Implementerat i aktuell arbetsrevision | Kontrakt `nordly-adk-turn-v3` redovisar förväntad/observerad agentordning, direkt ADK `FunctionResponse`-överlämning, slutlig författare, nullable faktisk provider-route och Java-verifieringens separata beslut. |
+| Begränsad agency | Verifierad lokalt i aktuell revision | Google ADK Java `SequentialAgent`, två namngivna barn, två modellanrop som hard cap, ett sammansatt read-only tool hos evidensagenten och noll tools hos diagnosagenten. Slutlig fullsvit: 480 unit/API/contract-tester och 6 databas-integrationstester passerade; 2 uttryckliga kostnadsbärande tester hoppades över. |
+| Workflow-kvitto | Implementerat i aktuell arbetsrevision | Kontrakt `nordly-adk-turn-v4` redovisar förväntad/observerad agentordning, direkt ADK `FunctionResponse`-överlämning, slutlig författare, nullable faktisk provider-route och Java-verifieringens separata beslut. Publika events och svar innehåller ingen rå modellprosa eller privat facitjämförelse. |
+| Primär driftagentintegration | Implementerad och verifierad lokalt | `incident-lab-plan-v1` följs av `incident-lab-run-v3` med nested `nordly-adk-turn-v4`. Båda är synkrona; frontend får endast spela upp det färdiga backendkvittot och inga fabricerade progress-events. |
 | Structured output | Verifierat | Java-validering och deterministisk verifiering hanterar schema, citationer, evidensstöd och facit separat. |
 | Runbook-RAG | Byggt och delvis verifierat | PostgreSQL/pgvector, 10 dokument/12 chunks, Gemini embeddings, hash-readiness och explicit import fungerar lokalt. |
-| Nordly företags-RAG | Struktur och gränser verifierade lokalt | 16 syntetiska dokument/30 chunks; 13 dokument/27 chunks är godkända för publik RAG. Restricted, deprecated och untrusted material filtreras före embedding. Semantisk v2-kvalitet väntar på en separat provider-eval. |
+| Nordly företags-RAG | Struktur och gränser verifierade lokalt | 16 syntetiska dokument/30 chunks; 13 dokument/27 chunks är godkända för publik RAG. Restricted, deprecated och untrusted material filtreras före embedding. `nordly-knowledge-rag-v3` verifierar schema, citation membership, åtkomstscope och utdataregler, men utvärderar inte semantisk entailment. |
 | Provider- och deployproveniens | Implementerad lokalt, inte molnverifierad | Gemensam Developer API/Vertex-klientgräns, transportseparerat vektorindex samt capabilities/RAG/ADK-kvitton utan project-id eller credentials. Inget Vertex-anrop eller ny deploy har gjorts. |
 | Retrieval-kvalitet | Mätt, förbättring krävs | Development Hit@4 5/5; held-out 4/5; no-match 3/3. Unsafe legacy-runbook var top-1 i det missade held-out-fallet. |
-| Prompt-injection-säkerhet | Inte verifierat | Den osäkra runbooken hämtades rank 1 i adversarial-fallet. Ett separat synthesis-test återstår. |
+| Prompt-injection-säkerhet | Delvis verifierad | Pre-AI-grinden blockerar testade adversariala instruktioner innan modell, embeddings och tools. Retrieval-evalen visade samtidigt en osäker legacy-runbook som top-1 i ett missat held-out-fall; semantisk synthesis-/entailmenttäckning återstår. |
 | Diagnoskvalitet | Verifierad per körning, inte aggregerad | Schema, citationer, stöd, coverage och correctness returneras per replay/live-run. Full modellaccuracy är inte mätt. |
 | Observability | Avgränsad OpenTelemetry-slice byggd och testad | Liveflödet har sanerade spans för `investigation → collect → tool/retrieval → synthesize → verify`. Lokal standard är no-op och OTLP span-export är separat opt-in. Strukturerade JSON-loggar, collector/dashboard och exporterad end-to-end-trace är inte verifierade. |
-| Deployment | Aktuell revision inte deployad i denna uppgift | Den kombinerade frontend-/backendcontainern är lokalt verifierad. En äldre publik Cloud Run-revision kan finnas, men den bevisar inte att den aktuella Phase 3A-koden är live. Cloud Run, Vertex AI och publik trafik är separata nästa beslut. |
+| Deployment | Aktuell revision inte deployad i denna uppgift | Den härdade backendrevisionen är verifierad lokalt. Frontend är ännu inte migrerad till slutkontrakten och den kombinerade slutcontainern är inte verifierad. En äldre publik Cloud Run-revision kan finnas, men den bevisar inte att aktuell kod är live. Den aktiva lokala providervägen är Gemini Developer API; Cloud Run, Vertex AI, IAM/ADC, Cloud SQL och publik trafik är separata nästa beslut. |
 
 ## Riskregister
 
@@ -54,7 +55,7 @@ ADK-flödet har två modellsteg och en hård gräns på två modellanrop. `nordl
 | R-06 | Schema, citation, evidensöverlämning eller facit underkänns men presenteras som korrekt | Deterministisk Java-verifierare är enda release gate; ett underkänt hårt villkor ger `verification_failed` och diagnosen hålls inne | Behåll negativa kontraktstester och visa ett verkligt failure case |
 | R-07 | Publik användning orsakar kostnad eller överbelastning | Replay som standard, explicit livebekräftelse, lokal concurrency/rolling rate limit, timeout och ett dagstak vars scope exponeras; `rag` använder en atomisk PostgreSQL-räknare | Cloud Run max-instances och providerbudgetlarm före deploy |
 | R-08 | Hemligheter eller onödiga data hamnar i telemetry | Nyckelfilen ignoreras av Git; publika payloads utesluter `GroundTruth`; OpenTelemetry-spans använder en testad attribut-allowlist utan generic attribute-API | Bygg samma allowlistprincip för framtida strukturerade JSON-loggar och granska exporterad telemetry innan en extern collector ansluts |
-| R-09 | Leverantören är långsam eller otillgänglig | Sanerade providerfel, kontrollerad timeout, mätt låg-latensstandard och ingen tyst replay | Mäta stabilitet; historiken innehåller timeout även om de två senaste RAG-smokesen slutfördes |
+| R-09 | Leverantören är långsam eller otillgänglig | Sanerade providerfel, kontrollerad timeout och ingen tyst replay | Mäta stabilitet; härdningsrundan gav ett planner-anrop med HTTP 502 utan retry och en separat HTTP 200-körning där Java höll inne diagnosen. Det bevisar felhantering, inte providerstabilitet. |
 | R-10 | Evalresultat överanpassas | Development och held-out hålls isär; tröskeln fryses före held-out | Versionshantera framtida dataset och ändra aldrig v1 efter resultatet |
 
 ## Säkra felutfall
@@ -72,6 +73,8 @@ ADK-flödet har två modellsteg och en hård gräns på två modellanrop. `nordl
 - Providerfel och timeout visas som explicita fel. Systemet märker aldrig en replay som liveutredning.
 - Rate limit returnerar ett tydligt svar och klienten gör inga automatiska live-retries.
 - Inget felutfall genomför eller påstår att remediation har utförts.
+- Incident Lab returnerar ett färdigt synkront post-run-kvitto. En frontend får
+  animera kvittot efteråt, men får inte framställa det som streamade live-events.
 
 ## Evals och ändringskontroll
 

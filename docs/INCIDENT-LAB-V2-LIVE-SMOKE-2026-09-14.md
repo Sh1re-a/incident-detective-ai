@@ -1,6 +1,7 @@
 # Incident Lab v2 live smoke — 2026-09-14
 
-Status: completed with the model answer withheld
+Status: historical live evidence with honest success, rejection and provider
+failure outcomes; no run is presented as more than it proved
 
 This receipt records one explicit, cost-bearing local smoke. It is kept because
 the safe failure is part of the result; it must not be rewritten as a successful
@@ -115,3 +116,91 @@ prompt v7 caused the failure.
 The next live validation must capture both HTTP status and the sanitized JSON
 body without printing secrets. It remains a separate, explicit cost-bearing
 run; it must not be triggered as an automatic retry.
+
+## Backend-hardening addendum — captured planner failure
+
+A later, independent planner request captured both status and sanitized body.
+It returned HTTP 502 with:
+
+- `code=MODEL_PROVIDER_ERROR`;
+- title `Incident planner failed`;
+- detail `Gemini could not complete the bounded planning request.`
+
+No automatic retry and no fabricated plan followed. Because this endpoint did
+not produce a plan receipt, the result does not prove which provider-internal
+stage failed. It proves that the API exposed a bounded, non-secret failure
+instead of pretending that planning succeeded.
+
+## Backend-hardening addendum — separate canonical run
+
+To isolate the investigation path from the failed planner, one separate direct
+canonical run was explicitly submitted. It was not a planner retry and must not
+be presented as though the failed planner produced its plan.
+
+### Generated case and alarm
+
+- Contract: `incident-lab-run-v3`.
+- HTTP status: 200.
+- Outcome: `alarm_detected_investigation_withheld`.
+- Answer state: `withheld`.
+- Family: `catalog_cache_invalidation`.
+- Evidence mode: `diagnostic`.
+- Seed origin: `server_generated`.
+- Seed: `6907494064764568081`.
+- Scenario: `generated-catalog-cache-invalidation-6e8ed80aa67f5ab1`.
+- Variant: `catalog-cache-invalidation-ad6eff707311d3b0`.
+- Evidence fingerprint:
+  `ad6eff707311d3b0f9b10cab312ebc460f7374f7e7f5c9f60b7e9180527d3f1b`.
+- Alarm rule: `CATALOG_VERSION_DIVERGENCE_V1`.
+- Observed signal: 2 divergent catalog versions against an at-least-1
+  threshold.
+
+### Observed ADK, tool and RAG receipt
+
+- Nested contract: `nordly-adk-turn-v4`.
+- ADK run ID: `517b9f34-6f91-4827-92d9-ec6bda5acc70`.
+- Framework: Google ADK for Java 1.7.0.
+- Observed agent order:
+  `nordly_evidence_agent` then `nordly_diagnosis_agent`.
+- Handoff: ADK function response.
+- Observed generation model: `gemini-3.1-flash-lite`.
+- Model calls: 2.
+- ADK function calls: 1.
+- Backend read operations: 4.
+- Embedding calls: 1.
+- Retrieval: `pgvector_exact_cosine` over `runbook-corpus-v1`.
+- Embedding model: `gemini-embedding-2`, 768 dimensions.
+- Top similarities: 0.7845443651889121 and 0.7349866521263488.
+- Query-embedding latency: 419 ms.
+- Diagnostic probe: `service_health`, read-only, `action_executed=false`.
+- Total investigation latency: 7,634 ms.
+- Estimated generation cost: USD 0.002177. This is a list-price estimate,
+  excludes planner cost and is not a provider invoice.
+
+The request-local backend contained four synthetic logs. The model-selected log
+query returned zero direct log matches, while the read-only service-health probe
+cited the generated catalog error log and failure trace. This exposed a UI
+projection gap: probe-cited logs were not included in
+`highlighted_log_evidence_ids`. The backend mapping was fixed afterward and is
+covered by automated tests; no second paid request was used to hide the original
+receipt.
+
+### Release decision
+
+The ADK sequence, handoff, tool boundary, final author, schema, citation IDs and
+direct evidence support passed. The candidate did not match the generated
+case's factual diagnosis. Java therefore returned:
+
+- `diagnosis=null` and no expected-answer comparison;
+- no root cause or affected service as fact;
+- the raw final model response withheld from public events;
+- backend-authored Swedish and English business/developer projections;
+- `write_tools_available=false` and `action_executed=false`;
+- a required human approval boundary.
+
+This paid run occurred before the later event-integrity, public-projection,
+failure-classification, receipt-reconciliation and provenance hardening commits.
+Those changes passed focused tests and the final full local suite. The run is
+evidence of the earlier real execution path; it is not evidence that the final
+working revision itself made another paid provider call, reached Vertex AI or
+was deployed.

@@ -1,6 +1,6 @@
 # Backend-API: handoff till frontend
 
-- **Senast uppdaterad:** 10 september 2026
+- **Senast uppdaterad:** 14 september 2026
 
 Det här dokumentet är kontraktet för chatten som bygger om frontend. Backend är
 källan för generator-, scenario-, körnings-, capability- och evaldata.
@@ -43,7 +43,7 @@ Gör detta som ett lokalt/build-time-steg, inte genom att hämta OpenAPI från e
 separat browser-origin i den färdiga appen. Den valfria CORS-allowlisten gäller
 avsiktligt bara `/api/v1/**`, inte Swagger eller `/v3/api-docs`.
 
-## De elva produkt- och proof-endpointsen
+## De tretton produkt- och proof-endpointsen
 
 | Metod | Path | Användning |
 |---|---|---|
@@ -52,6 +52,8 @@ avsiktligt bara `/api/v1/**`, inte Swagger eller `/v3/api-docs`.
 | `GET` | `/api/v1/knowledge/documents` | Read-only bibliotek över den syntetiska kunskapskorpusen och dokumentens lifecycle/access scope. |
 | `POST` | `/api/v1/knowledge/questions/runs/rag` | Explicit bekräftad fri Nordly-fråga genom säkerhetsgrind, godkänd korpus, Gemini embedding, pgvector, avgränsad Gemini-syntes och Java-verifiering. Endast under profilen `rag`. |
 | `POST` | `/api/v1/knowledge/questions/{questionId}/runs/recorded-replay` | Backenddriven kunskapsreplay med rankade källor, svar, verifiering, kvitto och uttryckliga runtime-begränsningar. |
+| `POST` | `/api/v1/incident-lab/plans` | Säkerhetsgrindad Gemini-plan som Java kanoniserar till ett avgränsat syntetiskt incidentförslag. Endast under profilen `rag`. |
+| `POST` | `/api/v1/incident-lab/runs` | Genererar backendtelemetri, utvärderar ett deterministiskt larm och anropar ADK endast när larmet har löst ut. Endast under profilen `rag`. |
 | `POST` | `/api/v1/agent/turns` | Explicit bekräftat `SequentialAgent`-flöde med två avgränsade ADK-agenter, post-run-events, workflow-kvitto och separat Java release gate. |
 | `GET` | `/api/v1/scenarios` | Säkra scenariosammanfattningar utan evidensinventarium eller facit. |
 | `POST` | `/api/v1/scenarios/{scenarioId}/runs/recorded-replay` | Gratis, deterministisk körning utan modellrequest. |
@@ -61,6 +63,14 @@ avsiktligt bara `/api/v1/**`, inte Swagger eller `/v3/api-docs`.
 
 Det finns ingen HTTP-endpoint som startar en eval, importerar embeddings eller
 skriver till databasen. Proof-endpointen är en read-only publicerad snapshot.
+
+Incident Lab är frontendens primära driftflöde. Planering och körning är två
+separata, synkrona requests. Planeringen kräver livebekräftelse, och run-requesten
+bär en ny bekräftelse som används om larmet utlöser ADK. Ett HTTP 200-svar är
+ett färdigt post-run-kvitto; det finns ingen streaming, polling eller
+bakgrundskörning att imitera i UI:t. `/api/v1/agent/turns` är det lägre
+ADK-kontrakt som Incident Lab använder för sitt agentsteg, inte huvudresan som
+frontend ska återskapa själv.
 
 För Generated Synthetic Case finns exakt **ett** API-anrop:
 `POST /api/v1/generated-cases/runs/live-ai`. Det finns inget separat create-anrop,
@@ -72,14 +82,16 @@ sker inom samma synkrona request. Fallet är request-lokalt och persisteras inte
 
 1. Hämta `capabilities`, `demo-world`, `scenarios` och den read-only
    retrieval-proof som frontenden visar parallellt när appen startar.
-2. Kräv `contract_version = capabilities-v4` för den här integrationen och
-   bygg generatorns val från `generated_cases`, inte från egna konstanter.
+2. Kräv `contract_version = capabilities-v5` för den här integrationen. Bygg
+   Incident Lab från `incident_lab` och äldre generatorval från
+   `generated_cases`, inte från egna konstanter.
 3. Visa fri Nordly-fråga som primärt läge när
    `capabilities.retrieval.active_profiles` innehåller `rag`; visa annars
    recorded replay som stabilt standardläge och erbjud inte en död live-route.
-4. Visa live-kontrollen utifrån `live_ai.request_routing_configured`, men låt alltid
-   serverns svar vara auktoritativt eftersom providerhälsa kan ändras efter
-   laddningen.
+4. Visa Incident Lab endast när `incident_lab.enabled = true` och förklara annars
+   `incident_lab.availability_reason`. Visa övriga live-kontroller utifrån
+   `live_ai.request_routing_configured`, men låt alltid serverns svar vara
+   auktoritativt eftersom providerhälsa kan ändras efter laddningen.
 5. Behandla retrieval-proof som kompletterande historiskt bevis: ett fel där
    får inte stoppa scenario/replay, och svaret får aldrig beskrivas som
    current-run-data.
@@ -150,20 +162,31 @@ Routen finns endast när Spring-profilen `rag` är aktiv. Tillåtna utfall är
 - Endast dokument med `lifecycle = APPROVED` och access scope `public_demo`
   finns i Nordly-indexet. Current-run-responsen rapporterar 13 möjliga dokument
   och 27 textstycken för den versionshanterade V2-korpusen.
-- Kontraktet `nordly-knowledge-rag-v2` returnerar
+- Kontraktet `nordly-knowledge-rag-v3` returnerar
   `retrieval.corpus_content_sha256`, ett nullable `index_snapshot` och
   `content_sha256` för varje faktisk träff. Saknat indexsnapshot betyder att
   readiness inte lästes i körningen; det får inte visas som ett redo index.
 - `provider_route` finns bara när minst ett provideranrop registrerades. Den
   visar transport, auth-läge och eventuell Vertex-location, men aldrig
   project-id eller credentials. Nollanrop ger `provider_route = null`.
+- `truth_label` och `truth_label_en` härleds från det verkliga kvittot. Noll
+  provideranrop, ett försökt men stoppat live-RAG och ett släppt live-RAG-svar
+  har olika backendägda texter; frontend får inte ersätta dem med en generell
+  “live”-etikett.
 - `phases[]` är efterhandskvitton över observerat systemarbete, aldrig dold
   tankekedja eller simulerad streaming.
 - `ranked_matches[].similarity` är rå cosine-likhet och får inte presenteras som
   säkerhet eller answer confidence.
+- `verification.evaluation_status` är `completed`, `not_run` eller
+  `not_applicable`. När verifiering inte kördes eller inte var tillämplig är de
+  enskilda kontrollfälten `false`; frontend får inte rita gröna checks för dem.
 - `verification` skiljer schema, käll-ID inom hämtad kontext, approved-only,
-  avgränsad utdata-policy/PII-scan och read-only-förmåga. Den bevisar inte
-  semantisk entailment för varje mening.
+  avgränsad utdata-policy/PII-scan och read-only-förmåga. Fältet
+  `semantic_claim_support_evaluated` är alltid `false` i v3: kontraktet bevisar
+  citation membership, inte semantisk entailment för varje mening.
+- Ett släppt svar har
+  `verification.overall_outcome = answered_with_retrieved_approved_citations`.
+  Det är inte ett correctness- eller accuracyvärde.
 - `receipt.cost_status` och `receipt.cost_basis` avgör kostnadscopyn.
   `estimated_cost_usd` är nullable och generationens listprisestimat inkluderar
   inte embeddingkostnad eller faktisk fakturadebitering.
@@ -176,6 +199,41 @@ routingförutsättningarna separat. `live_ai.request_routing_configured = true`
 betyder att båda är uppfyllda. `provider.credential_status = not_checked` för
 Vertex eftersom capability-endpointen medvetet inte laddar eller validerar ADC.
 Inget av fälten garanterar lyckad autentisering eller att providern är nåbar.
+
+## Incident Lab — primärt driftflöde
+
+Frontendens driftresa ska börja med `POST /api/v1/incident-lab/plans`. Requesten
+innehåller endast `instruction` och `confirm_live_ai`. Svaret använder
+`incident-lab-plan-v1` och returnerar `plan_ready`, `plan_rejected` eller
+`blocked_before_ai` tillsammans med säkerhetsbeslut, nullable modellförslag,
+Java-validering och providerkvitto. Ett blockerat eller misslyckat anrop får
+aldrig ersättas med en frontendskapad plan.
+
+Endast ett backendgodkänt `java_validation.plan` får skickas vidare till
+`POST /api/v1/incident-lab/runs`, tillsammans med valfri `seed`, valfritt
+`evidence_mode` och en ny `confirm_live_ai`. Run-svaret använder
+`incident-lab-run-v3`. Följande toppnivåfält äger presentationen:
+
+- `generation_receipt`, `scenario` och `backend_logs` beskriver det syntetiska
+  fall som Java faktiskt genererade;
+- `alarm_receipt` är nullable och avgör om agenten över huvud taget startade;
+- `agent_turn` är nullable och innehåller det sanerade `nordly-adk-turn-v4`-
+  kvittot när ADK kördes;
+- `business_response`, `developer_response` och `action_receipt` är
+  backendprojektioner av verifierade fakta;
+- `localized_presentations.sv` och `.en` är Javaägda versioner av samma fakta,
+  inte frontendöversättningar eller modellens fria text;
+- `answer_state` är `diagnosed`, `insufficient_evidence`, `withheld` eller
+  `not_started`;
+- `delivery = synchronous_post_run`. `backend_logs`, larm, events, bevis och
+  checks finns först i det avslutade svaret och får därefter animeras som replay.
+
+`outcome` skiljer bland annat `no_alarm`, `alarm_investigated` och
+`alarm_detected_investigation_withheld`. Frontend ska brancha på de returnerade
+fälten och får inte anta att ett larm alltid finns, att agenten alltid hittar en
+orsak eller att en föreslagen åtgärd utfördes. `action_receipt` ska alltid visa
+`write_tools_available = false`, `action_executed = false` och
+`human_approval_required = true`.
 
 ## Kontrollerat ADK-flöde
 
@@ -194,7 +252,7 @@ Content-Type: application/json
 ```
 
 Endpointen använder Google ADK for Java och kontrakt
-`nordly-adk-turn-v3`. Java kör säkerhetsgrinden före livebudget, ADK Runner,
+`nordly-adk-turn-v4`. Java kör säkerhetsgrinden före livebudget, ADK Runner,
 Gemini, tools och embeddings. En tillåten och bekräftad request skapar en
 request-lokal in-memory-session och kör ett `SequentialAgent` i denna fasta
 ordning:
@@ -206,7 +264,7 @@ ordning:
 2. ADK:s strukturerade `FunctionResponse` lämnas direkt vidare i eventströmmen
    till `nordly_diagnosis_agent`. Den agenten har inga tools och får bara skapa
    en diagnoskandidat från den överlämnade evidensen. Gemini-anropet binds till
-   `application/json` och `diagnosis-schema-v4`; prompttext är inte den enda
+   `application/json` och `diagnosis-schema-v5`; prompttext är inte den enda
    formatgränsen.
 3. Efter ADK-körningen avgör deterministisk Java-kod om kandidaten får visas.
    Ingen agent kan skriva, genomföra remediation eller godkänna sitt eget svar.
@@ -223,7 +281,7 @@ tool-events och kvittot bevarade. Då är `verification_event.schema_valid = fal
 och `diagnosis`, `verification` samt `comparison` är null; citationer och
 faktastöd kördes inte.
 
-### Workflow- och kontrollkvitto i v3
+### Workflow- och kontrollkvitto i v4
 
 - `workflow.type = sequential_agent`.
 - `workflow.expected_agent_order` kommer från backendens konfiguration.
@@ -246,8 +304,12 @@ faktastöd kördes inte.
 `events[]` är sanerade, backendregistrerade post-run-events. Frontend får visa
 författare, tool call, `FunctionResponse`, tokenmetadata och ordning, men inte
 märka dem som streaming eller modellens privata resonemang. Text från
-mellansteget hålls inne; den slutliga strukturerade diagnosen visas endast i
-det separata `diagnosis`-fältet efter Java-godkännande.
+mellansteget och modellens sluttext hålls inne. Alla publika `events[].text` är
+därför `null`. När `verification_event.answer_released = true` innehåller det
+separata `diagnosis`-fältet en Java-projicerad presentation av verifierade koder,
+claimtyper och evidence IDs — aldrig modellens fria prosa. `comparison` är
+alltid `null` i det publika ADK-svaret eftersom den privata förväntade diagnosen
+inte får lämna backend.
 
 ### Säkerhetsblockering utan anrop
 
@@ -270,8 +332,8 @@ stället `400 LIVE_AI_CONFIRMATION_REQUIRED` före quota och provider.
 
 Viktiga fält:
 
-- `contract_version = capabilities-v4`: capability-kontraktet som innehåller
-  stöd för Generated Synthetic Case och aktuell vector-index-readiness.
+- `contract_version = capabilities-v5`: capability-kontraktet som innehåller
+  Incident Lab, Generated Synthetic Case och aktuell vector-index-readiness.
 - `synthetic_only`: är alltid `true` i den här demon.
 - `remediation_enabled`: är alltid `false`.
 - `provider`: vald Google Gen AI-transport, auth-läge, eventuell location,
@@ -285,6 +347,9 @@ Viktiga fält:
 - `diagnostic_probe`: namnet på ADK-funktionen, backendens exakta
   probe-allowlist och bevis på att varje probe är case-bound, read-only och
   aldrig utför en åtgärd.
+- `incident_lab`: aktuell tillgänglighet, orsaken när flödet inte kan erbjudas,
+  plan-/run-kontrakten, leveranssätt, agentordning, larmkrav, svarstillstånd,
+  språk, familjer och den enda tillåtna read-only agentfunktionen.
 - `live_ai`: separat serveraktivering, lokal request-routing, aktiv
   modell/prompt, thinking level och backendens
   hårda call-/tidsbudgeter.
@@ -296,7 +361,31 @@ Viktiga fält:
 Visa inte egna hårdkodade budgetar eller modellnamn när samma värde finns här.
 Endpointen returnerar aldrig API-nyckeln.
 
-### Exakt `generated_cases`-capability i `capabilities-v4`
+### Incident Lab i `capabilities-v5`
+
+Frontend ska läsa följande gränser direkt från `incident_lab`:
+
+- `plan_contract_version = incident-lab-plan-v1`;
+- `run_contract_version = incident-lab-run-v3`;
+- `orchestration = sequential_agent` med
+  `expected_agent_order = [nordly_evidence_agent, nordly_diagnosis_agent]`;
+- `delivery = synchronous_post_run` och `streaming = false`;
+- `alarm_required = true` och `answer_states` innehåller `diagnosed`,
+  `insufficient_evidence`, `withheld` och `not_started`;
+- `explicit_confirmation_required = true`, `synthetic_only = true`,
+  `write_tools_available = false`, `action_executed = false` och
+  `human_approval_required = true`;
+- `registered_tool.function_name = inspect_incident_evidence`, med
+  backendägda read operations och diagnostic-probe-allowlist;
+- `supported_locales` och `incident_families` äger allt språk och alla
+  scenarioalternativ som UI:t får erbjuda.
+
+`incident_lab.enabled = true` betyder endast att profil, ADK, live-AI och
+icke-hemlig providerrouting är konfigurerade. Det är inte ett health check.
+Använd `availability_reason` för ett avstängt läge och låt varje faktiskt
+API-svar avgöra om en providerrequest lyckades.
+
+### Exakt `generated_cases`-capability i `capabilities-v5`
 
 ```json
 {
@@ -388,7 +477,16 @@ pgvector-backend innehåller svaret bland annat rank, similarity och hash.
 ### Scenario-lista
 
 `GET /api/v1/scenarios` är säker att använda i startvyn. Den läcker inte dolt
-`GroundTruth`, ett evidence inventory eller en färdig diagnos.
+`GroundTruth`, ett evidence inventory eller en färdig diagnos. Svaret är inte
+en fristående array utan wrappern `scenario-catalog-v2`:
+
+- `synthetic_only = true`;
+- `source = versioned_recorded_fixtures`;
+- `truth_label = Synthetic scenario summaries from versioned recorded fixtures.`;
+- `scenarios` innehåller de säkra scenariosammanfattningarna.
+
+Frontend ska behålla wrapperns källa och truth label nära katalogen. En rad i
+`scenarios` är inte ett larm som observerats i den aktuella processen.
 
 ### Recorded replay
 
@@ -401,13 +499,21 @@ Ingen body krävs. Ett replay-resultat har:
 - `mode = recorded_replay`
 - `truth_label = Simulated incident — recorded deterministic replay.`
 - `status = completed`
+- `provenance.synthetic = true`
+- `provenance.source = versioned_recorded_fixture`
+- `provenance.investigation_executed_in_this_run = false`
+- `provenance.tool_calls_executed_in_this_run = false`
+- `provenance.model_executed_in_this_run = false`
+- `provenance.deterministic_verification_executed_in_this_run = true`
 - `model_id = null`
 - `prompt_version = null`
 - `token_usage = null`
 - `estimated_cost_usd = null`
 
-Null-värdena betyder att ingen modell kördes. Byt dem inte mot noll eller ett
-modellnamn i presentationen.
+Null-värdena betyder att ingen modell kördes. Tool-resultaten är innehåll från
+den versionshanterade inspelningen, medan Java-verifieringen kördes i den
+aktuella requesten. Byt inte detta mot noll, ett modellnamn eller påståendet att
+agenten just läste loggarna.
 
 ### Live AI
 
@@ -500,10 +606,14 @@ Följande värden är särskilt viktiga för generated-läget:
 - `status` är `completed` eller `verification_failed`
 - `scenario_id` börjar med ett familjebundet prefix, exempelvis
   `generated-payment-timeout-` eller `generated-order-event-backlog-`
-- `diagnosis.status` är `diagnosed` eller `insufficient_evidence`
+- när `status = completed` är `diagnosis.status` `diagnosed` eller
+  `insufficient_evidence`; när `status = verification_failed` är `diagnosis`
+  `null`.
+- `comparison` är alltid `null` i live-resultat.
 
 `verification_failed` är ett komplett, inspekterbart HTTP `200`-resultat där
-Java-verifieraren hittade hard errors. Det är inte samma sak som
+Java-verifieraren underkände en release-grind, exempelvis schema, citationer,
+direkt evidensstöd eller faktamatchning. Det är inte samma sak som
 `diagnosis.status = insufficient_evidence`: en korrekt abstention för
 `evidence_mode = insufficient_evidence` kan ha körstatus `completed`.
 
@@ -516,9 +626,11 @@ frontend ska läsa.
 
 Efter att modellen har svarat använder Java det dolda facitobjektet för
 verifiering. De avsiktligt publika **resultaten** av kontrollen finns i
-`verification` och `comparison`; exempelvis schema-/citation-/coveragefält och
-`comparison.expected_*`. Visa dessa endast som post-run verifieringsresultat,
-inte som bevis på att modellen såg facit eller som en aggregerad accuracy.
+`verification`, exempelvis schema-, citations-, evidens-, coverage- och
+correctnessflaggor utan det förväntade svarets koder. Livefältet `comparison`
+är alltid `null`; `comparison.expected_*` finns endast i recorded replay. Visa
+kontrollerna endast som post-run-verifiering, inte som bevis på att modellen såg
+facit eller som en aggregerad accuracy.
 
 Backend tar inte emot fri text, filer, logguploads eller riktiga företagsdata i
 det här flödet. De enda användarindata som accepteras är de fem avgränsade
@@ -710,16 +822,22 @@ begränsad query-retry om frontendramverket behöver det.
 
 - Typerna speglar aktuell `/v3/api-docs`; reproducerbar automatisk generering
   återstår att verifiera.
-- Driftläget använder `POST /api/v1/agent/turns` och kräver
-  `contract_version = nordly-adk-turn-v3`.
+- Driftläget använder först `POST /api/v1/incident-lab/plans` och därefter
+  `POST /api/v1/incident-lab/runs`. Det kräver
+  `contract_version = incident-lab-plan-v1` respektive
+  `incident-lab-run-v3`.
+- Incident Lab visas från `capabilities-v5.incident_lab`; dess alternativ,
+  språk, agentordning och availability reason återskapas inte i frontend.
 - Workflow-vyn visar endast `workflow`, `events`, `tool_events`,
   `verification_event` och `receipt` från samma avslutade backendrequest.
 - Ett ADK-svar presenteras bara när `verification_event.answer_released = true`;
-  frontend återskapar aldrig Java-grindens beslut.
+  frontend återskapar aldrig Java-grindens beslut eller modellens prosa.
+- Incident Lab och ADK visas som `synchronous_post_run`; ingen animation kallas
+  streaming eller visas som observerad innan backendresponsen har kommit.
 - Frontend använder endast `POST /api/v1/generated-cases/runs/live-ai` för
   Generated Synthetic Case; den försöker inte skapa, polla, ladda upp eller
   återhämta ett persisterat case.
-- Generatorvalen kommer från `capabilities-v4.generated_cases` och requesten
+- Generatorvalen kommer från `capabilities-v5.generated_cases` och requesten
   skickar endast `seed`, `incident_family`, `evidence_mode`, `noise_level` och
   `confirm_live_ai`.
 - Replay fungerar utan livekonfiguration.
@@ -731,7 +849,8 @@ begränsad query-retry om frontendramverket behöver det.
 - Claims och evidens korslänkas med `evidence_id`, och verifieringsresultaten
   visas separat från diagnosen.
 - Det råa `GroundTruth`-objektet efterfrågas eller exponeras aldrig;
-  frontend använder endast post-run `verification` och `comparison`.
+  frontend använder post-run `verification`. `comparison` används endast för
+  recorded replay och är alltid `null` för live- och publika ADK-svar.
 - Kostnad märks som listprisestimat, visar `estimated_cost_basis` och behandlar
   cache-/token-null som **Not reported**.
 - Aktiv retrieval visas från capabilities eller aktuell tool-metadata.

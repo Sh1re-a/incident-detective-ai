@@ -1,7 +1,7 @@
 # Tekniska beslut
 
 - **Status:** levande beslutslogg; varje beslut har egen status
-- **Senast uppdaterad:** 10 september 2026
+- **Senast uppdaterad:** 14 september 2026
 
 Besluten ska hålla Incident Detective litet, förklarbart och mätbart. En föreslagen riktning blir accepterad när den är granskad eller implementerad. Därefter ändras den bara när ny evidens eller ett verkligt blockerande problem motiverar det, och ändringen dokumenteras här i stället för att döljas i implementationen.
 
@@ -67,13 +67,13 @@ Flödet är `COLLECT → SYNTHESIZE → VERIFY`, inte ett öppet agentramverk. D
 
 ## DEC-007 – En leverantör, function calling och structured output
 
-**Status:** Accepted for the current slice, updated 10 september 2026
+**Status:** Accepted for the current slice, updated 14 september 2026
 
 Det aktuella liveflödet använder Googles officiella Java SDK, pinnad till
 `google-genai` 1.67.0. Gemini Developer API är lokal standard, medan samma
 klientgräns kan välja Vertex AI med ADC, project och location. Standardprofilen
 är `gemini-3.1-flash-lite` med `MINIMAL` thinking och kontraktet
-`gemini-live-v6`. Endast Google Gen AI används som modellleverantör i kärnan.
+`gemini-live-v7`. Endast Google Gen AI används som modellleverantör i kärnan.
 
 **Varför:** Meritvärdet ligger i arkitektur, evals och omdöme, inte i leverantörens namn. Gratis lokal utveckling minskar startkostnaden utan att låtsas att den publika demon blir kostnadsfri.
 
@@ -81,12 +81,14 @@ klientgräns kan välja Vertex AI med ADC, project och location. Standardprofile
 inget generellt multi-provider-lager eller modellval byggs i gränssnittet.
 Providerkonstruktionen är testad utan nätverksanrop; Vertex-reachability är inte
 verifierad. `COLLECT` använder custom function tools, `SYNTHESIZE` görs separat
-utan tools med ett strikt schema och `VERIFY` är deterministisk Java-kod. v6
-behåller v5:s direkta evidenskrav och filtrerar tool-deklarationerna efter
-återstående serverbudget. Två v6-försök med `gemini-3.5-flash-lite` nådde
-timeout; två efterföljande RAG-smokes med standardprofilen slutfördes korrekt på
-6 057 respektive 5 505 ms. Det är ett motiverat utvecklingsval, inte ett
-stabilitets- eller accuracybevis; evalsen får avgöra om profilen behålls.
+utan tools med ett strikt schema och `VERIFY` är deterministisk Java-kod. v7
+kräver att en diagnostiserad kausal mekanism och berörd tjänst stöds direkt av
+logg eller trace; `insufficient_evidence` har en separat, snäv claimgräns. Tool-
+deklarationerna filtreras efter återstående serverbudget. Två tidigare v6-försök
+med `gemini-3.5-flash-lite` nådde timeout och två daterade v6-RAG-smokes med
+standardprofilen slutfördes på 6 057 respektive 5 505 ms. Det är historisk
+utvecklingsevidens, inte ett stabilitets- eller accuracybevis; evalsen får avgöra
+om profilen behålls.
 
 ## DEC-008 – RAG endast för runbooks
 
@@ -98,7 +100,7 @@ PostgreSQL/pgvector används för en fristående korpus med 10 ostrukturerade ru
 
 **Konsekvens:** Import är ett explicit och idempotent kommando; vanlig uppstart gör inga embedding-anrop. RAG-profilen vägrar retrieval om antal eller innehållshash inte matchar aktuell korpus och faller aldrig tyst tillbaka till keyword matching. Runbookresultat visar dokument-, chunk- och versionsmetadata samt rank, similarity, embeddingmodell, innehållshash, korpusversion och retrieval-backend. Tröskeln kalibreras endast på development. Retrieval v1 gav 5/5 development och 4/5 held-out Hit@4, medan tre no-match-fall gav 3/3. Den missade held-out-frågan och unsafe top-1 behålls som öppet kvalitetsproblem.
 
-`capabilities-v4` rapporterar samma readinesskontroll som aktuell backendstatus:
+`capabilities-v5` rapporterar samma readinesskontroll som aktuell backendstatus:
 korpusversion samt indexed/current/expected chunks. Embeddingprofilens identitet
 inkluderar även providertransport, så Developer API-vektorer inte kan behandlas
 som aktuella Vertex-vektorer. Readiness bevisar att indexet är redo, men aldrig
@@ -164,7 +166,7 @@ Slutcontainern ska deployas till Cloud Run. Hemligheter finns endast på servers
 
 **Varför:** Projektet ska bevisa verklig driftsättning utan att CI/CD blir det första problemet.
 
-**Konsekvens:** Den kombinerade frontend-/backendcontainern verifieras lokalt först. Den aktuella Phase 3A-revisionen deployas inte i denna uppgift. En eventuell äldre publik Cloud Run-revision är separat evidens och får inte användas som bevis för att aktuell kod är live. Cloud-resurser, Vertex AI, ny revision och publik trafik kräver separata uttryckliga beslut.
+**Konsekvens:** Backend verifieras lokalt först. Frontend är ännu inte migrerad till slutkontrakten och den kombinerade slutcontainern är inte verifierad. Den aktuella härdade backendrevisionen deployas inte i denna uppgift. En eventuell äldre publik Cloud Run-revision är separat evidens och får inte användas som bevis för att aktuell kod är live. Cloud-resurser, Vertex AI, ny revision och publik trafik kräver separata uttryckliga beslut.
 
 ## DEC-014 – Publikt portfolio-repo utan licens
 
@@ -190,7 +192,7 @@ Recorded replay använder versionshanterad, betrodd demodata. Hela fixturepakete
 
 **Status:** Accepted, 25 augusti 2026
 
-Det lokala Spring Boot-API:t dokumenteras med springdoc OpenAPI och Swagger UI. OpenAPI-schemat använder samma `snake_case` som verkliga JSON-svar, beskriver evidence-varianterna med explicita wire-värden och omfattar replay, live-RAG, genererade incidenter och den uttryckligen bekräftade ADK-endpointen `/api/v1/agent/turns`.
+Det lokala Spring Boot-API:t dokumenteras med springdoc OpenAPI och Swagger UI. OpenAPI-schemat använder samma `snake_case` som verkliga JSON-svar, beskriver evidence-varianterna med explicita wire-värden och omfattar replay, live-RAG, Incident Labs separata plan-/run-endpoints, genererade incidenter och den uttryckligen bekräftade ADK-endpointen `/api/v1/agent/turns`.
 
 **Varför:** Swagger ska hjälpa mig och en teknisk granskare att förstå och prova det API som faktiskt finns. Ett schema med andra fältnamn, dolt facit eller planerade funktioner skulle ge falsk trygghet.
 
@@ -218,17 +220,17 @@ Recorded replay är det kostnadsfria standardläget. Varje livekörning kräver 
 
 ## DEC-019 – Tvåagentsflöde i Google ADK for Java
 
-**Status:** Accepted and implemented in the current working revision, 10 september 2026
+**Status:** Accepted and implemented in the current working revision, updated 14 september 2026
 
 ADK-endpointen använder ett `SequentialAgent` med exakt två barn i fast ordning. `nordly_evidence_agent` har ensam tillgång till ett sammansatt read-only tool och måste returnera en tool call utan diagnos eller berättande text. ADK:s strukturerade `FunctionResponse` lämnas direkt vidare i eventströmmen till `nordly_diagnosis_agent`, som saknar tools och endast får formulera en typad diagnoskandidat från den överlämnade evidensen. Båda barnen har `maxSteps = 1`, hela körningen har `maxLlmCalls = 2` och agent transfer till parent eller peer är avstängd.
 
 **Varför:** Separationen visar ett verkligt multi-agentmönster utan att skapa fri agency. Evidensinsamling och formulering får olika behörigheter, samtidigt som ordning, kostnad och failure modes förblir begripliga.
 
-**Konsekvens:** `nordly-adk-turn-v3` returnerar ett workflow-kvitto med förväntad och observerad agentordning, handofftyp, slutlig författare och completionstatus. En nullable `provider_route` finns bara när körningen registrerade minst ett modell- eller embeddinganrop. Deterministisk Java-kod är enda release gate och kontrollerar ordning, direkt evidensöverlämning, tool-gräns, slutlig författare, exakt två modellanrop, schema, citationer och faktastöd. Ett underkänt villkor ger `verification_failed` och diagnosen hålls inne. Ingen agent kan skriva, genomföra remediation eller visa privat chain-of-thought. En säkerhetsblockerad request stoppar före ADK, Gemini, tools och embeddings och returnerar noll i kontrollkvittot.
+**Konsekvens:** `nordly-adk-turn-v4` returnerar ett workflow-kvitto med förväntad och observerad agentordning, handofftyp, slutlig författare och completionstatus. En nullable `provider_route` finns bara när körningen registrerade minst ett modell- eller embeddinganrop. Deterministisk Java-kod är enda release gate och kontrollerar ordning, direkt evidensöverlämning, tool-gräns, slutlig författare, exakt två modellanrop, schema, citationer, direkt faktastöd och matchning mot det request-lokala syntetiska fallet. Ett underkänt villkor ger `verification_failed` och diagnosen hålls inne. Publika events innehåller ingen modellprosa och ett släppt svar projiceras av Java från verifierade koder och evidence IDs; privat facitjämförelse returneras aldrig. Ingen agent kan skriva eller genomföra remediation. En säkerhetsblockerad request stoppar före ADK, Gemini, tools och embeddings och returnerar noll i kontrollkvittot.
 
 ## DEC-020 – En versionsstyrd Nordly-företagskorpus med exkludering före embedding
 
-**Status:** Accepted and implemented locally, 10 september 2026
+**Status:** Accepted and implemented locally, updated 14 september 2026
 
 Nordly Commerce AB använder en syntetisk företagskorpus med 16
 dokumentposter och 30 chunks. Exakt 13 `APPROVED + public_demo`-dokument med
@@ -243,6 +245,30 @@ dokumenthanteringssystem skulle vara onödig komplexitet i denna fas.
 **Konsekvens:** JSON-manifestet är canonical runtime source. Dokumentbiblioteket
 returnerar body och chunkhash endast för tillåtet material. RAG-kvitton binder
 varje körning till deterministisk korpushash, indexsnapshot och hash per träff.
-Den frysta v2-evalen innehåller svenska/engelska, held-out, multi-source,
-no-match och input-gate-fall, men semantic retrieval-kvalitet för v2 står kvar
-som `PENDING_PROVIDER_RUN` tills en separat betald körning godkänns.
+`nordly-knowledge-rag-v3` redovisar om verifieringen kördes, inte kördes eller
+inte var tillämplig. Den verifierar schema, citation membership, approved-only,
+utdataregler och read-only-gräns när det är tillämpligt, men
+`semantic_claim_support_evaluated=false`: en citerad källa får inte beskrivas
+som semantiskt stödbevisad. Den frysta v2-evalen är historisk och får inte
+användas som current-run-bevis.
+
+## DEC-021 – Backendkvitton äger den rika frontendens dynamiska sanning
+
+**Status:** Accepted, 14 september 2026
+
+Frontend får komponera, förenkla och animera backendens svar, men den får inte
+skapa egna loggar, larm, dokumentträffar, agentsteg, tool calls, modellnamn,
+verifieringsutfall, kostnader, deploymentstatus eller utförda åtgärder. Incident
+Lab använder två separata requests: `incident-lab-plan-v1` och
+`incident-lab-run-v3`. Båda är synkrona och returnerar färdiga post-run-kvitton.
+
+**Varför:** En rik rekryterarvänlig presentation har bara tekniskt bevisvärde om
+varje dynamiskt påstående kan spåras till samma backendrequest. Simulerad
+streaming eller frontendgenererade detaljer skulle blanda design med evidens.
+
+**Konsekvens:** UI:t får endast visa “väntar på backend” under pågående request.
+När svaret kommit får den spela upp den ordnade kvittosekvensen som en
+förklaring bakom kulisserna, tydligt märkt som post-run. Recorded replay behåller
+sin fixtureproveniens, livefel ersätts aldrig av ett mockat svar, och
+`BACKEND-HARDENING-GATE-2026-09-14.md` samt `FRONTEND-API-HANDOFF.md` är
+integrationsgränsen för nästa frontendfas.
