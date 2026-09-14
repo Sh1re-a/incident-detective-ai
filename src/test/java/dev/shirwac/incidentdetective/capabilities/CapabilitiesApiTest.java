@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.capabilities;
 
+import dev.shirwac.incidentdetective.incidentlab.IncidentLabRunResponse;
 import dev.shirwac.incidentdetective.live.LiveInvestigationService;
 import dev.shirwac.incidentdetective.replay.RecordedReplayService;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ class CapabilitiesApiTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("application/json"))
                 .andExpect(jsonPath("$.contract_version")
-                        .value("capabilities-v4"))
+                        .value("capabilities-v5"))
                 .andExpect(jsonPath("$.synthetic_only").value(true))
                 .andExpect(jsonPath("$.remediation_enabled").value(false))
                 .andExpect(jsonPath("$.provider.transport").value("vertex_ai"))
@@ -106,6 +107,82 @@ class CapabilitiesApiTest {
                         .value(true))
                 .andExpect(jsonPath("$.diagnostic_probe.action_executed")
                         .value(false))
+                .andExpect(jsonPath("$.incident_lab.enabled").value(false))
+                .andExpect(jsonPath("$.incident_lab.availability_reason")
+                        .value("rag_profile_required"))
+                .andExpect(jsonPath("$.incident_lab.required_profiles")
+                        .value(contains("rag")))
+                .andExpect(jsonPath("$.incident_lab.plan_contract_version")
+                        .value("incident-lab-plan-v1"))
+                .andExpect(jsonPath("$.incident_lab.run_contract_version")
+                        .value(IncidentLabRunResponse.CONTRACT_VERSION))
+                .andExpect(jsonPath("$.incident_lab.orchestration")
+                        .value("sequential_agent"))
+                .andExpect(jsonPath("$.incident_lab.expected_agent_order")
+                        .value(contains(
+                                "nordly_evidence_agent",
+                                "nordly_diagnosis_agent"
+                        )))
+                .andExpect(jsonPath("$.incident_lab.delivery")
+                        .value("synchronous_post_run"))
+                .andExpect(jsonPath("$.incident_lab.streaming").value(false))
+                .andExpect(jsonPath("$.incident_lab.alarm_required").value(true))
+                .andExpect(jsonPath("$.incident_lab.answer_states").value(contains(
+                        "diagnosed",
+                        "insufficient_evidence",
+                        "withheld",
+                        "not_started"
+                )))
+                .andExpect(jsonPath("$.incident_lab.explicit_confirmation_required")
+                        .value(true))
+                .andExpect(jsonPath("$.incident_lab.synthetic_only").value(true))
+                .andExpect(jsonPath("$.incident_lab.write_tools_available")
+                        .value(false))
+                .andExpect(jsonPath("$.incident_lab.action_executed")
+                        .value(false))
+                .andExpect(jsonPath("$.incident_lab.human_approval_required")
+                        .value(true))
+                .andExpect(jsonPath("$.incident_lab.registered_tool.function_name")
+                        .value("inspect_incident_evidence"))
+                .andExpect(jsonPath("$.incident_lab.registered_tool.read_only")
+                        .value(true))
+                .andExpect(jsonPath("$.incident_lab.registered_tool.case_bound")
+                        .value(true))
+                .andExpect(jsonPath("$.incident_lab.registered_tool.read_operations")
+                        .value(contains(
+                                "get_metrics",
+                                "search_logs",
+                                "get_trace",
+                                "retrieve_runbooks"
+                        )))
+                .andExpect(jsonPath(
+                        "$.incident_lab.registered_tool.diagnostic_probe_reference"
+                ).value("diagnostic_probe"))
+                .andExpect(jsonPath(
+                        "$.incident_lab.registered_tool.allowed_diagnostic_probe_ids"
+                ).value(contains(
+                        "service_health",
+                        "dependency_status",
+                        "release_metadata",
+                        "config_fingerprint_diff"
+                )))
+                .andExpect(jsonPath("$.incident_lab.supported_locales")
+                        .value(contains("sv", "en")))
+                .andExpect(jsonPath("$.incident_lab.incident_families[*].id")
+                        .value(contains(
+                                "payment_timeout",
+                                "catalog_cache_invalidation",
+                                "order_event_backlog",
+                                "order_idempotency_failure"
+                        )))
+                .andExpect(jsonPath("$.incident_lab.incident_families[0].label.sv")
+                        .value("Betalningar svarar för sent"))
+                .andExpect(jsonPath("$.incident_lab.incident_families[0].label.en")
+                        .value("Payments time out"))
+                .andExpect(jsonPath("$.incident_lab.incident_families[0].service")
+                        .value("payment_adapter"))
+                .andExpect(jsonPath("$.incident_lab.incident_families[0].alarm_signal")
+                        .value("http_5xx_response_count"))
                 .andExpect(jsonPath("$.live_ai.request_routing_configured")
                         .value(true))
                 .andExpect(jsonPath("$.live_ai.explicit_confirmation_required")

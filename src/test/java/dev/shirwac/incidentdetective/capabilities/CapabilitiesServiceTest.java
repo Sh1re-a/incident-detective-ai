@@ -3,6 +3,8 @@ package dev.shirwac.incidentdetective.capabilities;
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
 import dev.shirwac.incidentdetective.ai.GeminiThinkingLevel;
 import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
+import dev.shirwac.incidentdetective.adk.AdkAgentRuntime;
+import dev.shirwac.incidentdetective.adk.AdkProperties;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.EmbeddingCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ModeCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ToolBudgetCapability;
@@ -13,10 +15,12 @@ import dev.shirwac.incidentdetective.investigation.tools.RetrieveRunbooksResult;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalBackend;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalStrategy;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
+import dev.shirwac.incidentdetective.incidentlab.IncidentLabRunResponse;
 import dev.shirwac.incidentdetective.live.GlobalDailyLiveQuota;
 import dev.shirwac.incidentdetective.live.LiveInvestigationService;
 import dev.shirwac.incidentdetective.live.PromptCacheStrategy;
 import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeCorpus;
+import dev.shirwac.incidentdetective.planning.IncidentService;
 import dev.shirwac.incidentdetective.rag.RagProperties;
 import dev.shirwac.incidentdetective.rag.RunbookIndexReadiness;
 import dev.shirwac.incidentdetective.rag.RunbookIndexStatus;
@@ -60,6 +64,7 @@ class CapabilitiesServiceTest {
         environment.setActiveProfiles("replay");
         CapabilitiesResponse response = new CapabilitiesService(
                 ai,
+                new AdkProperties(true),
                 retrieval(RunbookRetrievalBackend.DETERMINISTIC_FIXTURE),
                 RAG,
                 knowledgeCorpus(),
@@ -68,7 +73,7 @@ class CapabilitiesServiceTest {
                 Optional.empty()
         ).describe();
 
-        assertEquals("capabilities-v4", response.contractVersion());
+        assertEquals("capabilities-v5", response.contractVersion());
         assertTrue(response.syntheticOnly());
         assertFalse(response.remediationEnabled());
         assertEquals("developer_api", response.provider().transport());
@@ -125,6 +130,107 @@ class CapabilitiesServiceTest {
         assertTrue(response.diagnosticProbe().caseBound());
         assertTrue(response.diagnosticProbe().readOnly());
         assertFalse(response.diagnosticProbe().actionExecuted());
+        assertFalse(response.incidentLab().enabled());
+        assertEquals(
+                "rag_profile_required",
+                response.incidentLab().availabilityReason()
+        );
+        assertEquals(List.of("rag"), response.incidentLab().requiredProfiles());
+        assertEquals(
+                "incident-lab-plan-v1",
+                response.incidentLab().planContractVersion()
+        );
+        assertEquals(
+                IncidentLabRunResponse.CONTRACT_VERSION,
+                response.incidentLab().runContractVersion()
+        );
+        assertEquals(
+                AdkAgentRuntime.WORKFLOW_TYPE,
+                response.incidentLab().orchestration()
+        );
+        assertEquals(List.of(
+                AdkAgentRuntime.EVIDENCE_AGENT_NAME,
+                AdkAgentRuntime.DIAGNOSIS_AGENT_NAME
+        ), response.incidentLab().expectedAgentOrder());
+        assertEquals("synchronous_post_run", response.incidentLab().delivery());
+        assertFalse(response.incidentLab().streaming());
+        assertTrue(response.incidentLab().alarmRequired());
+        assertEquals(List.of(
+                "diagnosed",
+                "insufficient_evidence",
+                "withheld",
+                "not_started"
+        ), response.incidentLab().answerStates());
+        assertTrue(response.incidentLab().explicitConfirmationRequired());
+        assertTrue(response.incidentLab().syntheticOnly());
+        assertFalse(response.incidentLab().writeToolsAvailable());
+        assertFalse(response.incidentLab().actionExecuted());
+        assertTrue(response.incidentLab().humanApprovalRequired());
+        assertEquals(
+                AdkAgentRuntime.TOOL_NAME,
+                response.incidentLab().registeredTool().functionName()
+        );
+        assertTrue(response.incidentLab().registeredTool().readOnly());
+        assertTrue(response.incidentLab().registeredTool().caseBound());
+        assertEquals(
+                List.of(ToolName.values()),
+                response.incidentLab().registeredTool().readOperations()
+        );
+        assertEquals(
+                "diagnostic_probe",
+                response.incidentLab().registeredTool()
+                        .diagnosticProbeReference()
+        );
+        assertEquals(
+                List.of(DiagnosticProbeId.values()),
+                response.incidentLab().registeredTool()
+                        .allowedDiagnosticProbeIds()
+        );
+        assertEquals(List.of("sv", "en"), response.incidentLab().supportedLocales());
+        assertEquals(
+                List.of(
+                        "payment_timeout",
+                        "catalog_cache_invalidation",
+                        "order_event_backlog",
+                        "order_idempotency_failure"
+                ),
+                response.incidentLab().incidentFamilies().stream()
+                        .map(CapabilitiesResponse.IncidentFamilyCapability::id)
+                        .toList()
+        );
+        assertEquals(Map.of(
+                "payment_timeout", IncidentService.PAYMENT_ADAPTER,
+                "catalog_cache_invalidation", IncidentService.CATALOG_SERVICE,
+                "order_event_backlog", IncidentService.ORDER_EVENT_CONSUMER,
+                "order_idempotency_failure", IncidentService.ORDER_SERVICE
+        ), response.incidentLab().incidentFamilies().stream().collect(
+                Collectors.toMap(
+                        CapabilitiesResponse.IncidentFamilyCapability::id,
+                        CapabilitiesResponse.IncidentFamilyCapability::service
+                )
+        ));
+        assertEquals(Map.of(
+                "payment_timeout", "http_5xx_response_count",
+                "catalog_cache_invalidation", "catalog_version_divergence_count",
+                "order_event_backlog", "order_consumer_lag_seconds",
+                "order_idempotency_failure", "duplicate_order_creation_count"
+        ), response.incidentLab().incidentFamilies().stream().collect(
+                Collectors.toMap(
+                        CapabilitiesResponse.IncidentFamilyCapability::id,
+                        CapabilitiesResponse.IncidentFamilyCapability::alarmSignal
+                )
+        ));
+        assertTrue(response.incidentLab().incidentFamilies().stream().allMatch(
+                family -> !family.label().sv().isBlank()
+                        && !family.label().en().isBlank()
+                        && !family.description().sv().isBlank()
+                        && !family.description().en().isBlank()
+                        && !family.customerImpact().sv().isBlank()
+                        && !family.customerImpact().en().isBlank()
+                        && !family.alarmSignal().isBlank()
+                        && !family.alarmSignalConcept().sv().isBlank()
+                        && !family.alarmSignalConcept().en().isBlank()
+        ));
 
         assertTrue(response.liveAi().enabledByConfiguration());
         assertTrue(response.liveAi().requestRoutingConfigured());
@@ -200,6 +306,36 @@ class CapabilitiesServiceTest {
     }
 
     @Test
+    void marksIncidentLabEnabledOnlyWhenItsConfigurationBoundaryIsComplete() {
+        GeminiAiProperties ai = new GeminiAiProperties(
+                "must-never-be-returned",
+                true,
+                "gemini-3.1-flash-lite",
+                GeminiThinkingLevel.MINIMAL,
+                "gemini-live-v7"
+        );
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("rag");
+
+        CapabilitiesResponse response = new CapabilitiesService(
+                ai,
+                new AdkProperties(true),
+                retrieval(RunbookRetrievalBackend.DETERMINISTIC_FIXTURE),
+                RAG,
+                knowledgeCorpus(),
+                environment,
+                quota(GlobalDailyLiveQuota.Scope.PROCESS_LOCAL),
+                Optional.empty()
+        ).describe();
+
+        assertTrue(response.incidentLab().enabled());
+        assertEquals(
+                "enabled_by_configuration_not_health_checked",
+                response.incidentLab().availabilityReason()
+        );
+    }
+
+    @Test
     void exposesTheEmbeddingProfileOnlyWhenPgvectorIsActive() {
         GeminiAiProperties ai = new GeminiAiProperties(
                 null,
@@ -225,6 +361,7 @@ class CapabilitiesServiceTest {
 
         CapabilitiesResponse response = new CapabilitiesService(
                 ai,
+                new AdkProperties(true),
                 retrieval(RunbookRetrievalBackend.PGVECTOR_EXACT_COSINE),
                 RAG,
                 knowledgeCorpus(),
@@ -265,6 +402,11 @@ class CapabilitiesServiceTest {
         );
         assertEquals("414264f", response.deployment().buildGitSha());
         assertFalse(response.liveAi().requestRoutingConfigured());
+        assertFalse(response.incidentLab().enabled());
+        assertEquals(
+                "live_ai_disabled",
+                response.incidentLab().availabilityReason()
+        );
         assertEquals(
                 GlobalDailyLiveQuota.Scope.DATABASE_GLOBAL,
                 response.liveAi().budget().dailyQuotaScope()

@@ -6,6 +6,7 @@ import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalBackend
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
 import dev.shirwac.incidentdetective.live.GlobalDailyLiveQuota;
 import dev.shirwac.incidentdetective.live.PromptCacheStrategy;
+import dev.shirwac.incidentdetective.planning.IncidentService;
 import dev.shirwac.incidentdetective.replay.RunMode;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -41,6 +42,8 @@ public record CapabilitiesResponse(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         DiagnosticProbeCapability diagnosticProbe,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        IncidentLabCapability incidentLab,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         LiveAiCapability liveAi,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         GeneratedCasesCapability generatedCases,
@@ -49,11 +52,137 @@ public record CapabilitiesResponse(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         PromptCacheCapability promptCache
 ) {
-    public static final String CONTRACT_VERSION = "capabilities-v4";
+    public static final String CONTRACT_VERSION = "capabilities-v5";
 
     public CapabilitiesResponse {
         modes = List.copyOf(modes);
         tools = List.copyOf(tools);
+    }
+
+    public record IncidentLabCapability(
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "True only when the required profile, ADK, live AI, "
+                            + "and non-secret provider routing configuration are enabled. "
+                            + "This does not claim provider health or reachability."
+            )
+            boolean enabled,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = {
+                            "enabled_by_configuration_not_health_checked",
+                            "rag_profile_required",
+                            "adk_disabled",
+                            "live_ai_disabled",
+                            "provider_routing_not_configured"
+                    }
+            )
+            String availabilityReason,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            List<String> requiredProfiles,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String planContractVersion,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String runContractVersion,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = "sequential_agent"
+            )
+            String orchestration,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            List<String> expectedAgentOrder,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = "synchronous_post_run"
+            )
+            String delivery,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean streaming,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean alarmRequired,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            List<String> answerStates,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean explicitConfirmationRequired,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean syntheticOnly,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean writeToolsAvailable,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean actionExecuted,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean humanApprovalRequired,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            IncidentLabToolCapability registeredTool,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "Locales included in the backend-owned incident "
+                            + "family catalog copy."
+            )
+            List<String> supportedLocales,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            List<IncidentFamilyCapability> incidentFamilies
+    ) {
+        public IncidentLabCapability {
+            requiredProfiles = List.copyOf(requiredProfiles);
+            expectedAgentOrder = List.copyOf(expectedAgentOrder);
+            answerStates = List.copyOf(answerStates);
+            supportedLocales = List.copyOf(supportedLocales);
+            incidentFamilies = List.copyOf(incidentFamilies);
+        }
+    }
+
+    public record IncidentLabToolCapability(
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = "inspect_incident_evidence"
+            )
+            String functionName,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean readOnly,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean caseBound,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            List<ToolName> readOperations,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "Name of the top-level diagnostic_probe capability "
+                            + "that defines this nested probe boundary."
+            )
+            String diagnosticProbeReference,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            List<DiagnosticProbeId> allowedDiagnosticProbeIds
+    ) {
+        public IncidentLabToolCapability {
+            readOperations = List.copyOf(readOperations);
+            allowedDiagnosticProbeIds = List.copyOf(allowedDiagnosticProbeIds);
+        }
+    }
+
+    public record IncidentFamilyCapability(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String id,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            LocalizedCopy label,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            LocalizedCopy description,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            LocalizedCopy customerImpact,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            IncidentService service,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String alarmSignal,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            LocalizedCopy alarmSignalConcept
+    ) {
+    }
+
+    public record LocalizedCopy(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String sv,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            String en
+    ) {
     }
 
     public record ProviderCapability(

@@ -51,6 +51,7 @@ class CapabilitiesOpenApiTest {
                         "modes",
                         "tools",
                         "diagnostic_probe",
+                        "incident_lab",
                         "live_ai",
                         "generated_cases",
                         "retrieval",
@@ -59,7 +60,7 @@ class CapabilitiesOpenApiTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.CapabilitiesResponse"
                                 + ".properties.contract_version.enum"
-                ).value(contains("capabilities-v4")))
+                ).value(contains("capabilities-v5")))
                 .andExpect(jsonPath(
                         "$.components.schemas.ProviderCapability.required"
                 ).value(containsInAnyOrder(
@@ -130,7 +131,56 @@ class CapabilitiesOpenApiTest {
                         "dependency_status",
                         "release_metadata",
                         "config_fingerprint_diff"
+                        )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.IncidentLabCapability.required"
+                ).value(containsInAnyOrder(
+                        "enabled",
+                        "availability_reason",
+                        "required_profiles",
+                        "plan_contract_version",
+                        "run_contract_version",
+                        "orchestration",
+                        "expected_agent_order",
+                        "delivery",
+                        "streaming",
+                        "alarm_required",
+                        "answer_states",
+                        "explicit_confirmation_required",
+                        "synthetic_only",
+                        "write_tools_available",
+                        "action_executed",
+                        "human_approval_required",
+                        "registered_tool",
+                        "supported_locales",
+                        "incident_families"
                 )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.IncidentLabCapability"
+                                + ".properties.orchestration.enum"
+                ).value(contains("sequential_agent")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.IncidentLabCapability"
+                                + ".properties.delivery.enum"
+                ).value(contains("synchronous_post_run")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.IncidentLabToolCapability"
+                                + ".properties.function_name.enum"
+                ).value(contains("inspect_incident_evidence")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.IncidentFamilyCapability.required"
+                ).value(containsInAnyOrder(
+                        "id",
+                        "label",
+                        "description",
+                        "customer_impact",
+                        "service",
+                        "alarm_signal",
+                        "alarm_signal_concept"
+                )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.LocalizedCopy.required"
+                ).value(containsInAnyOrder("sv", "en")))
                 .andExpect(jsonPath(
                         "$.components.schemas.RetrievalCapability"
                                 + ".properties.backend.enum"
