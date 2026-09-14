@@ -1,6 +1,7 @@
 package dev.shirwac.incidentdetective.planning;
 
 import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.HashSet;
 import java.util.List;
@@ -13,7 +14,9 @@ import java.util.Objects;
 public record IncidentPlanProposal(
         IncidentPlanProposalStatus status,
         String summary,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         GeneratedIncidentFamily incidentFamily,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         IncidentSeverity requestedSeverity,
         List<IncidentService> affectedServices,
         IncidentBlastRadius requestedBlastRadius

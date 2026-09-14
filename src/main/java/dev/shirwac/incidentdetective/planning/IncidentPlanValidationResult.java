@@ -1,13 +1,17 @@
 package dev.shirwac.incidentdetective.planning;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.List;
 import java.util.Objects;
 
 /** Deterministic Java decision over one untrusted model proposal. */
 public record IncidentPlanValidationResult(
         IncidentPlanDecision decision,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         IncidentPlan plan,
         List<IncidentPlanAdjustmentCode> adjustments,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         IncidentPlanRejection rejection
 ) {
     public IncidentPlanValidationResult {

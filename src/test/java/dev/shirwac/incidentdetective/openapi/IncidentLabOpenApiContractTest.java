@@ -108,6 +108,49 @@ class IncidentLabOpenApiContractTest {
         );
     }
 
+    @Test
+    void documentsConditionalPlannerFieldsAsPresentAndNullable()
+            throws Exception {
+        JsonNode schemas = jsonMapper.readTree(
+                mockMvc.perform(get("/v3/api-docs"))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString()
+        ).at("/components/schemas");
+
+        assertRequiredNullable(
+                schemas,
+                "IncidentPlanProposal",
+                "incident_family"
+        );
+        assertRequiredNullable(
+                schemas,
+                "IncidentPlanProposal",
+                "requested_severity"
+        );
+        assertRequiredNullable(
+                schemas,
+                "IncidentPlanValidationResult",
+                "plan"
+        );
+        assertRequiredNullable(
+                schemas,
+                "IncidentPlanValidationResult",
+                "rejection"
+        );
+        assertRequiredNullable(
+                schemas,
+                "IncidentPlannerReceipt",
+                "provider_response_id"
+        );
+        assertRequiredNullable(
+                schemas,
+                "IncidentPlannerReceipt",
+                "token_usage"
+        );
+    }
+
     private static Set<String> textValues(JsonNode values) {
         Set<String> result = new HashSet<>();
         values.forEach(value -> result.add(value.asText()));
@@ -125,5 +168,45 @@ class IncidentLabOpenApiContractTest {
                 && oneOf.values().stream().anyMatch(candidate ->
                 "null".equals(candidate.path("type").asText())
         );
+    }
+
+    private static void assertRequiredNullable(
+            JsonNode schemas,
+            String ownerSchema,
+            String propertyName
+    ) {
+        JsonNode owner = schemas.get(ownerSchema);
+        assertTrue(
+                textValues(owner.get("required")).contains(propertyName),
+                ownerSchema + "." + propertyName + " must always be present"
+        );
+        assertTrue(
+                allowsNull(owner.get("properties").get(propertyName)),
+                ownerSchema + "." + propertyName + " must allow null"
+        );
+        assertTrue(
+                allowsNonNull(owner.get("properties").get(propertyName)),
+                ownerSchema + "." + propertyName
+                        + " must retain its non-null schema"
+        );
+    }
+
+    private static boolean allowsNonNull(JsonNode schema) {
+        JsonNode type = schema.get("type");
+        if (type != null) {
+            if (!type.isArray()) {
+                return !"null".equals(type.asText());
+            }
+            return type.values().stream().anyMatch(candidate ->
+                    !"null".equals(candidate.asText())
+            );
+        }
+        JsonNode oneOf = schema.get("oneOf");
+        if (oneOf != null && oneOf.isArray()) {
+            return oneOf.values().stream().anyMatch(candidate ->
+                    !"null".equals(candidate.path("type").asText())
+            );
+        }
+        return schema.has("$ref");
     }
 }

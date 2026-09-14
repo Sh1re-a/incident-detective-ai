@@ -1,12 +1,15 @@
 package dev.shirwac.incidentdetective.planning;
 
 import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /** Generic evidence for the one model call that produced a proposal. */
 public record IncidentPlannerReceipt(
         String transport,
         String model,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         String providerResponseId,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
         ModelTokenUsage tokenUsage,
         long latencyMs
 ) {
