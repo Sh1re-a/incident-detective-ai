@@ -70,6 +70,7 @@ public final class IncidentLabService {
     private final GeneratedCaseGenerationService generatedCases;
     private final GeneratedIncidentAlarmEvaluator alarmEvaluator;
     private final AdkAgentTurnService adkAgent;
+    private final IncidentLabResponsePresenter responsePresenter;
 
     public IncidentLabService(
             KnowledgeRagSafetyGate safetyGate,
@@ -85,6 +86,7 @@ public final class IncidentLabService {
         this.adkAgent = adkAgent;
         planValidator = new IncidentPlanValidator();
         alarmEvaluator = new GeneratedIncidentAlarmEvaluator();
+        responsePresenter = new IncidentLabResponsePresenter();
     }
 
     public IncidentLabPlanResponse createPlan(IncidentLabPlanRequest request) {
@@ -138,12 +140,27 @@ public final class IncidentLabService {
                         request.confirmLiveAi()
                 )
                 : null;
+        IncidentLabResponsePresenter.Presentation presentation =
+                responsePresenter.present(
+                        generated.scenario(),
+                        backendLogs,
+                        alarm.orElse(null),
+                        agentTurn
+                );
+        agentTurn = IncidentLabResponsePresenter.sanitizeAgentTurn(
+                agentTurn,
+                presentation.answerState()
+        );
 
         return new IncidentLabRunResponse(
                 IncidentLabRunResponse.CONTRACT_VERSION,
                 runOutcome(alarm, agentTurn),
                 IncidentLabRunResponse.DELIVERY,
                 IncidentLabRunResponse.TRUTH_LABEL,
+                presentation.answerState(),
+                presentation.businessResponse(),
+                presentation.developerResponse(),
+                presentation.actionReceipt(),
                 canonicalPlan,
                 generation.receipt(),
                 generated.scenario(),

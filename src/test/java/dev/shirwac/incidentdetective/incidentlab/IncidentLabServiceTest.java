@@ -2,6 +2,7 @@ package dev.shirwac.incidentdetective.incidentlab;
 
 import dev.shirwac.incidentdetective.adk.AdkAgentTurnResponse;
 import dev.shirwac.incidentdetective.adk.AdkAgentTurnService;
+import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
 import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
@@ -31,6 +32,7 @@ import dev.shirwac.incidentdetective.planning.IncidentPlannerReceipt;
 import dev.shirwac.incidentdetective.planning.IncidentPlannerResponse;
 import dev.shirwac.incidentdetective.planning.IncidentService;
 import dev.shirwac.incidentdetective.planning.IncidentSeverity;
+import dev.shirwac.incidentdetective.replay.ReplayComparison;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -41,6 +43,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -201,6 +204,8 @@ class IncidentLabServiceTest {
         GeneratedCaseGeneration generation = generation(generated);
         AdkAgentTurnResponse agentTurn = mock(AdkAgentTurnResponse.class);
         when(agentTurn.outcome()).thenReturn("verification_failed");
+        when(agentTurn.diagnosis()).thenReturn(mock(Diagnosis.class));
+        when(agentTurn.comparison()).thenReturn(mock(ReplayComparison.class));
         when(generatedCases.generate(any())).thenReturn(generation);
         when(adkAgent.runGeneratedCase(any(), any(), eq(true)))
                 .thenReturn(agentTurn);
@@ -213,7 +218,9 @@ class IncidentLabServiceTest {
                 "alarm_detected_investigation_withheld",
                 response.outcome()
         );
-        assertSame(agentTurn, response.agentTurn());
+        assertNotSame(agentTurn, response.agentTurn());
+        assertNull(response.agentTurn().comparison());
+        assertNull(response.agentTurn().diagnosis());
     }
 
     @Test
