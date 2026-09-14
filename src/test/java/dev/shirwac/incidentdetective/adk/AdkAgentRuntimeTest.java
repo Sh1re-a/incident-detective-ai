@@ -16,6 +16,11 @@ import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
 import dev.shirwac.incidentdetective.domain.evidence.MetricEvidence;
 import dev.shirwac.incidentdetective.domain.evidence.RunbookEvidence;
 import dev.shirwac.incidentdetective.domain.evidence.TraceEvidence;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeId;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeOutcome;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeReceipt;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeRequest;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeService;
 import dev.shirwac.incidentdetective.generated.GeneratedCase;
 import dev.shirwac.incidentdetective.generated.GeneratedCaseRequest;
 import dev.shirwac.incidentdetective.generated.GeneratedEvidenceMode;
@@ -43,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AdkAgentRuntimeTest {
@@ -67,6 +73,10 @@ class AdkAgentRuntimeTest {
 
         assertEquals(2, result.modelCallCount());
         assertEquals(1, result.toolInvocationCount());
+        assertEquals(
+                DiagnosticProbeId.SERVICE_HEALTH,
+                result.diagnosticProbeReceipt().probeId()
+        );
         assertEquals(2, model.requests().size());
         assertEquals(
                 List.of(
@@ -226,8 +236,54 @@ class AdkAgentRuntimeTest {
         assertEquals(raw, released.text());
     }
 
+    @Test
+    void rejectsFreeFormTerminalLikeProbeBeforeAnyDiagnosticRuns() {
+        GeneratedCase generated = generatedCase();
+        DiagnosticProbeService probes = mock(DiagnosticProbeService.class);
+        AdkAgentRuntime.ReadOnlyIncidentTool tool =
+                new AdkAgentRuntime.ReadOnlyIncidentTool(
+                        generated.investigationData(),
+                        boundedTools(generated),
+                        probes
+                );
+
+        Map<String, Object> response = tool.inspectIncidentEvidence(
+                "PAYMENT_ADAPTER",
+                "payment timeout",
+                "open_terminal"
+        );
+
+        assertEquals("invalid_arguments", response.get("status"));
+        assertNull(tool.diagnosticProbeReceipt());
+        verifyNoInteractions(probes);
+    }
+
     private AdkAgentRuntime runtime(InvestigationToolExecutor tools) {
-        return new AdkAgentRuntime(tools, JsonMapper.builder().build());
+        return new AdkAgentRuntime(
+                tools,
+                diagnosticProbes(),
+                JsonMapper.builder().build()
+        );
+    }
+
+    private DiagnosticProbeService diagnosticProbes() {
+        DiagnosticProbeService probes = mock(DiagnosticProbeService.class);
+        when(probes.execute(
+                any(InvestigationData.class),
+                any(DiagnosticProbeRequest.class)
+        )).thenAnswer(invocation -> {
+            InvestigationData data = invocation.getArgument(0);
+            DiagnosticProbeRequest request = invocation.getArgument(1);
+            return new DiagnosticProbeReceipt(
+                    data.scenario().scenarioId(),
+                    request.probeId(),
+                    DiagnosticProbeOutcome.NOT_AVAILABLE,
+                    "No additional bounded findings were available.",
+                    List.of(),
+                    false
+            );
+        });
+        return probes;
     }
 
     private GeneratedCase generatedCase() {
@@ -317,7 +373,8 @@ class AdkAgentRuntimeTest {
                                                 .name(AdkAgentRuntime.TOOL_NAME)
                                                 .args(Map.of(
                                                         "log_query", "PAYMENT_ADAPTER",
-                                                        "runbook_query", "payment timeout"
+                                                        "runbook_query", "payment timeout",
+                                                        "diagnostic_probe", "service_health"
                                                 ))
                                                 .build())
                                         .build())

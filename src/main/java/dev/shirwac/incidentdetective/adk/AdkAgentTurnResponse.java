@@ -4,6 +4,7 @@ import dev.shirwac.incidentdetective.ai.GoogleGenAiProviderRoute;
 import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.scenario.Scenario;
 import dev.shirwac.incidentdetective.domain.verification.VerificationReport;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeReceipt;
 import dev.shirwac.incidentdetective.live.LiveToolEvent;
 import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
 import dev.shirwac.incidentdetective.replay.ReplayComparison;
@@ -40,6 +41,8 @@ public record AdkAgentTurnResponse(
         WorkflowReceipt workflow,
         List<RuntimeEvent> events,
         List<LiveToolEvent> toolEvents,
+        @Schema(nullable = true)
+        DiagnosticProbeReceipt diagnosticProbe,
         @Schema(nullable = true)
         Diagnosis diagnosis,
         @Schema(nullable = true)

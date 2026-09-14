@@ -265,6 +265,7 @@ public final class AdkAgentTurnService {
                 workflowReceipt(trajectory),
                 runtime.projectEvents(run.events(), false),
                 toolEvents,
+                run.diagnosticProbeReceipt(),
                 answerReleased ? candidate : null,
                 checked.report(),
                 checked.comparison(),
@@ -278,7 +279,7 @@ public final class AdkAgentTurnService {
                 new ControlReceipt(
                         run.modelCallCount(),
                         run.toolInvocationCount(),
-                        toolEvents.size(),
+                        readOperationCount(run, toolEvents),
                         embeddingCallCount,
                         false,
                         false,
@@ -339,6 +340,7 @@ public final class AdkAgentTurnService {
                 workflowReceipt(trajectory),
                 runtime.projectEvents(run.events(), false),
                 toolEvents,
+                run.diagnosticProbeReceipt(),
                 null,
                 null,
                 null,
@@ -360,7 +362,7 @@ public final class AdkAgentTurnService {
                 new ControlReceipt(
                         run.modelCallCount(),
                         run.toolInvocationCount(),
-                        toolEvents.size(),
+                        readOperationCount(run, toolEvents),
                         embeddingCallCount,
                         false,
                         false,
@@ -403,6 +405,7 @@ public final class AdkAgentTurnService {
                 null,
                 null,
                 null,
+                null,
                 new ControlReceipt(
                         0,
                         0,
@@ -419,6 +422,14 @@ public final class AdkAgentTurnService {
                 ),
                 List.of("The request was stopped before Google ADK, Gemini, tools, or embeddings ran.")
         );
+    }
+
+    private int readOperationCount(
+            AdkAgentRuntime.RunResult run,
+            List<LiveToolEvent> toolEvents
+    ) {
+        return toolEvents.size()
+                + (run.diagnosticProbeReceipt() == null ? 0 : 1);
     }
 
     private GoogleGenAiProviderRoute providerRoute(int providerCalls) {
