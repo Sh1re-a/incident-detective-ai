@@ -7,6 +7,7 @@ import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
 import dev.shirwac.incidentdetective.ai.ModelResponseFailureMetadata;
+import dev.shirwac.incidentdetective.domain.diagnosis.Claim;
 import dev.shirwac.incidentdetective.domain.diagnosis.ClaimCode;
 import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
@@ -144,8 +145,23 @@ class AdkAgentTurnApiTest {
     void completedTurnPublishesTheObservedSequentialWorkflowReceipt()
             throws Exception {
         stubAdmittedRun(validTrajectory(), 2, true);
+        String sentinel = "MODEL_PROSE_MUST_NOT_ESCAPE_9F2C";
+        when(diagnosisDecoder.decode("{}")).thenReturn(new Diagnosis(
+                DiagnosisStatus.DIAGNOSED,
+                "CATALOG_CACHE_INVALIDATION_FAILURE",
+                "CATALOG_SERVICE",
+                sentinel + " business",
+                sentinel + " technical",
+                List.of(new Claim(
+                        ClaimCode.ROOT_CAUSE,
+                        "CATALOG_CACHE_INVALIDATION_FAILURE",
+                        sentinel + " claim",
+                        List.of("catalog-log-1")
+                )),
+                new SafeNextStep(sentinel + " next step", true)
+        ));
 
-        mockMvc.perform(post(PATH)
+        String response = mockMvc.perform(post(PATH)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request(
                                 "Undersök larmet med endast read-only verktyg.",
@@ -207,7 +223,34 @@ class AdkAgentTurnApiTest {
                 .andExpect(jsonPath("$.receipt.model_calls").value(2))
                 .andExpect(jsonPath("$.receipt.adk_tool_calls").value(1))
                 .andExpect(jsonPath("$.receipt.read_operations").value(2))
-                .andExpect(jsonPath("$.diagnosis").isMap());
+                .andExpect(jsonPath("$.diagnosis").isMap())
+                .andExpect(jsonPath("$.diagnosis.business_summary").value(
+                        "Java released a diagnosis after deterministic "
+                                + "verification of this generated synthetic case."
+                ))
+                .andExpect(jsonPath("$.diagnosis.technical_summary").value(
+                        "Verified root-cause code "
+                                + "CATALOG_CACHE_INVALIDATION_FAILURE and "
+                                + "affected-service code CATALOG_SERVICE."
+                ))
+                .andExpect(jsonPath("$.diagnosis.claims[0].display_text").value(
+                        "Verified root cause code: "
+                                + "CATALOG_CACHE_INVALIDATION_FAILURE."
+                ))
+                .andExpect(jsonPath("$.diagnosis.safe_next_step.summary").value(
+                        "Have a human review the cited read-only evidence "
+                                + "before approving any change."
+                ))
+                .andExpect(jsonPath("$.diagnosis.safe_next_step.requires_human_approval")
+                        .value(true))
+                .andExpect(jsonPath("$.comparison").value((Object) null))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertFalse(response.contains(sentinel));
+        assertFalse(response.contains("expected_root_cause_code"));
+        assertFalse(response.contains("expected_affected_service"));
     }
 
     @Test
@@ -292,6 +335,7 @@ class AdkAgentTurnApiTest {
                 .andExpect(jsonPath("$.diagnosis").value((Object) null))
                 .andExpect(jsonPath("$.diagnostic_probe")
                         .value((Object) null))
+                .andExpect(jsonPath("$.comparison").value((Object) null))
                 .andExpect(jsonPath("$.verification_event.schema_valid")
                         .value(true))
                 .andExpect(jsonPath("$.verification_event.citations_valid")

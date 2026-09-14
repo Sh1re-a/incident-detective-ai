@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
 public final class AdkAgentTurnController {
 
     private final AdkAgentTurnService service;
+    private final AdkAgentTurnPublicProjector publicProjector =
+            new AdkAgentTurnPublicProjector();
 
     public AdkAgentTurnController(AdkAgentTurnService service) {
         this.service = service;
@@ -38,7 +40,8 @@ public final class AdkAgentTurnController {
             description = "Java blocks unsafe input before the provider. A real Google ADK "
                     + "Runner then creates an in-memory session, lets Gemini call one bounded "
                     + "read-only evidence tool, and records the tool trajectory. Java verifies "
-                    + "the structured diagnosis before it may be returned. Events are a "
+                    + "the structured diagnosis before it may be returned. Model-authored "
+                    + "prose and the private expected answer are withheld. Events are a "
                     + "post-run receipt, not hidden reasoning or streaming."
     )
     @ApiResponses({
@@ -74,6 +77,6 @@ public final class AdkAgentTurnController {
     public AdkAgentTurnResponse run(
             @Valid @RequestBody AdkAgentTurnRequest request
     ) {
-        return service.run(request);
+        return publicProjector.project(service.run(request));
     }
 }
