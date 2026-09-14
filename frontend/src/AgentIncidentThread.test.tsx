@@ -370,6 +370,24 @@ const blockedResponse = {
   },
 } satisfies AdkAgentTurnResponse;
 
+const contractRejectedResponse = {
+  ...(completedResponse as AdkAgentTurnResponse),
+  run_id: "contract-rejected-run-1",
+  outcome: "verification_failed",
+  diagnosis: null,
+  verification: null,
+  comparison: null,
+  verification_event: {
+    ...completedResponse.verification_event,
+    source: "deterministic_java_contract_gate",
+    schema_valid: false,
+    citations_valid: false,
+    factual_result_matches_ground_truth: false,
+    answer_released: false,
+    summary: "Java rejected the model response contract. Downstream checks were not run.",
+  },
+} satisfies AdkAgentTurnResponse;
+
 function jsonResponse(body: unknown): Response {
   return { ok: true, status: 200, json: async () => body } as Response;
 }
@@ -446,6 +464,26 @@ describe("Nordly ADK incident thread", () => {
     expect(logs[1]).toHaveAttribute("data-cited", "false");
   });
 
+  it("keeps the real run receipt when Java rejects the model contract", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(contractRejectedResponse)));
+    const user = userEvent.setup();
+    render(<AgentIncidentThread locale="sv" active />);
+
+    await user.click(screen.getByRole("button", { name: "Skicka larmet till agenten" }));
+
+    expect(await screen.findByRole("heading", {
+      name: "AI:n svarade. Säkerhetskontraktet sa nej.",
+    })).toBeVisible();
+    expect(screen.queryByText(completedResponse.diagnosis.business_summary)).not.toBeInTheDocument();
+    expect(screen.getByText(/2 modellanrop · 3 read-only-läsningar · 1 embedding · 0 actions/i)).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Så långt kom körningen" }));
+    expect(screen.getByText("Google ADK 1.7.0")).toBeVisible();
+    expect(screen.getByText("Svarformat")).toBeVisible();
+    expect(screen.getAllByText("Inte körd")).toHaveLength(2);
+    expect(screen.getAllByText("Svar stoppat")).toHaveLength(2);
+  });
+
   it("shows a truthful zero-use receipt when Java blocks the request before ADK", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(blockedResponse)));
     const user = userEvent.setup();
@@ -470,8 +508,9 @@ describe("Nordly ADK incident thread", () => {
 
       expect(await screen.findByRole("heading", { name: "Ingen AI-utredning utfördes." })).toBeVisible();
       expect(screen.getByText(/Google ADK, Gemini, verktyg, RAG\/embeddings och actions startade aldrig/i)).toBeVisible();
-      expect(screen.getByText(`Backendkod: ${code}`)).toBeVisible();
+      expect(screen.getByText(`Backendkod: ${code} · HTTP 503`)).toBeVisible();
       expect(screen.getByText("0 Gemini · 0 ADK · 0 tools · 0 embeddings · 0 actions")).toBeVisible();
+      expect(screen.getByText("Sanitised backend detail.")).toBeVisible();
       expect(screen.queryByRole("button", { name: "Så byggdes svaret" })).not.toBeInTheDocument();
     },
   );
@@ -484,9 +523,11 @@ describe("Nordly ADK incident thread", () => {
     await user.click(screen.getByRole("button", { name: "Skicka larmet till agenten" }));
 
     expect(await screen.findByRole("heading", {
-      name: "AI-utredningen startade, men inget svar släpptes.",
+      name: "Livekörningen stoppades. Inget svar släpptes.",
     })).toBeVisible();
-    expect(screen.getByText("Backendkod: MODEL_PROVIDER_TIMEOUT")).toBeVisible();
+    expect(screen.getByText("Gemini-provider")).toBeVisible();
+    expect(screen.getByText("Inte rapporterat av backend")).toBeVisible();
+    expect(screen.getByText("Backendkod: MODEL_PROVIDER_TIMEOUT · HTTP 504")).toBeVisible();
     expect(screen.queryByText("0 Gemini · 0 ADK · 0 tools · 0 embeddings · 0 actions")).not.toBeInTheDocument();
   });
 });

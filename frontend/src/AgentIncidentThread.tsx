@@ -17,6 +17,7 @@ type RunState = "idle" | "submitting" | "done" | "failed";
 interface AgentFailure {
   code?: string;
   status?: number;
+  detail?: string;
 }
 
 const stoppedBeforeAiCodes = new Set([
@@ -28,6 +29,11 @@ const stoppedBeforeAiCodes = new Set([
 ]);
 
 const stoppedDuringRunPrefixes = ["MODEL_PROVIDER_", "RAG_"] as const;
+const stoppedDuringRunCodes = new Set([
+  "LIVE_INVESTIGATION_TIMEOUT",
+  "MALFORMED_MODEL_RESPONSE",
+  "INVALID_MODEL_TOOL_ARGUMENTS",
+]);
 
 interface AgentIncidentThreadProps {
   locale: KnowledgeRagLocale;
@@ -133,6 +139,10 @@ const copy = {
     withheldTitle: "Agenten fick inte visa sin slutsats.",
     withheldBody:
       "Java hittade att resultatet inte klarade alla kontroller. Därför visas ingen modelltext som om den vore verifierad.",
+    contractRejectedKicker: "AI-SVARET STOPPADES AV JAVA",
+    contractRejectedTitle: "AI:n svarade. Säkerhetskontraktet sa nej.",
+    contractRejectedBody:
+      "Den verkliga ADK-körningen och bevisläsningen finns kvar i kvittot, men slutsvaret bröt mot det tillåtna formatet. Rå modelltext kastades bort och ingen diagnos släpptes.",
     notRunKicker: "INTE KÖRD",
     notRunTitle: "Ingen AI-utredning utfördes.",
     notRunBody:
@@ -141,10 +151,23 @@ const copy = {
     failedTitle: "Inget verifierat svar kunde visas.",
     failedBody:
       "Backend kunde inte lämna ett godkänt kvitto. Ingen automatisk omkörning gjordes och ingen ofullständig slutsats visas som färdig.",
-    runStoppedTitle: "AI-utredningen startade, men inget svar släpptes.",
+    runStoppedTitle: "Livekörningen stoppades. Inget svar släpptes.",
     runStoppedBody:
-      "Backend stoppade körningen vid ett provider-, timeout- eller retrievalfel. Därför visas ingen modelltext som ett verifierat resultat.",
+      "Ett verkligt provider-, timeout-, retrieval- eller kontraktsfel rapporterades. Backend visar inget ofullständigt svar som färdigt.",
     backendCode: "Backendkod",
+    backendDetail: "Backendens säkra förklaring",
+    failureArea: "Rapporterat felområde",
+    failureProgress: "Vad hann bli klart",
+    failureAnswer: "Svarstatus",
+    failureNotReported: "Inte rapporterat av backend",
+    failureNotReleased: "Inte släppt · ingen automatisk retry, replay eller fallback",
+    areaStartGate: "Kontrollerad startgrind",
+    areaProvider: "Gemini-provider",
+    areaRag: "RAG och kunskapshämtning",
+    areaContract: "Modellens svarskontrakt",
+    areaToolArguments: "Agentens verktygsargument",
+    areaTimeout: "Hela livekörningens timeout",
+    areaTransport: "Okänt transportfel",
     behindKicker: "BAKOM SVARET · RETURNERADE BACKENDHÄNDELSER",
     behindTitle: "Här syns agentens arbete – utan dolda tankar.",
     behindLead:
@@ -187,6 +210,8 @@ const copy = {
     passed: "Godkänd",
     released: "Verifierat svar släppt",
     stopped: "Svar stoppat",
+    notChecked: "Inte körd",
+    showProgress: "Så långt kom körningen",
     controlsTitle: "Kontrollgränsen",
     modelCalls: "Modellanrop",
     adkCalls: "ADK-funktioner",
@@ -244,6 +269,10 @@ const copy = {
     withheldTitle: "The agent was not allowed to show its conclusion.",
     withheldBody:
       "Java found that the result did not pass every check. No model text is therefore presented as verified.",
+    contractRejectedKicker: "AI RESPONSE STOPPED BY JAVA",
+    contractRejectedTitle: "The AI responded. The safety contract said no.",
+    contractRejectedBody:
+      "The real ADK run and evidence reads remain in the receipt, but the final response broke the allowed contract. Raw model text was discarded and no diagnosis was released.",
     notRunKicker: "NOT RUN",
     notRunTitle: "No AI investigation was performed.",
     notRunBody:
@@ -252,10 +281,23 @@ const copy = {
     failedTitle: "No verified answer could be shown.",
     failedBody:
       "The backend could not return an approved receipt. No automatic retry was made, and no incomplete conclusion is presented as finished.",
-    runStoppedTitle: "The AI investigation started, but no answer was released.",
+    runStoppedTitle: "The live run stopped. No answer was released.",
     runStoppedBody:
-      "The backend stopped the run at a provider, timeout or retrieval error. No model text is therefore shown as a verified result.",
+      "A real provider, timeout, retrieval or contract error was reported. The backend does not present an incomplete response as finished.",
     backendCode: "Backend code",
+    backendDetail: "Backend's safe explanation",
+    failureArea: "Reported failure area",
+    failureProgress: "What completed",
+    failureAnswer: "Answer status",
+    failureNotReported: "Not reported by the backend",
+    failureNotReleased: "Not released · no automatic retry, replay or fallback",
+    areaStartGate: "Controlled start gate",
+    areaProvider: "Gemini provider",
+    areaRag: "RAG and knowledge retrieval",
+    areaContract: "Model response contract",
+    areaToolArguments: "Agent tool arguments",
+    areaTimeout: "Whole live-run timeout",
+    areaTransport: "Unknown transport failure",
     behindKicker: "BEHIND THE ANSWER · RETURNED BACKEND EVENTS",
     behindTitle: "See the agent’s work – without hidden thoughts.",
     behindLead:
@@ -298,6 +340,8 @@ const copy = {
     passed: "Passed",
     released: "Verified answer released",
     stopped: "Answer stopped",
+    notChecked: "Not run",
+    showProgress: "How far the run got",
     controlsTitle: "Control boundary",
     modelCalls: "Model calls",
     adkCalls: "ADK functions",
@@ -464,6 +508,7 @@ function BehindTheAnswer({
     .find((metadata) => metadata !== null) ?? null;
   const actualAdk = result.runtime.framework === "google_adk" && result.runtime.runner_invoked;
   const verification = result.verification_event;
+  const contractRejected = verification?.schema_valid === false;
 
   if (blocked) {
     return (
@@ -649,14 +694,18 @@ function BehindTheAnswer({
             <h4>{labels.javaTitle}</h4>
             <div className="agent-check-list">
               {[
-                [labels.schema, verification.schema_valid],
-                [labels.citations, verification.citations_valid],
-                [labels.factual, verification.factual_result_matches_ground_truth],
-              ].map(([label, passed]) => (
-                <span key={String(label)} data-passed={passed}>
-                  <i aria-hidden="true">{passed ? "✓" : "!"}</i>
+                { label: labels.schema, passed: verification.schema_valid, skipped: false },
+                { label: labels.citations, passed: verification.citations_valid, skipped: contractRejected },
+                {
+                  label: labels.factual,
+                  passed: verification.factual_result_matches_ground_truth,
+                  skipped: contractRejected,
+                },
+              ].map(({ label, passed, skipped }) => (
+                <span key={label} data-passed={passed} data-skipped={skipped}>
+                  <i aria-hidden="true">{skipped ? "—" : passed ? "✓" : "!"}</i>
                   {label}
-                  <strong>{passed ? labels.passed : labels.stopped}</strong>
+                  <strong>{skipped ? labels.notChecked : passed ? labels.passed : labels.stopped}</strong>
                 </span>
               ))}
             </div>
@@ -788,7 +837,7 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
       if (error instanceof DOMException && error.name === "AbortError") return;
       setFailure(
         error instanceof IncidentApiError
-          ? { code: error.code, status: error.status }
+          ? { code: error.code, status: error.status, detail: error.message }
           : {},
       );
       setState("failed");
@@ -813,17 +862,37 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
   }
 
   const diagnosis = result?.diagnosis;
-  const completed = result?.outcome === "completed" && diagnosis !== null;
+  const answerReleased = result?.verification_event?.answer_released === true;
+  const completed = result?.outcome === "completed" && diagnosis !== null && answerReleased;
   const blocked = result?.outcome === "blocked_before_ai";
-  const withheld = result?.outcome === "verification_failed";
+  const withheld = result?.outcome === "verification_failed"
+    || (result?.outcome === "completed" && !answerReleased);
+  const contractRejected = withheld && result?.verification_event?.schema_valid === false;
   const stoppedBeforeAi = failure?.code
     ? stoppedBeforeAiCodes.has(failure.code)
     : false;
   const stoppedDuringRun = failure?.code
-    ? stoppedDuringRunPrefixes.some((prefix) => failure.code?.startsWith(prefix))
+    ? stoppedDuringRunCodes.has(failure.code)
+      || stoppedDuringRunPrefixes.some((prefix) => failure.code?.startsWith(prefix))
     : false;
   const failureCode = failure?.code
     ?? (failure?.status ? `HTTP_${failure.status}` : labels.notReported);
+  const failureCodeLine = failure?.status
+    ? `${failureCode} · HTTP ${failure.status}`
+    : failureCode;
+  const failureArea = stoppedBeforeAi
+    ? labels.areaStartGate
+    : failure?.code === "MALFORMED_MODEL_RESPONSE"
+      ? labels.areaContract
+      : failure?.code === "INVALID_MODEL_TOOL_ARGUMENTS"
+        ? labels.areaToolArguments
+        : failure?.code === "LIVE_INVESTIGATION_TIMEOUT"
+          ? labels.areaTimeout
+          : failure?.code?.startsWith("MODEL_PROVIDER_")
+            ? labels.areaProvider
+            : failure?.code?.startsWith("RAG_")
+              ? labels.areaRag
+              : labels.areaTransport;
 
   return (
     <div className="agent-portal" hidden={!active}>
@@ -939,9 +1008,14 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
 
             {withheld && result && (
               <article className="agent-answer agent-answer--withheld">
-                <p className="answer-card__kicker">{labels.withheldKicker}</p>
-                <h3>{labels.withheldTitle}</h3>
-                <p>{labels.withheldBody}</p>
+                <p className="answer-card__kicker">
+                  {contractRejected ? labels.contractRejectedKicker : labels.withheldKicker}
+                </p>
+                <h3>{contractRejected ? labels.contractRejectedTitle : labels.withheldTitle}</h3>
+                <p>{contractRejected ? labels.contractRejectedBody : labels.withheldBody}</p>
+                <p className="agent-run-facts">
+                  {result.receipt.model_calls} {labels.modelCalls.toLowerCase()} · {result.receipt.read_operations} {labels.reads.toLowerCase()} · {result.receipt.embedding_calls} embedding · 0 actions
+                </p>
               </article>
             )}
 
@@ -964,10 +1038,31 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
                       ? labels.runStoppedBody
                       : labels.failedBody}
                 </p>
-                {stoppedBeforeAi && (
-                  <p className="agent-run-facts">0 Gemini · 0 ADK · 0 tools · 0 embeddings · 0 actions</p>
+                <dl className="agent-failure-receipt">
+                  <div>
+                    <dt>{labels.failureArea}</dt>
+                    <dd>{failureArea}</dd>
+                  </div>
+                  <div>
+                    <dt>{labels.failureProgress}</dt>
+                    <dd>
+                      {stoppedBeforeAi
+                        ? "0 Gemini · 0 ADK · 0 tools · 0 embeddings · 0 actions"
+                        : labels.failureNotReported}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{labels.failureAnswer}</dt>
+                    <dd>{labels.failureNotReleased}</dd>
+                  </div>
+                </dl>
+                {failure?.detail && (
+                  <p className="agent-failure-detail">
+                    <strong>{labels.backendDetail}</strong>
+                    {failure.detail}
+                  </p>
                 )}
-                <p className="agent-run-facts">{labels.backendCode}: {failureCode}</p>
+                <p className="agent-run-facts">{labels.backendCode}: {failureCodeLine}</p>
               </article>
             )}
 
@@ -1005,7 +1100,13 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
                   aria-controls="agent-backstage"
                   onClick={() => setDetailsOpen((open) => !open)}
                 >
-                  <span>{detailsOpen ? labels.hideWork : labels.showWork}</span>
+                  <span>
+                    {detailsOpen
+                      ? labels.hideWork
+                      : withheld
+                        ? labels.showProgress
+                        : labels.showWork}
+                  </span>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d={detailsOpen ? "m6 14 6-6 6 6" : "m6 10 6 6 6-6"} /></svg>
                 </button>
                 <button className="agent-reset" type="button" onClick={reset}>{labels.newAlert}</button>
