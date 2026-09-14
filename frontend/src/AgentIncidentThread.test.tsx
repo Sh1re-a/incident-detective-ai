@@ -374,6 +374,19 @@ function jsonResponse(body: unknown): Response {
   return { ok: true, status: 200, json: async () => body } as Response;
 }
 
+function problemResponse(status: number, code: string): Response {
+  return {
+    ok: false,
+    status,
+    json: async () => ({
+      title: "Live AI unavailable",
+      detail: "Sanitised backend detail.",
+      status,
+      code,
+    }),
+  } as Response;
+}
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -444,5 +457,36 @@ describe("Nordly ADK incident thread", () => {
     expect(await screen.findByRole("heading", { name: /säkerhetsgränsen stoppade frågan/i })).toBeVisible();
     expect(screen.getByText("0 Gemini · 0 ADK · 0 tools · 0 embeddings · 0 actions")).toBeVisible();
     expect(screen.queryByText("Google ADK 1.7.0")).not.toBeInTheDocument();
+  });
+
+  it.each(["LIVE_AI_DISABLED", "LIVE_AI_NOT_CONFIGURED"])(
+    "states that no investigation ran when the start gate returns %s",
+    async (code) => {
+      vi.stubGlobal("fetch", vi.fn(async () => problemResponse(503, code)));
+      const user = userEvent.setup();
+      render(<AgentIncidentThread locale="sv" active />);
+
+      await user.click(screen.getByRole("button", { name: "Skicka larmet till agenten" }));
+
+      expect(await screen.findByRole("heading", { name: "Ingen AI-utredning utfördes." })).toBeVisible();
+      expect(screen.getByText(/Google ADK, Gemini, verktyg, RAG\/embeddings och actions startade aldrig/i)).toBeVisible();
+      expect(screen.getByText(`Backendkod: ${code}`)).toBeVisible();
+      expect(screen.getByText("0 Gemini · 0 ADK · 0 tools · 0 embeddings · 0 actions")).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Så byggdes svaret" })).not.toBeInTheDocument();
+    },
+  );
+
+  it("does not claim zero calls when a provider timeout stops an admitted run", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => problemResponse(504, "MODEL_PROVIDER_TIMEOUT")));
+    const user = userEvent.setup();
+    render(<AgentIncidentThread locale="sv" active />);
+
+    await user.click(screen.getByRole("button", { name: "Skicka larmet till agenten" }));
+
+    expect(await screen.findByRole("heading", {
+      name: "AI-utredningen startade, men inget svar släpptes.",
+    })).toBeVisible();
+    expect(screen.getByText("Backendkod: MODEL_PROVIDER_TIMEOUT")).toBeVisible();
+    expect(screen.queryByText("0 Gemini · 0 ADK · 0 tools · 0 embeddings · 0 actions")).not.toBeInTheDocument();
   });
 });

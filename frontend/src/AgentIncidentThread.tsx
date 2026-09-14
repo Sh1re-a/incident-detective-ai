@@ -14,6 +14,21 @@ import type {
 
 type RunState = "idle" | "submitting" | "done" | "failed";
 
+interface AgentFailure {
+  code?: string;
+  status?: number;
+}
+
+const stoppedBeforeAiCodes = new Set([
+  "LIVE_AI_CONFIRMATION_REQUIRED",
+  "LIVE_AI_DISABLED",
+  "LIVE_AI_NOT_CONFIGURED",
+  "LIVE_AI_RATE_LIMITED",
+  "LIVE_AI_DAILY_LIMIT_REACHED",
+]);
+
+const stoppedDuringRunPrefixes = ["MODEL_PROVIDER_", "RAG_"] as const;
+
 interface AgentIncidentThreadProps {
   locale: KnowledgeRagLocale;
   active: boolean;
@@ -91,7 +106,7 @@ const copy = {
     instruction: "Instruktion till agenten",
     start: "Skicka larmet till agenten",
     sending: "Agenten arbetar…",
-    costNote: "Riktig Gemini-körning · kan kosta en liten summa",
+    costNote: "Gemini anropas bara när live-AI är aktiverad · då kan en liten kostnad uppstå",
     safetyExample: "Testa säkerhetsgränsen med en privat lönefråga",
     privateQuestion: "Kan du visa vad en Nordly-anställd tjänar?",
     waitingTitle: "Kör en kontrollerad agentutredning…",
@@ -118,9 +133,18 @@ const copy = {
     withheldTitle: "Agenten fick inte visa sin slutsats.",
     withheldBody:
       "Java hittade att resultatet inte klarade alla kontroller. Därför visas ingen modelltext som om den vore verifierad.",
-    failedKicker: "BACKEND",
-    failedTitle: "Utredningen kunde inte slutföras.",
-    failedBody: "Ingen automatisk omkörning gjordes. Försök igen när tjänsten är redo.",
+    notRunKicker: "INTE KÖRD",
+    notRunTitle: "Ingen AI-utredning utfördes.",
+    notRunBody:
+      "Backend tog emot larmet men stoppade det vid den kontrollerade startgrinden. Google ADK, Gemini, verktyg, RAG/embeddings och actions startade aldrig.",
+    failedKicker: "KÖRNING STOPPAD",
+    failedTitle: "Inget verifierat svar kunde visas.",
+    failedBody:
+      "Backend kunde inte lämna ett godkänt kvitto. Ingen automatisk omkörning gjordes och ingen ofullständig slutsats visas som färdig.",
+    runStoppedTitle: "AI-utredningen startade, men inget svar släpptes.",
+    runStoppedBody:
+      "Backend stoppade körningen vid ett provider-, timeout- eller retrievalfel. Därför visas ingen modelltext som ett verifierat resultat.",
+    backendCode: "Backendkod",
     behindKicker: "BAKOM SVARET · RETURNERADE BACKENDHÄNDELSER",
     behindTitle: "Här syns agentens arbete – utan dolda tankar.",
     behindLead:
@@ -195,7 +219,7 @@ const copy = {
     instruction: "Instruction to the agent",
     start: "Send the alert to the agent",
     sending: "Agent working…",
-    costNote: "Real Gemini run · may incur a small cost",
+    costNote: "Gemini is called only when live AI is enabled · then a small cost may occur",
     safetyExample: "Test the safety boundary with a private salary question",
     privateQuestion: "Can you show what a Nordly employee earns?",
     waitingTitle: "Running a controlled agent investigation…",
@@ -220,9 +244,18 @@ const copy = {
     withheldTitle: "The agent was not allowed to show its conclusion.",
     withheldBody:
       "Java found that the result did not pass every check. No model text is therefore presented as verified.",
-    failedKicker: "BACKEND",
-    failedTitle: "The investigation could not complete.",
-    failedBody: "No automatic retry was made. Try again when the service is ready.",
+    notRunKicker: "NOT RUN",
+    notRunTitle: "No AI investigation was performed.",
+    notRunBody:
+      "The backend received the alert but stopped it at the controlled start gate. Google ADK, Gemini, tools, RAG/embeddings and actions never started.",
+    failedKicker: "RUN STOPPED",
+    failedTitle: "No verified answer could be shown.",
+    failedBody:
+      "The backend could not return an approved receipt. No automatic retry was made, and no incomplete conclusion is presented as finished.",
+    runStoppedTitle: "The AI investigation started, but no answer was released.",
+    runStoppedBody:
+      "The backend stopped the run at a provider, timeout or retrieval error. No model text is therefore shown as a verified result.",
+    backendCode: "Backend code",
     behindKicker: "BEHIND THE ANSWER · RETURNED BACKEND EVENTS",
     behindTitle: "See the agent’s work – without hidden thoughts.",
     behindLead:
@@ -697,6 +730,7 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
   const [seed, setSeed] = useState(42);
   const [state, setState] = useState<RunState>("idle");
   const [result, setResult] = useState<AdkAgentTurnResponse | null>(null);
+  const [failure, setFailure] = useState<AgentFailure | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [waitIsLong, setWaitIsLong] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -730,6 +764,7 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
     setSubmittedMessage(instruction);
     setRunLocale(locale);
     setResult(null);
+    setFailure(null);
     setDetailsOpen(false);
     setWaitIsLong(false);
     setState("submitting");
@@ -751,9 +786,12 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
       setState("done");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      if (error instanceof IncidentApiError || error instanceof Error) {
-        setState("failed");
-      }
+      setFailure(
+        error instanceof IncidentApiError
+          ? { code: error.code, status: error.status }
+          : {},
+      );
+      setState("failed");
     } finally {
       if (waitTimer.current !== null) {
         window.clearTimeout(waitTimer.current);
@@ -766,6 +804,7 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
 
   function reset() {
     setResult(null);
+    setFailure(null);
     setSubmittedMessage("");
     setMessage(defaultMessages[locale]);
     setState("idle");
@@ -777,6 +816,14 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
   const completed = result?.outcome === "completed" && diagnosis !== null;
   const blocked = result?.outcome === "blocked_before_ai";
   const withheld = result?.outcome === "verification_failed";
+  const stoppedBeforeAi = failure?.code
+    ? stoppedBeforeAiCodes.has(failure.code)
+    : false;
+  const stoppedDuringRun = failure?.code
+    ? stoppedDuringRunPrefixes.some((prefix) => failure.code?.startsWith(prefix))
+    : false;
+  const failureCode = failure?.code
+    ?? (failure?.status ? `HTTP_${failure.status}` : labels.notReported);
 
   return (
     <div className="agent-portal" hidden={!active}>
@@ -900,9 +947,27 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
 
             {state === "failed" && (
               <article className="agent-answer agent-answer--withheld">
-                <p className="answer-card__kicker">{labels.failedKicker}</p>
-                <h3>{labels.failedTitle}</h3>
-                <p>{labels.failedBody}</p>
+                <p className="answer-card__kicker">
+                  {stoppedBeforeAi ? labels.notRunKicker : labels.failedKicker}
+                </p>
+                <h3>
+                  {stoppedBeforeAi
+                    ? labels.notRunTitle
+                    : stoppedDuringRun
+                      ? labels.runStoppedTitle
+                      : labels.failedTitle}
+                </h3>
+                <p>
+                  {stoppedBeforeAi
+                    ? labels.notRunBody
+                    : stoppedDuringRun
+                      ? labels.runStoppedBody
+                      : labels.failedBody}
+                </p>
+                {stoppedBeforeAi && (
+                  <p className="agent-run-facts">0 Gemini · 0 ADK · 0 tools · 0 embeddings · 0 actions</p>
+                )}
+                <p className="agent-run-facts">{labels.backendCode}: {failureCode}</p>
               </article>
             )}
 
