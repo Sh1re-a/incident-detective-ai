@@ -67,6 +67,8 @@ public final class KnowledgeRagSafetyGate {
             "(?:folj inte|do not follow|dont follow).{0,45}"
                     + "(?:tidigare|foregaende|previous|prior).{0,20}"
                     + "(?:regler|instruktioner|rules|instructions|directions)",
+            "(?:bortse fran|ignore|disregard).{0,25}"
+                    + "(?:allt ovan|everything above|all above)",
             "(?:system prompt|systemprompt|developer message|jailbreak|bypass|"
                     + "kringga|override instructions)",
             "(?:anvand|use).{0,35}(?:alla interna dokument|every internal document|"
@@ -86,7 +88,9 @@ public final class KnowledgeRagSafetyGate {
                     + "meddelande|release|system)",
             "(?:cancel|delete|change|update|publish|send|contact|deploy|"
                     + "rollback|roll back)"
-                    + ".{0,30}(?:order|account|customer|data|message|release|system)"
+                    + ".{0,30}(?:order|account|customer|data|message|release|system)",
+            "(?:rollback|roll back|rulla (?:tillbaka|tillbaks))"
+                    + "(?: nu| now| omedelbart)?$"
     );
 
     public Decision evaluate(String question) {
