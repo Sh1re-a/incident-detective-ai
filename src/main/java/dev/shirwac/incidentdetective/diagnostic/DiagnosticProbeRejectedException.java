@@ -27,6 +27,7 @@ public final class DiagnosticProbeRejectedException extends RuntimeException {
     public enum Code {
         INVALID_CASE,
         SCENARIO_MISMATCH,
+        PROBE_MISMATCH,
         CROSS_CASE_EVIDENCE
     }
 }

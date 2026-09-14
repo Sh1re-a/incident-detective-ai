@@ -156,6 +156,103 @@ class DiagnosticProbeServiceTest {
     }
 
     @Test
+    void rejectsHandlerReceiptForAnotherScenario() {
+        GeneratedCase generated = generated(42L, GeneratedEvidenceMode.DIAGNOSTIC);
+        DiagnosticProbeService maliciousService = serviceWithReplacement(
+                new FixedReceiptHandler(new DiagnosticProbeReceipt(
+                        "generated-another-case",
+                        DiagnosticProbeId.SERVICE_HEALTH,
+                        DiagnosticProbeOutcome.OBSERVED,
+                        "Returned a receipt for another case.",
+                        List.of(findingWithEvidence(
+                                generated.investigationData()
+                                        .evidenceInventory().getFirst().evidenceId()
+                        )),
+                        false
+                ))
+        );
+
+        DiagnosticProbeRejectedException exception = assertThrows(
+                DiagnosticProbeRejectedException.class,
+                () -> maliciousService.execute(
+                        generated,
+                        requestFor(generated, DiagnosticProbeId.SERVICE_HEALTH)
+                )
+        );
+
+        assertEquals(
+                DiagnosticProbeRejectedException.Code.SCENARIO_MISMATCH,
+                exception.code()
+        );
+    }
+
+    @Test
+    void rejectsHandlerReceiptForAnotherProbe() {
+        GeneratedCase generated = generated(42L, GeneratedEvidenceMode.DIAGNOSTIC);
+        DiagnosticProbeService maliciousService = serviceWithReplacement(
+                new FixedReceiptHandler(new DiagnosticProbeReceipt(
+                        generated.scenario().scenarioId(),
+                        DiagnosticProbeId.DEPENDENCY_STATUS,
+                        DiagnosticProbeOutcome.OBSERVED,
+                        "Returned a receipt for another probe.",
+                        List.of(findingWithEvidence(
+                                generated.investigationData()
+                                        .evidenceInventory().getFirst().evidenceId()
+                        )),
+                        false
+                ))
+        );
+
+        DiagnosticProbeRejectedException exception = assertThrows(
+                DiagnosticProbeRejectedException.class,
+                () -> maliciousService.execute(
+                        generated,
+                        requestFor(generated, DiagnosticProbeId.SERVICE_HEALTH)
+                )
+        );
+
+        assertEquals(
+                DiagnosticProbeRejectedException.Code.PROBE_MISMATCH,
+                exception.code()
+        );
+    }
+
+    @Test
+    void rejectsHandlerReceiptThatCitesAnotherCasesEvidence() {
+        GeneratedCase generated = generated(42L, GeneratedEvidenceMode.DIAGNOSTIC);
+        GeneratedCase anotherCase = generated(
+                99L,
+                GeneratedEvidenceMode.DIAGNOSTIC
+        );
+        DiagnosticProbeService maliciousService = serviceWithReplacement(
+                new FixedReceiptHandler(new DiagnosticProbeReceipt(
+                        generated.scenario().scenarioId(),
+                        DiagnosticProbeId.SERVICE_HEALTH,
+                        DiagnosticProbeOutcome.OBSERVED,
+                        "Returned evidence from another case.",
+                        List.of(findingWithEvidence(
+                                anotherCase.investigationData()
+                                        .evidenceInventory().getFirst().evidenceId()
+                        )),
+                        false
+                ))
+        );
+
+        DiagnosticProbeRejectedException exception = assertThrows(
+                DiagnosticProbeRejectedException.class,
+                () -> maliciousService.execute(
+                        generated,
+                        requestFor(generated, DiagnosticProbeId.SERVICE_HEALTH)
+                )
+        );
+
+        assertEquals(
+                DiagnosticProbeRejectedException.Code.CROSS_CASE_EVIDENCE,
+                exception.code()
+        );
+    }
+
+    @Test
     void requestExposesNoCommandPathHostOrUrlInputAndRejectsUnknownProbe() {
         assertEquals(
                 List.of("scenarioId", "probeId"),
@@ -220,5 +317,51 @@ class DiagnosticProbeServiceTest {
                 evidenceMode,
                 GeneratedNoiseLevel.LOW
         ));
+    }
+
+    private DiagnosticProbeRequest requestFor(
+            GeneratedCase generated,
+            DiagnosticProbeId probeId
+    ) {
+        return new DiagnosticProbeRequest(
+                generated.scenario().scenarioId(),
+                probeId
+        );
+    }
+
+    private DiagnosticProbeFinding findingWithEvidence(String evidenceId) {
+        return new DiagnosticProbeFinding(
+                "service_health",
+                "payment-adapter",
+                "degraded",
+                "A bounded test finding.",
+                List.of(evidenceId)
+        );
+    }
+
+    private DiagnosticProbeService serviceWithReplacement(
+            DiagnosticProbeHandler replacement
+    ) {
+        return new DiagnosticProbeService(List.of(
+                replacement,
+                new DependencyStatusProbeHandler(),
+                new ReleaseMetadataProbeHandler(),
+                new ConfigFingerprintDiffProbeHandler()
+        ));
+    }
+
+    private record FixedReceiptHandler(
+            DiagnosticProbeReceipt receipt
+    ) implements DiagnosticProbeHandler {
+
+        @Override
+        public DiagnosticProbeId probeId() {
+            return DiagnosticProbeId.SERVICE_HEALTH;
+        }
+
+        @Override
+        public DiagnosticProbeReceipt inspect(InvestigationData data) {
+            return receipt;
+        }
     }
 }

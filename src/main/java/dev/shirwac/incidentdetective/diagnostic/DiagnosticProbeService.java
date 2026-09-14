@@ -7,7 +7,9 @@ import org.springframework.stereotype.Service;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /** Dispatches only allowlisted probes after enforcing request-local isolation. */
 @Service
@@ -97,10 +99,48 @@ public final class DiagnosticProbeService {
         long startedAt = System.nanoTime();
         DiagnosticProbeReceipt receipt = handlers.get(request.probeId())
                 .inspect(data);
+        validateHandlerReceipt(data, request, receipt);
         long durationMs = TimeUnit.NANOSECONDS.toMillis(
                 Math.max(0, System.nanoTime() - startedAt)
         );
         return receipt.withDurationMs(durationMs);
+    }
+
+    private void validateHandlerReceipt(
+            InvestigationData data,
+            DiagnosticProbeRequest request,
+            DiagnosticProbeReceipt receipt
+    ) {
+        if (receipt == null) {
+            throw rejection(
+                    DiagnosticProbeRejectedException.Code.INVALID_CASE,
+                    "The diagnostic handler returned no receipt."
+            );
+        }
+        if (!request.scenarioId().equals(receipt.scenarioId())) {
+            throw rejection(
+                    DiagnosticProbeRejectedException.Code.SCENARIO_MISMATCH,
+                    "The diagnostic receipt does not belong to this generated case."
+            );
+        }
+        if (request.probeId() != receipt.probeId()) {
+            throw rejection(
+                    DiagnosticProbeRejectedException.Code.PROBE_MISMATCH,
+                    "The diagnostic receipt does not match the requested probe."
+            );
+        }
+        Set<String> caseEvidenceIds = data.evidenceInventory().stream()
+                .map(evidence -> evidence.evidenceId())
+                .collect(Collectors.toUnmodifiableSet());
+        boolean containsCrossCaseEvidence = receipt.findings().stream()
+                .flatMap(finding -> finding.evidenceIds().stream())
+                .anyMatch(evidenceId -> !caseEvidenceIds.contains(evidenceId));
+        if (containsCrossCaseEvidence) {
+            throw rejection(
+                    DiagnosticProbeRejectedException.Code.CROSS_CASE_EVIDENCE,
+                    "The diagnostic receipt cites evidence outside this generated case."
+            );
+        }
     }
 
     private DiagnosticProbeRejectedException rejection(
