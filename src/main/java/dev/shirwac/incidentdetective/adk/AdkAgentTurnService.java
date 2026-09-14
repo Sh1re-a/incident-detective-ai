@@ -21,18 +21,23 @@ import dev.shirwac.incidentdetective.generated.GeneratedCaseFactory;
 import dev.shirwac.incidentdetective.generated.GeneratedCaseRequest;
 import dev.shirwac.incidentdetective.investigation.CompletedInvestigationVerification;
 import dev.shirwac.incidentdetective.investigation.GroundTruthInvestigationVerifier;
+import dev.shirwac.incidentdetective.investigation.tools.InvalidToolArgumentsException;
 import dev.shirwac.incidentdetective.investigation.tools.ToolExecution;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
 import dev.shirwac.incidentdetective.live.LiveInvestigationException;
 import dev.shirwac.incidentdetective.live.LiveInvestigationFailure;
 import dev.shirwac.incidentdetective.live.LiveToolEvent;
 import dev.shirwac.incidentdetective.nordly.KnowledgeRagSafetyGate;
+import dev.shirwac.incidentdetective.rag.RunbookEmbeddingException;
+import dev.shirwac.incidentdetective.rag.RunbookIndexNotReadyException;
 import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.genai.errors.ApiException;
 
+import java.io.InterruptedIOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -550,21 +555,42 @@ public final class AdkAgentTurnService {
             if (cause instanceof LiveInvestigationException live) {
                 return live;
             }
+            if (cause instanceof RunbookIndexNotReadyException notReady) {
+                return notReady;
+            }
+            if (cause instanceof RunbookEmbeddingException embedding) {
+                return embedding;
+            }
+            if (cause instanceof DataAccessException database) {
+                return database;
+            }
+            if (cause instanceof InvalidToolArgumentsException invalidTool) {
+                return invalidTool;
+            }
             if (cause instanceof ApiException api) {
                 ModelProviderFailure failure = api.code() == 429
                         ? ModelProviderFailure.RATE_LIMITED
-                        : ModelProviderFailure.UPSTREAM;
+                        : isProviderTimeout(api)
+                                ? ModelProviderFailure.TIMEOUT
+                                : ModelProviderFailure.UPSTREAM;
                 return new ModelProviderException(
                         failure,
                         "Gemini provider request failed during the ADK run",
                         exception
                 );
             }
-            if (cause instanceof java.util.concurrent.TimeoutException
-                    || cause instanceof java.net.http.HttpTimeoutException) {
+            if (isTimeout(cause)) {
                 return new ModelProviderException(
                         ModelProviderFailure.TIMEOUT,
                         "Gemini timed out during the ADK run",
+                        exception
+                );
+            }
+            if (cause instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+                return new ModelProviderException(
+                        ModelProviderFailure.TIMEOUT,
+                        "Google ADK run was interrupted before completion",
                         exception
                 );
             }
@@ -575,6 +601,29 @@ public final class AdkAgentTurnService {
                 "Google ADK could not complete the bounded run",
                 exception
         );
+    }
+
+    private boolean isTimeout(Throwable cause) {
+        return cause instanceof InterruptedIOException
+                || cause instanceof java.util.concurrent.TimeoutException
+                || cause instanceof java.net.http.HttpTimeoutException;
+    }
+
+    private boolean isProviderTimeout(ApiException api) {
+        return api.code() == 408
+                || api.code() == 504
+                || containsTimeout(api);
+    }
+
+    private boolean containsTimeout(Throwable throwable) {
+        Throwable cause = throwable;
+        while (cause != null) {
+            if (isTimeout(cause)) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private boolean factualResultMatches(

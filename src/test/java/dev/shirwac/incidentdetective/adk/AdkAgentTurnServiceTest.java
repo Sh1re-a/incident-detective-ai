@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.adk;
 
+import com.google.genai.errors.ApiException;
 import com.google.adk.models.BaseLlm;
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
 import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
@@ -26,13 +27,20 @@ import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
 import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
 import dev.shirwac.incidentdetective.investigation.GroundTruthInvestigationVerifier;
 import dev.shirwac.incidentdetective.investigation.InvestigationData;
+import dev.shirwac.incidentdetective.investigation.tools.InvalidToolArgumentsException;
 import dev.shirwac.incidentdetective.investigation.tools.ToolExecution;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
 import dev.shirwac.incidentdetective.nordly.KnowledgeRagSafetyGate;
+import dev.shirwac.incidentdetective.rag.RunbookEmbeddingException;
+import dev.shirwac.incidentdetective.rag.RunbookEmbeddingFailure;
+import dev.shirwac.incidentdetective.rag.RunbookIndexNotReadyException;
+import dev.shirwac.incidentdetective.rag.RunbookIndexStatus;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.InterruptedIOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -42,6 +50,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -165,6 +175,156 @@ class AdkAgentTurnServiceTest {
         verify(cases, times(1)).create(generatedRequest);
         verify(runtime).run(same(generated), eq(MESSAGE), same(model));
         verify(liveRunGuard, times(1)).runConfirmed(eq(true), any());
+    }
+
+    @Test
+    void preservesRunbookIndexFailureForTheRagExceptionHandler() {
+        RunbookIndexNotReadyException failure = new RunbookIndexNotReadyException(
+                new RunbookIndexStatus(2, 2, 4)
+        );
+        stubRuntimeFailure(failure);
+
+        RunbookIndexNotReadyException thrown = assertThrows(
+                RunbookIndexNotReadyException.class,
+                () -> service.runGeneratedCase(
+                        generatedCase("index-not-ready"),
+                        MESSAGE,
+                        true
+                )
+        );
+
+        assertSame(failure, thrown);
+    }
+
+    @Test
+    void preservesEmbeddingFailureForTheRagExceptionHandler() {
+        RunbookEmbeddingException failure = new RunbookEmbeddingException(
+                RunbookEmbeddingFailure.UPSTREAM,
+                "Test-only embedding provider failure"
+        );
+        stubRuntimeFailure(new IllegalStateException("ADK wrapper", failure));
+
+        RunbookEmbeddingException thrown = assertThrows(
+                RunbookEmbeddingException.class,
+                () -> service.runGeneratedCase(
+                        generatedCase("embedding-failure"),
+                        MESSAGE,
+                        true
+                )
+        );
+
+        assertSame(failure, thrown);
+    }
+
+    @Test
+    void preservesDatabaseFailureForTheRagExceptionHandler() {
+        DataAccessResourceFailureException failure =
+                new DataAccessResourceFailureException(
+                        "Test-only pgvector failure"
+                );
+        stubRuntimeFailure(new IllegalStateException("ADK wrapper", failure));
+
+        DataAccessResourceFailureException thrown = assertThrows(
+                DataAccessResourceFailureException.class,
+                () -> service.runGeneratedCase(
+                        generatedCase("database-failure"),
+                        MESSAGE,
+                        true
+                )
+        );
+
+        assertSame(failure, thrown);
+    }
+
+    @Test
+    void preservesInvalidToolArgumentsForTheControlExceptionHandler() {
+        InvalidToolArgumentsException failure = mock(
+                InvalidToolArgumentsException.class
+        );
+        stubRuntimeFailure(new IllegalStateException("ADK wrapper", failure));
+
+        InvalidToolArgumentsException thrown = assertThrows(
+                InvalidToolArgumentsException.class,
+                () -> service.runGeneratedCase(
+                        generatedCase("invalid-tool-arguments"),
+                        MESSAGE,
+                        true
+                )
+        );
+
+        assertSame(failure, thrown);
+    }
+
+    @Test
+    void classifiesInterruptedIoAsTimeoutInsteadOfGenericUpstreamFailure() {
+        stubRuntimeFailure(new IllegalStateException(
+                "ADK wrapper",
+                new InterruptedIOException("Test-only read timeout")
+        ));
+
+        ModelProviderException thrown = assertThrows(
+                ModelProviderException.class,
+                () -> service.runGeneratedCase(
+                        generatedCase("interrupted-io"),
+                        MESSAGE,
+                        true
+                )
+        );
+
+        assertEquals(ModelProviderFailure.TIMEOUT, thrown.failure());
+        assertFalse(Thread.currentThread().isInterrupted());
+    }
+
+    @Test
+    void classifiesGatewayTimeoutStatusAsProviderTimeout() {
+        ApiException failure = mock(ApiException.class);
+        when(failure.code()).thenReturn(504);
+        stubRuntimeFailure(failure);
+
+        ModelProviderException thrown = assertThrows(
+                ModelProviderException.class,
+                () -> service.runGeneratedCase(
+                        generatedCase("provider-timeout"),
+                        MESSAGE,
+                        true
+                )
+        );
+
+        assertEquals(ModelProviderFailure.TIMEOUT, thrown.failure());
+    }
+
+    @Test
+    void restoresInterruptFlagAndClassifiesInterruptedRunAsTimeout() {
+        assertFalse(Thread.currentThread().isInterrupted());
+        stubRuntimeFailure(new IllegalStateException(
+                "ADK wrapper",
+                new InterruptedException("Test-only interruption")
+        ));
+
+        try {
+            ModelProviderException thrown = assertThrows(
+                    ModelProviderException.class,
+                    () -> service.runGeneratedCase(
+                            generatedCase("interrupted-run"),
+                            MESSAGE,
+                            true
+                    )
+            );
+
+            assertEquals(ModelProviderFailure.TIMEOUT, thrown.failure());
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    private void stubRuntimeFailure(RuntimeException failure) {
+        AdkGeminiModelFactory.ModelLease lease = mock(
+                AdkGeminiModelFactory.ModelLease.class
+        );
+        when(lease.model()).thenReturn(model);
+        when(models.create()).thenReturn(lease);
+        when(runtime.run(any(), eq(MESSAGE), eq(model))).thenThrow(failure);
     }
 
     private void stubRejectedRun(GeneratedCase generated) {
