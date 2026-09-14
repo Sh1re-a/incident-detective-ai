@@ -40,6 +40,7 @@ import java.util.Map;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -285,7 +286,7 @@ class AdkAgentTurnApiTest {
     }
 
     @Test
-    void logsOnlySafeMetadataWhenTheDiagnosisResponseIsRejected(
+    void returnsARealReceiptAndLogsOnlySafeMetadataWhenDiagnosisIsRejected(
             CapturedOutput output
     ) throws Exception {
         stubAdmittedRun(validTrajectory(), 2);
@@ -308,16 +309,53 @@ class AdkAgentTurnApiTest {
                         )
                 )
         );
+        when(runtime.projectEvents(any(), eq(false))).thenReturn(List.of(
+                new AdkAgentTurnResponse.RuntimeEvent(
+                        3,
+                        "event-final",
+                        "invocation-42",
+                        AdkAgentRuntime.DIAGNOSIS_AGENT_NAME,
+                        "final_response",
+                        Instant.parse("2026-09-11T10:00:00Z"),
+                        true,
+                        true,
+                        null,
+                        List.of(),
+                        List.of(),
+                        null,
+                        "gemini-test-version"
+                )
+        ));
 
-        mockMvc.perform(post(PATH)
+        String response = mockMvc.perform(post(PATH)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request(
                                 "Undersök larmet med endast read-only verktyg.",
                                 true
                         )))
-                .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.code")
-                        .value("MALFORMED_MODEL_RESPONSE"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contract_version")
+                        .value("nordly-adk-turn-v3"))
+                .andExpect(jsonPath("$.outcome")
+                        .value("verification_failed"))
+                .andExpect(jsonPath("$.diagnosis").value((Object) null))
+                .andExpect(jsonPath("$.verification").value((Object) null))
+                .andExpect(jsonPath("$.comparison").value((Object) null))
+                .andExpect(jsonPath("$.events.length()").value(1))
+                .andExpect(jsonPath("$.events[0].content_withheld").value(true))
+                .andExpect(jsonPath("$.tool_events.length()").value(1))
+                .andExpect(jsonPath("$.verification_event.schema_valid")
+                        .value(false))
+                .andExpect(jsonPath("$.verification_event.answer_released")
+                        .value(false))
+                .andExpect(jsonPath("$.receipt.model_calls").value(2))
+                .andExpect(jsonPath("$.receipt.adk_tool_calls").value(1))
+                .andExpect(jsonPath("$.receipt.read_operations").value(1))
+                .andExpect(jsonPath("$.receipt.embedding_calls").value(0))
+                .andExpect(jsonPath("$.receipt.action_executed").value(false))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
 
         String logs = output.getAll();
         assertTrue(logs.contains("category=BEAN_VALIDATION"));
@@ -326,6 +364,8 @@ class AdkAgentTurnApiTest {
                 "property_paths=[safeNextStep.requiresHumanApproval]"
         ));
         assertFalse(logs.contains(rawModelValue));
+        assertFalse(response.contains(rawModelValue));
+        verify(verifier, never()).verify(any(), any(), any());
     }
 
     private void stubAdmittedRun(

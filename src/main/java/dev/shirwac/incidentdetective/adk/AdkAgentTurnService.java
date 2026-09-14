@@ -151,7 +151,16 @@ public final class AdkAgentTurnService {
                             && finalText.startsWith("{")
                             && finalText.endsWith("}")
             );
-            throw exception;
+            if (exception.failure() != ModelProviderFailure.MALFORMED_RESPONSE) {
+                throw exception;
+            }
+            return rejectedDiagnosisReceipt(
+                    generated,
+                    safety,
+                    run,
+                    trajectory,
+                    startedAt
+            );
         }
         Set<String> seenEvidenceIds = run.toolExecutions().stream()
                 .flatMap(execution -> execution.evidence().stream())
@@ -236,6 +245,87 @@ public final class AdkAgentTurnService {
                         "Events are returned after the synchronous run; this endpoint does not stream hidden reasoning.",
                         "Only the evidence agent has read-only evidence access; neither agent can execute remediation.",
                         "Correctness is checked against this generated case only; it is not a general model-accuracy claim."
+                )
+        );
+    }
+
+    private AdkAgentTurnResponse rejectedDiagnosisReceipt(
+            GeneratedCase generated,
+            KnowledgeRagSafetyGate.Decision safety,
+            AdkAgentRuntime.RunResult run,
+            AdkAgentRuntime.TrajectoryValidation trajectory,
+            Instant startedAt
+    ) {
+        Instant completedAt = clock.instant();
+        long latencyMs = Math.max(
+                0,
+                Duration.between(startedAt, completedAt).toMillis()
+        );
+        List<LiveToolEvent> toolEvents = run.toolExecutions().stream()
+                .map(this::toolEvent)
+                .toList();
+        int embeddingCallCount = embeddingCalls(toolEvents);
+        int providerCallCount = run.modelCallCount() + embeddingCallCount;
+        ModelTokenUsage usage = aggregateUsage(run.events().stream()
+                .map(event -> event.usageMetadata()
+                        .map(runtimeUsage())
+                        .orElse(null))
+                .filter(Objects::nonNull)
+                .toList());
+        ModelCostEstimate cost = costEstimator.estimate(ai.modelId(), usage);
+
+        return new AdkAgentTurnResponse(
+                AdkAgentTurnResponse.CONTRACT_VERSION,
+                UUID.randomUUID().toString(),
+                run.sessionId(),
+                run.turnId(),
+                AdkAgentTurnResponse.MODE,
+                AdkAgentTurnResponse.TRUTH_LABEL,
+                "verification_failed",
+                providerRoute(providerCallCount),
+                generated.scenario(),
+                safety(safety),
+                runtimeProvenance(true),
+                workflowReceipt(trajectory),
+                runtime.projectEvents(run.events(), false),
+                toolEvents,
+                null,
+                null,
+                null,
+                new VerificationEvent(
+                        "deterministic_java_contract_gate",
+                        completedAt,
+                        false,
+                        false,
+                        false,
+                        trajectory.agentSequenceValid(),
+                        trajectory.evidenceHandoffValid(),
+                        trajectory.toolBoundaryValid()
+                                && trajectory.transferBoundaryValid(),
+                        trajectory.finalAuthorValid(),
+                        false,
+                        "Java rejected the model response contract. Citation and factual checks were not run, and no answer was released."
+                ),
+                new ControlReceipt(
+                        run.modelCallCount(),
+                        run.toolInvocationCount(),
+                        toolEvents.size(),
+                        embeddingCallCount,
+                        false,
+                        false,
+                        true,
+                        List.of(AdkAgentRuntime.TOOL_NAME),
+                        usage,
+                        cost.estimatedUsd(),
+                        cost.basis(),
+                        latencyMs
+                ),
+                List.of(
+                        "All incident data is synthetic and request-local.",
+                        "The Google ADK session is in-memory and discarded after this request.",
+                        "The rejected model response is never returned to the client.",
+                        "Citation and factual checks were not run because the Diagnosis contract failed first.",
+                        "Only read-only evidence operations were available; no remediation action was executed."
                 )
         );
     }
