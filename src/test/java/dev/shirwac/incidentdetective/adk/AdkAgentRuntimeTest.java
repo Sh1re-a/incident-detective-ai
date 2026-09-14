@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -205,6 +206,24 @@ class AdkAgentRuntimeTest {
                 runtime.finalText(List.of(diagnosis, evidenceNarrative))
         );
         assertEquals("", runtime.finalText(List.of(evidenceNarrative)));
+    }
+
+    @Test
+    void projectedFinalResponseWithholdsModelTextUnlessReleased() {
+        AdkAgentRuntime runtime = runtime(mock(InvestigationToolExecutor.class));
+        String raw = "DO-NOT-RELEASE-model-output";
+        Event diagnosis = textEvent(AdkAgentRuntime.DIAGNOSIS_AGENT_NAME, raw);
+
+        AdkAgentTurnResponse.RuntimeEvent withheld =
+                runtime.projectEvents(List.of(diagnosis), false).getFirst();
+        assertTrue(withheld.finalResponse());
+        assertTrue(withheld.contentWithheld());
+        assertNull(withheld.text());
+
+        AdkAgentTurnResponse.RuntimeEvent released =
+                runtime.projectEvents(List.of(diagnosis), true).getFirst();
+        assertFalse(released.contentWithheld());
+        assertEquals(raw, released.text());
     }
 
     private AdkAgentRuntime runtime(InvestigationToolExecutor tools) {
