@@ -31,8 +31,9 @@ public final class KnowledgeRagSafetyGate {
             "(?:visa|ge(?: mig)?|hamta|lista|skriv ut|beratta|show|give me|"
                     + "fetch|list|print|tell me|provide)"
                     + ".{0,45}(?:personlig information|personuppgifter|kunddata|"
-                    + "namn|e-post|epost|adress|telefon|personnummer|personal "
-                    + "information|customer data|name|email|address|phone|ssn)",
+                    + "namn|e-post|epost|mejl|mail|adress|telefon|personnummer|"
+                    + "personal information|customer data|name|email|address|"
+                    + "phone|ssn)",
             "(?:vem ar kunden|who is the customer)"
     );
     private static final List<Pattern> SECRET_REQUESTS = patterns(
@@ -54,12 +55,18 @@ public final class KnowledgeRagSafetyGate {
                     + "staff member|person|someone|somebody)",
             "(?:vad|hur mycket|what|how much).{0,25}"
                     + "(?:tjanar|far i lon|earns?|is paid).{0,45}"
-                    + "(?:pa nordly|at nordly|anstalld|medarbetare|employee|staff)"
+                    + "(?:pa nordly|at nordly|anstalld|medarbetare|employee|staff)",
+            "(?:vad|hur mycket|what|how much).{0,45}"
+                    + "(?:tjanar|far|earns?|is paid).{0,45}"
+                    + "(?:vd|ceo|chef|i manaden|per manad|per month)"
     );
     private static final List<Pattern> PROMPT_INJECTIONS = patterns(
             "(?:ignorera|bortse fran|ignore|disregard|forget).{0,45}"
                     + "(?:regler|instruktioner|tidigare|previous|prior|rules|"
                     + "instructions|directions)",
+            "(?:folj inte|do not follow|dont follow).{0,45}"
+                    + "(?:tidigare|foregaende|previous|prior).{0,20}"
+                    + "(?:regler|instruktioner|rules|instructions|directions)",
             "(?:system prompt|systemprompt|developer message|jailbreak|bypass|"
                     + "kringga|override instructions)",
             "(?:anvand|use).{0,35}(?:alla interna dokument|every internal document|"
@@ -74,9 +81,11 @@ public final class KnowledgeRagSafetyGate {
     );
     private static final List<Pattern> WRITE_ACTIONS = patterns(
             "(?:avboka|radera|andra|uppdatera|publicera|skicka|kontakta|"
-                    + "deploya|rulla tillbaka).{0,30}(?:order|konto|kund|data|"
+                    + "deploya|rulla (?:tillbaka|tillbaks)).{0,30}"
+                    + "(?:order|konto|kund|data|"
                     + "meddelande|release|system)",
-            "(?:cancel|delete|change|update|publish|send|contact|deploy|rollback)"
+            "(?:cancel|delete|change|update|publish|send|contact|deploy|"
+                    + "rollback|roll back)"
                     + ".{0,30}(?:order|account|customer|data|message|release|system)"
     );
 
@@ -110,7 +119,8 @@ public final class KnowledgeRagSafetyGate {
                     "The question was stopped before AI because it requests secrets or credentials."
             );
         }
-        if (matches(PROMPT_INJECTIONS, normalized)) {
+        String promptNormalized = normalized.replace('0', 'o');
+        if (matches(PROMPT_INJECTIONS, promptNormalized)) {
             return Decision.block(
                     ReasonCode.PROMPT_INJECTION,
                     "Frågan försöker ändra säkerhetsreglerna och stoppades före AI.",

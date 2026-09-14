@@ -59,8 +59,11 @@ public final class IncidentLabService {
             .thenComparing(LogEvidence::evidenceId);
     private static final Pattern EXPLICIT_REAL_SCOPE = Pattern.compile(
             "\\b(?:produktion(?:ssystem(?:et)?)?|production(?: system)?|prod|"
-                    + "live[- ]?system(?:et)?|verklig(?:a)? miljo|real environment|"
-                    + "(?:riktig|verklig)(?:a)? kund(?:er|erna|ernas)?|real customers?)\\b"
+                    + "live[- ]?(?:system(?:et)?|infrastructure)|"
+                    + "verklig(?:a)? miljo|real environment|"
+                    + "verklig kunddata|skarpt system|riktiga anvandare|"
+                    + "(?:riktig|verklig)(?:a)? kund(?:er|erna|ernas|ers)?|"
+                    + "real customers?)\\b"
     );
 
     private final KnowledgeRagSafetyGate safetyGate;

@@ -35,6 +35,8 @@ import dev.shirwac.incidentdetective.planning.IncidentSeverity;
 import dev.shirwac.incidentdetective.replay.ReplayComparison;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
@@ -105,11 +107,21 @@ class IncidentLabServiceTest {
         verifyNoInteractions(liveAiRunGuard, planner);
     }
 
-    @Test
-    void explicitProductionScopeStopsBeforeGenericSafetyOrProvider() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "Krascha produktionssystemet",
+            "Analysera riktiga kunders data",
+            "Undersök verklig kunddata",
+            "Inspect live infrastructure",
+            "Kör mot skarpt system",
+            "Hämta riktiga användare"
+    })
+    void explicitProductionScopeStopsBeforeGenericSafetyOrProvider(
+            String instruction
+    ) {
         IncidentLabPlanResponse response = service.createPlan(
                 new IncidentLabPlanRequest(
-                        "Krascha produktionssystemet",
+                        instruction,
                         true
                 )
         );
