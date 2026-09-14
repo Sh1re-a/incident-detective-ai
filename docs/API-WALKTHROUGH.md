@@ -199,9 +199,17 @@ De måste hållas isär. En modell kan gissa rätt rotorsak men använda dåliga
 ### Två statusnivåer som inte ska blandas ihop
 
 - `diagnosis.status = insufficient_evidence` betyder att modellen ärligt avstod. Körningen kan fortfarande vara tekniskt `completed`.
-- `run.status = verification_failed` betyder att en strukturerad diagnos kom tillbaka men att den deterministiska kontrollen hittade ett hårt fel, till exempel ett påhittat evidence-ID.
+- `run.status = verification_failed` eller ADK-turnens `outcome = verification_failed`
+  betyder att Java inte släppte någon diagnos. Antingen bröt själva
+  `Diagnosis`-payloaden mot kontraktet, eller så hittade den senare
+  deterministiska kontrollen ett hårt fel, till exempel ett påhittat evidence-ID.
 
-Ett `verification_failed`-resultat returneras som HTTP 200 eftersom API-körningen lyckades och verifieringsutfallet är det resultat som ska inspekteras. Providerfel och ogiltiga requests använder däremot 4xx/5xx.
+Ett `verification_failed`-resultat returneras som HTTP 200 eftersom API-körningen
+lyckades och stoppkvittot är resultatet som ska inspekteras. Vid ett tidigt
+Diagnosis-kontraktsfel är `diagnosis`, `verification` och `comparison` null,
+medan events, read-only tool-resultat, kostnad och kontrollkvitto behålls.
+Providerfel före ett komplett kvitto och ogiltiga requests använder däremot
+4xx/5xx.
 
 ## GroundTruth utan överdrift
 

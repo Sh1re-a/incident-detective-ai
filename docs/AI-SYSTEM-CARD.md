@@ -60,7 +60,10 @@ ADK-flödet har två modellsteg och en hård gräns på två modellanrop. `nordl
 ## Säkra felutfall
 
 - `insufficient_evidence` är ett giltigt avstående, inte ett tekniskt fel.
-- `verification_failed` betyder att en strukturerad diagnos underkändes efter modellen.
+- `verification_failed` betyder att Java höll inne modellens slutsats. Det kan
+  ske direkt när `Diagnosis`-kontraktet brister eller senare när schema,
+  citationer, evidensstöd eller syntetiskt facit underkänns. Ett komplett
+  ADK post-run-kvitto behålls, men rå modelltext släpps aldrig.
 - `blocked_before_ai` betyder att Java stoppade input före ADK Runner, Gemini, tools och embeddings; kvittot ska då visa noll anrop och noll actions.
 - Providerfel och timeout visas som explicita fel. Systemet märker aldrig en replay som liveutredning.
 - Rate limit returnerar ett tydligt svar och klienten gör inga automatiska live-retries.

@@ -205,7 +205,9 @@ ordning:
    runbooks.
 2. ADK:s strukturerade `FunctionResponse` lämnas direkt vidare i eventströmmen
    till `nordly_diagnosis_agent`. Den agenten har inga tools och får bara skapa
-   en strukturerad diagnoskandidat från den överlämnade evidensen.
+   en diagnoskandidat från den överlämnade evidensen. Gemini-anropet binds till
+   `application/json` och `diagnosis-schema-v4`; prompttext är inte den enda
+   formatgränsen.
 3. Efter ADK-körningen avgör deterministisk Java-kod om kandidaten får visas.
    Ingen agent kan skriva, genomföra remediation eller godkänna sitt eget svar.
 
@@ -214,7 +216,11 @@ Båda barnen har ett modellsteg och hela körningen har hard cap
 spåret dessutom visar exakt ett ADK-tool-anrop, rätt agentordning, giltig direkt
 evidensöverlämning, tool-fri diagnosagent, rätt slutlig författare samt godkänt
 schema, citationer och faktastöd. Annars är utfallet `verification_failed` och
-`diagnosis` hålls inne.
+`diagnosis` hålls inne. Om sluttexten inte ens klarar `Diagnosis`-kontraktet
+returneras samma inspekterbara HTTP 200-utfall med de verkliga ADK-eventen,
+tool-events och kvittot bevarade. Då är `verification_event.schema_valid = false`
+och `diagnosis`, `verification` samt `comparison` är null; citationer och
+faktastöd kördes inte.
 
 ### Workflow- och kontrollkvitto i v3
 
@@ -646,7 +652,8 @@ Branching ska använda `code`, inte den mänskliga `title` eller `detail`.
 | 429 | `LIVE_AI_RATE_LIMITED` | En annan livekörning pågår eller fem starter har nåtts inom det rullande tiominutersfönstret. Respektera `Retry-After`, men starta inte om automatiskt. |
 | 429 | `LIVE_AI_DAILY_LIMIT_REACHED` | Den konfigurerade livebudgeten på 20 starter per UTC-dygn är slut. `Retry-After` anger sekunder till nästa UTC-dygn; `daily_quota_scope` avgör om räknaren är processlokal eller databasgemensam. |
 | 429 | `MODEL_PROVIDER_RATE_LIMITED` | Provider rate limit; inget pålitligt `Retry-After` utlovas. |
-| 502 | `MODEL_PROVIDER_ERROR` / `MALFORMED_MODEL_RESPONSE` / `INVALID_MODEL_TOOL_ARGUMENTS` | Visa sanerat livefel. |
+| 502 | `MODEL_PROVIDER_ERROR` / `INVALID_MODEL_TOOL_ARGUMENTS` | Visa sanerat livefel. |
+| 502 | `MALFORMED_MODEL_RESPONSE` | Visa sanerat livefel för endpoints som saknar ett komplett post-run-kvitto. Ett färdigkört ADK-turn där bara slutligt `Diagnosis`-kontrakt underkänns returnerar i stället HTTP 200 `verification_failed` med modelltexten dold. |
 | 502 | `RAG_EMBEDDING_PROVIDER_ERROR` / `RAG_EMBEDDING_RESPONSE_INVALID` | Visa sanerat retrievalfel; ingen automatisk fallback. |
 | 503 | `LIVE_AI_DISABLED` / `LIVE_AI_NOT_CONFIGURED` | Inaktivera eller förklara live utan att påverka replay. |
 | 503 | `RAG_EMBEDDING_NOT_CONFIGURED` / `RAG_INDEX_NOT_READY` / `RAG_DATABASE_UNAVAILABLE` | Förklara att aktiv RAG-backend inte kan genomföra retrieval. Märk inte om körningen till fixture-RAG. |
