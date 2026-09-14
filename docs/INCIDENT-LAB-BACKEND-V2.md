@@ -1,6 +1,7 @@
 # Incident Lab Backend v2
 
-Status: implemented locally; 444 tests passed; post-v7 live validation pending
+Status: implemented locally; 443 tests passed and 2 opt-in tests skipped;
+post-v7 live validation pending
 
 Scope: synthetic Nordly incidents, local backend first
 
@@ -16,11 +17,14 @@ Implemented and verified locally:
   diagnosis agent;
 - one bounded ADK function backed by typed log, metric, trace, runbook and
   diagnostic-probe reads;
+- a backend capability contract that exposes the diagnostic-probe allowlist and
+  its case-bound, read-only, no-action semantics;
 - embeddings and pgvector retrieval with explicit receipts;
 - business, developer and action receipts derived from verified backend state;
 - strict Java release control for supported, insufficient and withheld answers;
 - OpenAPI coverage for optional inputs and safe failure responses;
-- the full Maven suite: 444 tests, zero failures.
+- the full Maven suite: 443 passed, zero failures, two opt-in live/eval tests
+  skipped.
 
 Live evidence is intentionally split from test evidence. One pre-v7 run crossed
 Gemini, ADK, embeddings and pgvector and was safely withheld by Java. A later

@@ -1,6 +1,7 @@
 package dev.shirwac.incidentdetective.capabilities;
 
 import dev.shirwac.incidentdetective.ai.GeminiThinkingLevel;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeId;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalBackend;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
 import dev.shirwac.incidentdetective.live.GlobalDailyLiveQuota;
@@ -37,6 +38,8 @@ public record CapabilitiesResponse(
         List<ModeCapability> modes,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         List<ToolCapability> tools,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        DiagnosticProbeCapability diagnosticProbe,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         LiveAiCapability liveAi,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
@@ -150,6 +153,32 @@ public record CapabilitiesResponse(
             )
             boolean readOnly
     ) {
+    }
+
+    public record DiagnosticProbeCapability(
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = "run_diagnostic_probe"
+            )
+            String functionName,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            List<DiagnosticProbeId> allowedProbeIds,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "True because the probe can inspect only the current generated case."
+            )
+            boolean caseBound,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean readOnly,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "Always false. A diagnostic probe never changes backend state."
+            )
+            boolean actionExecuted
+    ) {
+        public DiagnosticProbeCapability {
+            allowedProbeIds = List.copyOf(allowedProbeIds);
+        }
     }
 
     public record LiveAiCapability(

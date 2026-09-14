@@ -282,6 +282,9 @@ Viktiga fält:
   antal godkända dokument/chunks.
 - `modes`: truth label, model-backed-status och bekräftelsekrav per körläge.
 - `tools`: de typade funktioner som finns; alla är read-only.
+- `diagnostic_probe`: namnet på ADK-funktionen, backendens exakta
+  probe-allowlist och bevis på att varje probe är case-bound, read-only och
+  aldrig utför en åtgärd.
 - `live_ai`: separat serveraktivering, lokal request-routing, aktiv
   modell/prompt, thinking level och backendens
   hårda call-/tidsbudgeter.
@@ -330,6 +333,27 @@ autentisering eller providerhälsa. Fältet
 omstart; `rag`-profilens räknare är atomisk och delad via PostgreSQL. API:t
 returnerar inte hur många körningar som återstår. Frontend får inte hitta på en
 remaining-counter eller kalla `process_local` för ett globalt kostnadsskydd.
+
+### Exakt `diagnostic_probe`-capability
+
+```json
+{
+  "function_name": "run_diagnostic_probe",
+  "allowed_probe_ids": [
+    "service_health",
+    "dependency_status",
+    "release_metadata",
+    "config_fingerprint_diff"
+  ],
+  "case_bound": true,
+  "read_only": true,
+  "action_executed": false
+}
+```
+
+Frontend använder detta objekt för att förklara vad agenten får göra. Den ska
+inte bygga en egen lista eller antyda terminalåtkomst, skrivverktyg eller
+automatisk reparation.
 
 ### Aktiv retrieval är inte samma sak som evalbevis
 

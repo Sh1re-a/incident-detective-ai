@@ -7,6 +7,7 @@ import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.Embedding
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ModeCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ToolBudgetCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.VectorIndexCapability;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeId;
 import dev.shirwac.incidentdetective.investigation.tools.RetrieveRunbooksArguments;
 import dev.shirwac.incidentdetective.investigation.tools.RetrieveRunbooksResult;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalBackend;
@@ -113,6 +114,17 @@ class CapabilitiesServiceTest {
         assertTrue(response.tools().stream().allMatch(
                 CapabilitiesResponse.ToolCapability::readOnly
         ));
+        assertEquals(
+                "run_diagnostic_probe",
+                response.diagnosticProbe().functionName()
+        );
+        assertEquals(
+                List.of(DiagnosticProbeId.values()),
+                response.diagnosticProbe().allowedProbeIds()
+        );
+        assertTrue(response.diagnosticProbe().caseBound());
+        assertTrue(response.diagnosticProbe().readOnly());
+        assertFalse(response.diagnosticProbe().actionExecuted());
 
         assertTrue(response.liveAi().enabledByConfiguration());
         assertTrue(response.liveAi().requestRoutingConfigured());

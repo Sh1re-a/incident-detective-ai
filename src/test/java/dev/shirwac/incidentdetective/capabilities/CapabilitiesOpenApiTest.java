@@ -50,6 +50,7 @@ class CapabilitiesOpenApiTest {
                         "knowledge_corpus",
                         "modes",
                         "tools",
+                        "diagnostic_probe",
                         "live_ai",
                         "generated_cases",
                         "retrieval",
@@ -107,6 +108,28 @@ class CapabilitiesOpenApiTest {
                         "search_logs",
                         "get_trace",
                         "retrieve_runbooks"
+                )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.DiagnosticProbeCapability.required"
+                ).value(containsInAnyOrder(
+                        "function_name",
+                        "allowed_probe_ids",
+                        "case_bound",
+                        "read_only",
+                        "action_executed"
+                )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.DiagnosticProbeCapability"
+                                + ".properties.function_name.enum"
+                ).value(contains("run_diagnostic_probe")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.DiagnosticProbeCapability"
+                                + ".properties.allowed_probe_ids.items.enum"
+                ).value(contains(
+                        "service_health",
+                        "dependency_status",
+                        "release_metadata",
+                        "config_fingerprint_diff"
                 )))
                 .andExpect(jsonPath(
                         "$.components.schemas.RetrievalCapability"

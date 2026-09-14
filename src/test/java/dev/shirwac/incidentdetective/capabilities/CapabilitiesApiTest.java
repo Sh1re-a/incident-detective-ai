@@ -91,6 +91,21 @@ class CapabilitiesApiTest {
                         .value(org.hamcrest.Matchers.everyItem(
                                 org.hamcrest.Matchers.is(true)
                         )))
+                .andExpect(jsonPath("$.diagnostic_probe.function_name")
+                        .value("run_diagnostic_probe"))
+                .andExpect(jsonPath("$.diagnostic_probe.allowed_probe_ids")
+                        .value(contains(
+                                "service_health",
+                                "dependency_status",
+                                "release_metadata",
+                                "config_fingerprint_diff"
+                        )))
+                .andExpect(jsonPath("$.diagnostic_probe.case_bound")
+                        .value(true))
+                .andExpect(jsonPath("$.diagnostic_probe.read_only")
+                        .value(true))
+                .andExpect(jsonPath("$.diagnostic_probe.action_executed")
+                        .value(false))
                 .andExpect(jsonPath("$.live_ai.request_routing_configured")
                         .value(true))
                 .andExpect(jsonPath("$.live_ai.explicit_confirmation_required")

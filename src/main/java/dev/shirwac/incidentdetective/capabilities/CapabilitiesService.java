@@ -3,6 +3,7 @@ package dev.shirwac.incidentdetective.capabilities;
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
 import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.DeploymentCapability;
+import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.DiagnosticProbeCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.EmbeddingCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.GeneratedCasesCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.KnowledgeCorpusCapability;
@@ -15,6 +16,7 @@ import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.Retrieval
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ToolBudgetCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.ToolCapability;
 import dev.shirwac.incidentdetective.capabilities.CapabilitiesResponse.VectorIndexCapability;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeId;
 import dev.shirwac.incidentdetective.generated.GeneratedCaseFactory;
 import dev.shirwac.incidentdetective.generated.GeneratedCaseRunResult;
 import dev.shirwac.incidentdetective.generated.GeneratedEvidenceMode;
@@ -80,6 +82,7 @@ public final class CapabilitiesService {
                 knowledgeCorpus(),
                 modes(),
                 tools(),
+                diagnosticProbe(),
                 liveAi(),
                 generatedCases(),
                 retrieval(),
@@ -144,6 +147,16 @@ public final class CapabilitiesService {
         return Arrays.stream(ToolName.values())
                 .map(tool -> new ToolCapability(tool, true))
                 .toList();
+    }
+
+    private DiagnosticProbeCapability diagnosticProbe() {
+        return new DiagnosticProbeCapability(
+                "run_diagnostic_probe",
+                Arrays.stream(DiagnosticProbeId.values()).toList(),
+                true,
+                true,
+                false
+        );
     }
 
     private LiveAiCapability liveAi() {
