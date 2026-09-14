@@ -554,6 +554,7 @@ export interface AdkVerificationEvent {
   executed_at: string;
   schema_valid: boolean;
   citations_valid: boolean;
+  direct_evidence_support_valid: boolean;
   factual_result_matches_ground_truth: boolean;
   agent_sequence_valid: boolean;
   evidence_handoff_valid: boolean;

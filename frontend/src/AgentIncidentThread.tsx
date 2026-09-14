@@ -139,6 +139,11 @@ const copy = {
     withheldTitle: "Agenten fick inte visa sin slutsats.",
     withheldBody:
       "Java hittade att resultatet inte klarade alla kontroller. Därför visas ingen modelltext som om den vore verifierad.",
+    evidenceRejectedKicker: "STOPPAD AV BEVISKONTROLLEN",
+    evidenceRejectedTitle: "Slutsatsen såg rätt ut. Beviskedjan gjorde inte det.",
+    evidenceRejectedGenericTitle: "Beviskedjan höll inte hela vägen.",
+    evidenceRejectedBody:
+      "AI:n använde riktiga källor, men varje påstående fick inte direkt stöd av källan den hänvisade till. Java stoppade därför svaret och ingen ändring gjordes.",
     contractRejectedKicker: "AI-SVARET STOPPADES AV JAVA",
     contractRejectedTitle: "AI:n svarade. Säkerhetskontraktet sa nej.",
     contractRejectedBody:
@@ -194,6 +199,8 @@ const copy = {
     evidenceExplain: "Ett bevisobjekt är en loggrad, ett mätvärde, ett trace eller ett runbook-utdrag.",
     logTitle: "Loggarna som förklarade händelsen",
     cited: "Använd i slutsatsen",
+    citedWithheld: "AI:n hänvisade hit",
+    citedUnsupported: "Hänvisad · otillräckligt stöd",
     readOnlyLog: "Läst · inte citerad",
     ragTitle: "RAG hittade relevant driftkunskap",
     ragBody:
@@ -205,7 +212,8 @@ const copy = {
     source: "Källa",
     javaTitle: "Java avgjorde vad som fick visas",
     schema: "Svarformat",
-    citations: "Källhänvisningar",
+    citations: "Käll-ID:n finns",
+    evidenceSupport: "Källan stödjer påståendet",
     factual: "Match mot syntetiskt facit",
     passed: "Godkänd",
     released: "Verifierat svar släppt",
@@ -269,6 +277,11 @@ const copy = {
     withheldTitle: "The agent was not allowed to show its conclusion.",
     withheldBody:
       "Java found that the result did not pass every check. No model text is therefore presented as verified.",
+    evidenceRejectedKicker: "STOPPED BY THE EVIDENCE CHECK",
+    evidenceRejectedTitle: "The conclusion looked right. The evidence chain did not.",
+    evidenceRejectedGenericTitle: "The evidence chain did not hold all the way through.",
+    evidenceRejectedBody:
+      "The AI used real sources, but not every claim was directly supported by the source it cited. Java therefore stopped the answer and no change was made.",
     contractRejectedKicker: "AI RESPONSE STOPPED BY JAVA",
     contractRejectedTitle: "The AI responded. The safety contract said no.",
     contractRejectedBody:
@@ -324,6 +337,8 @@ const copy = {
     evidenceExplain: "An evidence item is one log line, metric, trace or runbook passage.",
     logTitle: "The logs that explained the event",
     cited: "Used in the conclusion",
+    citedWithheld: "Cited by the AI",
+    citedUnsupported: "Cited · insufficient support",
     readOnlyLog: "Read · not cited",
     ragTitle: "RAG found relevant operational knowledge",
     ragBody:
@@ -335,7 +350,8 @@ const copy = {
     source: "Source",
     javaTitle: "Java decided what could be shown",
     schema: "Answer format",
-    citations: "Citations",
+    citations: "Citation IDs exist",
+    evidenceSupport: "Sources support the claims",
     factual: "Synthetic ground-truth match",
     passed: "Passed",
     released: "Verified answer released",
@@ -492,8 +508,15 @@ function BehindTheAnswer({
 }) {
   const labels = copy[locale];
   const blocked = result.outcome === "blocked_before_ai";
-  const citedEvidenceIds = new Set(
-    result.diagnosis?.claims.flatMap((claim) => claim.evidence_ids) ?? [],
+  const citationSupport = result.verification?.evidence_precision.citation_support ?? [];
+  const citedEvidenceIds = new Set([
+    ...(result.diagnosis?.claims.flatMap((claim) => claim.evidence_ids) ?? []),
+    ...citationSupport.map((citation) => citation.evidence_id),
+  ]);
+  const unsupportedEvidenceIds = new Set(
+    citationSupport
+      .filter((citation) => !citation.supported)
+      .map((citation) => citation.evidence_id),
   );
   const metrics = evidenceByType(result, "metric") as MetricEvidence[];
   const logs = evidenceByType(result, "log") as LogEvidence[];
@@ -509,6 +532,7 @@ function BehindTheAnswer({
   const actualAdk = result.runtime.framework === "google_adk" && result.runtime.runner_invoked;
   const verification = result.verification_event;
   const contractRejected = verification?.schema_valid === false;
+  const supportedCitationCount = citationSupport.filter((citation) => citation.supported).length;
 
   if (blocked) {
     return (
@@ -612,12 +636,25 @@ function BehindTheAnswer({
             <ol className="agent-log-list">
               {logs.map((log) => {
                 const cited = citedEvidenceIds.has(log.evidence_id);
+                const unsupported = unsupportedEvidenceIds.has(log.evidence_id);
                 return (
-                  <li key={log.evidence_id} data-cited={cited}>
+                  <li
+                    key={log.evidence_id}
+                    data-cited={cited}
+                    data-support={unsupported ? "failed" : cited ? "passed" : "unused"}
+                  >
                     <header>
                       <span>{formatDate(log.observed_at, locale)}</span>
                       <strong>{log.content.service}</strong>
-                      <em>{cited ? labels.cited : labels.readOnlyLog}</em>
+                      <em>
+                        {unsupported
+                          ? labels.citedUnsupported
+                          : cited
+                            ? result.diagnosis
+                              ? labels.cited
+                              : labels.citedWithheld
+                            : labels.readOnlyLog}
+                      </em>
                     </header>
                     <p>{log.content.message}</p>
                     <small>{log.source_ref}</small>
@@ -694,18 +731,31 @@ function BehindTheAnswer({
             <h4>{labels.javaTitle}</h4>
             <div className="agent-check-list">
               {[
-                { label: labels.schema, passed: verification.schema_valid, skipped: false },
-                { label: labels.citations, passed: verification.citations_valid, skipped: contractRejected },
+                { label: labels.schema, passed: verification.schema_valid, skipped: false, detail: null },
+                { label: labels.citations, passed: verification.citations_valid, skipped: contractRejected, detail: null },
+                {
+                  label: labels.evidenceSupport,
+                  passed: verification.direct_evidence_support_valid,
+                  skipped: contractRejected,
+                  detail: citationSupport.length > 0
+                    ? `${supportedCitationCount} / ${citationSupport.length}`
+                    : null,
+                },
                 {
                   label: labels.factual,
                   passed: verification.factual_result_matches_ground_truth,
                   skipped: contractRejected,
+                  detail: null,
                 },
-              ].map(({ label, passed, skipped }) => (
+              ].map(({ label, passed, skipped, detail }) => (
                 <span key={label} data-passed={passed} data-skipped={skipped}>
                   <i aria-hidden="true">{skipped ? "—" : passed ? "✓" : "!"}</i>
                   {label}
-                  <strong>{skipped ? labels.notChecked : passed ? labels.passed : labels.stopped}</strong>
+                  <strong>
+                    {skipped
+                      ? labels.notChecked
+                      : `${detail ? `${detail} · ` : ""}${passed ? labels.passed : labels.stopped}`}
+                  </strong>
                 </span>
               ))}
             </div>
@@ -868,6 +918,14 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
   const withheld = result?.outcome === "verification_failed"
     || (result?.outcome === "completed" && !answerReleased);
   const contractRejected = withheld && result?.verification_event?.schema_valid === false;
+  const evidenceSupportFailed = withheld
+    && !contractRejected
+    && result?.verification_event?.citations_valid === true
+    && result?.verification_event?.direct_evidence_support_valid === false;
+  const factualConclusionMatched = result?.verification_event
+    ?.factual_result_matches_ground_truth === true;
+  const evidenceLinks = result?.verification?.evidence_precision.citation_support ?? [];
+  const unsupportedEvidenceLinks = evidenceLinks.filter((link) => !link.supported).length;
   const stoppedBeforeAi = failure?.code
     ? stoppedBeforeAiCodes.has(failure.code)
     : false;
@@ -1009,10 +1067,36 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
             {withheld && result && (
               <article className="agent-answer agent-answer--withheld">
                 <p className="answer-card__kicker">
-                  {contractRejected ? labels.contractRejectedKicker : labels.withheldKicker}
+                  {contractRejected
+                    ? labels.contractRejectedKicker
+                    : evidenceSupportFailed
+                      ? labels.evidenceRejectedKicker
+                      : labels.withheldKicker}
                 </p>
-                <h3>{contractRejected ? labels.contractRejectedTitle : labels.withheldTitle}</h3>
-                <p>{contractRejected ? labels.contractRejectedBody : labels.withheldBody}</p>
+                <h3>
+                  {contractRejected
+                    ? labels.contractRejectedTitle
+                    : evidenceSupportFailed
+                      ? factualConclusionMatched
+                        ? labels.evidenceRejectedTitle
+                        : labels.evidenceRejectedGenericTitle
+                      : labels.withheldTitle}
+                </h3>
+                {evidenceSupportFailed && evidenceLinks.length > 0 ? (
+                  <p>
+                    {locale === "sv"
+                      ? `Alla ${evidenceLinks.length} källhänvisningar pekade på lästa källor. ${evidenceLinks.length - unsupportedEvidenceLinks} av ${evidenceLinks.length} stödde det exakta påståendet; ${unsupportedEvidenceLinks} gjorde det inte. Därför släppte Java inget svar.`
+                      : `All ${evidenceLinks.length} citations pointed to sources the agent had read. ${evidenceLinks.length - unsupportedEvidenceLinks} of ${evidenceLinks.length} supported the exact claim; ${unsupportedEvidenceLinks} did not. Java therefore released no answer.`}
+                  </p>
+                ) : (
+                  <p>
+                    {contractRejected
+                      ? labels.contractRejectedBody
+                      : evidenceSupportFailed
+                        ? labels.evidenceRejectedBody
+                        : labels.withheldBody}
+                  </p>
+                )}
                 <p className="agent-run-facts">
                   {result.receipt.model_calls} {labels.modelCalls.toLowerCase()} · {result.receipt.read_operations} {labels.reads.toLowerCase()} · {result.receipt.embedding_calls} embedding · 0 actions
                 </p>

@@ -294,6 +294,7 @@ const completedResponse = {
     executed_at: "2026-09-01T10:00:04Z",
     schema_valid: true,
     citations_valid: true,
+    direct_evidence_support_valid: true,
     factual_result_matches_ground_truth: true,
     agent_sequence_valid: true,
     evidence_handoff_valid: true,
@@ -382,9 +383,38 @@ const contractRejectedResponse = {
     source: "deterministic_java_contract_gate",
     schema_valid: false,
     citations_valid: false,
+    direct_evidence_support_valid: false,
     factual_result_matches_ground_truth: false,
     answer_released: false,
     summary: "Java rejected the model response contract. Downstream checks were not run.",
+  },
+} satisfies AdkAgentTurnResponse;
+
+const unsupportedEvidenceResponse = {
+  ...(completedResponse as AdkAgentTurnResponse),
+  run_id: "unsupported-evidence-run-1",
+  outcome: "verification_failed",
+  diagnosis: null,
+  verification: {
+    ...completedResponse.verification,
+    evidence_precision: {
+      applicable: true,
+      supported_triples: 0,
+      total_triples: 1,
+      score: 0,
+      citation_support: [{
+        claim_code: "root_cause",
+        claim_value_code: "CATALOG_CACHE_INVALIDATION_FAILURE",
+        evidence_id: citedLogId,
+        supported: false,
+      }],
+    },
+  },
+  verification_event: {
+    ...completedResponse.verification_event,
+    direct_evidence_support_valid: false,
+    answer_released: false,
+    summary: "Java withheld the diagnosis: direct evidence support failed for 1 of 1 claim-to-evidence links.",
   },
 } satisfies AdkAgentTurnResponse;
 
@@ -480,8 +510,27 @@ describe("Nordly ADK incident thread", () => {
     await user.click(screen.getByRole("button", { name: "Så långt kom körningen" }));
     expect(screen.getByText("Google ADK 1.7.0")).toBeVisible();
     expect(screen.getByText("Svarformat")).toBeVisible();
-    expect(screen.getAllByText("Inte körd")).toHaveLength(2);
+    expect(screen.getAllByText("Inte körd")).toHaveLength(3);
     expect(screen.getAllByText("Svar stoppat")).toHaveLength(2);
+  });
+
+  it("explains when real sources do not directly support every AI claim", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(unsupportedEvidenceResponse)));
+    const user = userEvent.setup();
+    render(<AgentIncidentThread locale="sv" active />);
+
+    await user.click(screen.getByRole("button", { name: "Skicka larmet till agenten" }));
+
+    expect(await screen.findByRole("heading", {
+      name: "Slutsatsen såg rätt ut. Beviskedjan gjorde inte det.",
+    })).toBeVisible();
+    expect(screen.getByText(/0 av 1 stödde det exakta påståendet/i)).toBeVisible();
+    expect(screen.queryByText(completedResponse.diagnosis.business_summary)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Så långt kom körningen" }));
+    expect(screen.getByText("Käll-ID:n finns")).toBeVisible();
+    expect(screen.getByText("Källan stödjer påståendet")).toBeVisible();
+    expect(screen.getByText("Hänvisad · otillräckligt stöd")).toBeVisible();
   });
 
   it("shows a truthful zero-use receipt when Java blocks the request before ADK", async () => {

@@ -5355,6 +5355,19 @@ summary:focus-visible {
   color: #a9bdff;
 }
 
+.agent-log-list li[data-support="failed"] {
+  border-color: rgba(245, 167, 76, 0.5);
+  background: linear-gradient(90deg, rgba(185, 105, 20, 0.2), rgba(185, 105, 20, 0.035));
+}
+
+.agent-log-list li[data-support="failed"]::before {
+  background: #f0a34a;
+}
+
+.agent-log-list li[data-support="failed"] header em {
+  color: #ffc375;
+}
+
 .agent-log-list p {
   margin: 9px 0 0;
   color: #f0f2f6;
@@ -5480,7 +5493,7 @@ summary:focus-visible {
 
 .agent-check-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin-top: 22px;
 }
