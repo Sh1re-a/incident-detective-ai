@@ -165,6 +165,47 @@ class GetMetricsToolTest {
     }
 
     @Test
+    void ignoresMislabeledCrossScenarioMetricsInsideTheCatalogBoundary() {
+        InvestigationData original = catalog.findById(
+                "checkout-orders-at-risk-v1"
+        ).orElseThrow();
+        MetricEvidence foreignMetric = new MetricEvidence(
+                "foreign-metric",
+                "checkout-cart-segment-failures-v1",
+                START,
+                "Foreign synthetic metric",
+                "fixture://foreign-metric",
+                new MetricEvidence.MetricContent(
+                        "foreign_metric_name",
+                        1,
+                        "count",
+                        Map.of("service", "CHECKOUT_API")
+                )
+        );
+        GetMetricsTool isolatedTool = new GetMetricsTool(
+                scenarioId -> Optional.of(new InvestigationData(
+                        original.scenario(),
+                        List.of(foreignMetric)
+                )),
+                validator
+        );
+
+        GetMetricsResult result = isolatedTool.execute(
+                original.scenario().scenarioId(),
+                new GetMetricsArguments(
+                        List.of("foreign_metric_name"),
+                        START,
+                        END
+                )
+        );
+
+        assertTrue(result.availableMetricNames().isEmpty());
+        assertEquals(List.of("foreign_metric_name"),
+                result.unknownMetricNames());
+        assertTrue(result.evidence().isEmpty());
+    }
+
+    @Test
     void capsDenseResultsAndReportsTruncation() {
         InvestigationData original = catalog.findById("checkout-orders-at-risk-v1")
                 .orElseThrow();
