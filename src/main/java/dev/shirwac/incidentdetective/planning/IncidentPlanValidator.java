@@ -17,14 +17,14 @@ public final class IncidentPlanValidator {
 
     private static final IncidentSeverity RUNNABLE_SEVERITY =
             IncidentSeverity.HIGH;
-    private static final String RUNNABLE_SUMMARY =
-            "Synthetic PAYMENT_ADAPTER timeout with three HTTP 504 responses.";
     private static final Set<GeneratedIncidentFamily> RUNNABLE_FAMILIES =
-            Set.of(GeneratedIncidentFamily.PAYMENT_TIMEOUT);
-    private static final List<IncidentService> RUNNABLE_PAYMENT_SERVICES =
-            List.of(IncidentService.PAYMENT_ADAPTER);
+            Set.copyOf(EnumSet.allOf(GeneratedIncidentFamily.class));
     private static final Map<GeneratedIncidentFamily, List<IncidentService>>
             FAMILY_SERVICES = familyServices();
+    private static final Map<GeneratedIncidentFamily, IncidentService>
+            CANONICAL_SERVICES = canonicalServices();
+    private static final Map<GeneratedIncidentFamily, String>
+            CANONICAL_SUMMARIES = canonicalSummaries();
 
     public IncidentPlanValidationResult validate(
             IncidentPlanProposal proposal
@@ -76,15 +76,17 @@ public final class IncidentPlanValidator {
             );
         }
 
-        if (!requestedServices.equals(
-                EnumSet.copyOf(RUNNABLE_PAYMENT_SERVICES)
-        )) {
+        IncidentService canonicalService = CANONICAL_SERVICES.get(
+                proposal.incidentFamily()
+        );
+        List<IncidentService> canonicalServices = List.of(canonicalService);
+        if (!requestedServices.equals(EnumSet.of(canonicalService))) {
             adjustments.add(
                     IncidentPlanAdjustmentCode
                             .SERVICES_NARROWED_TO_RUNNABLE_CORE
             );
         }
-        selectedServices = RUNNABLE_PAYMENT_SERVICES;
+        selectedServices = canonicalServices;
 
         IncidentSeverity severity = RUNNABLE_SEVERITY;
         if (proposal.requestedSeverity() != RUNNABLE_SEVERITY) {
@@ -98,7 +100,7 @@ public final class IncidentPlanValidator {
                 proposal.incidentFamily(),
                 severity,
                 selectedServices,
-                RUNNABLE_SUMMARY,
+                CANONICAL_SUMMARIES.get(proposal.incidentFamily()),
                 true,
                 false,
                 true
@@ -162,5 +164,32 @@ public final class IncidentPlanValidator {
             );
         }
         return Map.copyOf(services);
+    }
+
+    private static Map<GeneratedIncidentFamily, IncidentService>
+            canonicalServices() {
+        return Map.of(
+                GeneratedIncidentFamily.PAYMENT_TIMEOUT,
+                IncidentService.PAYMENT_ADAPTER,
+                GeneratedIncidentFamily.CATALOG_CACHE_INVALIDATION,
+                IncidentService.CATALOG_SERVICE,
+                GeneratedIncidentFamily.ORDER_EVENT_BACKLOG,
+                IncidentService.ORDER_EVENT_CONSUMER,
+                GeneratedIncidentFamily.ORDER_IDEMPOTENCY_FAILURE,
+                IncidentService.ORDER_SERVICE
+        );
+    }
+
+    private static Map<GeneratedIncidentFamily, String> canonicalSummaries() {
+        return Map.of(
+                GeneratedIncidentFamily.PAYMENT_TIMEOUT,
+                "Synthetic PAYMENT_ADAPTER timeout with three HTTP 504 responses.",
+                GeneratedIncidentFamily.CATALOG_CACHE_INVALIDATION,
+                "Synthetic CATALOG_SERVICE incident with catalog version divergence.",
+                GeneratedIncidentFamily.ORDER_EVENT_BACKLOG,
+                "Synthetic ORDER_EVENT_CONSUMER incident with elevated consumer lag.",
+                GeneratedIncidentFamily.ORDER_IDEMPOTENCY_FAILURE,
+                "Synthetic ORDER_SERVICE incident with duplicate order creation."
+        );
     }
 }

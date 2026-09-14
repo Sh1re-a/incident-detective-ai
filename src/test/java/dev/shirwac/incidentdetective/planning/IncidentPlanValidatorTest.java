@@ -128,7 +128,7 @@ class IncidentPlanValidatorTest {
     }
 
     @Test
-    void rejectsARecognizedFamilyThatIsNotRunnableInV1() {
+    void approvesEveryRecognizedFamilyWithItsCanonicalService() {
         IncidentPlanValidationResult result = validator.validate(candidate(
                 GeneratedIncidentFamily.ORDER_IDEMPOTENCY_FAILURE,
                 IncidentSeverity.MEDIUM,
@@ -139,10 +139,23 @@ class IncidentPlanValidatorTest {
                 IncidentBlastRadius.SINGLE_SERVICE
         ));
 
-        assertEquals(IncidentPlanDecision.REJECTED, result.decision());
+        assertEquals(IncidentPlanDecision.NARROWED, result.decision());
         assertEquals(
-                IncidentPlanRejectionCode.INCIDENT_FAMILY_NOT_RUNNABLE,
-                result.rejection().code()
+                List.of(IncidentService.ORDER_SERVICE),
+                result.plan().affectedServices()
+        );
+        assertEquals(
+                "Synthetic ORDER_SERVICE incident with duplicate order creation.",
+                result.plan().summary()
+        );
+        assertEquals(
+                List.of(
+                        IncidentPlanAdjustmentCode
+                                .SERVICES_NARROWED_TO_RUNNABLE_CORE,
+                        IncidentPlanAdjustmentCode
+                                .SEVERITY_CANONICALIZED_TO_HIGH
+                ),
+                result.adjustments()
         );
     }
 
@@ -207,8 +220,28 @@ class IncidentPlanValidatorTest {
             assertFalse(validator.allowedServices(family).isEmpty());
         }
         assertEquals(
-                Set.of(GeneratedIncidentFamily.PAYMENT_TIMEOUT),
+                Set.copyOf(EnumSet.allOf(GeneratedIncidentFamily.class)),
                 validator.runnableFamilies()
+        );
+    }
+
+    @Test
+    void eachFamilyUsesAnHonestCanonicalCoreService() {
+        assertCanonicalService(
+                GeneratedIncidentFamily.PAYMENT_TIMEOUT,
+                IncidentService.PAYMENT_ADAPTER
+        );
+        assertCanonicalService(
+                GeneratedIncidentFamily.CATALOG_CACHE_INVALIDATION,
+                IncidentService.CATALOG_SERVICE
+        );
+        assertCanonicalService(
+                GeneratedIncidentFamily.ORDER_EVENT_BACKLOG,
+                IncidentService.ORDER_EVENT_CONSUMER
+        );
+        assertCanonicalService(
+                GeneratedIncidentFamily.ORDER_IDEMPOTENCY_FAILURE,
+                IncidentService.ORDER_SERVICE
         );
     }
 
@@ -259,5 +292,20 @@ class IncidentPlanValidatorTest {
                 services,
                 radius
         );
+    }
+
+    private void assertCanonicalService(
+            GeneratedIncidentFamily family,
+            IncidentService expectedService
+    ) {
+        IncidentPlanValidationResult result = validator.validate(candidate(
+                family,
+                IncidentSeverity.HIGH,
+                List.of(expectedService),
+                IncidentBlastRadius.SINGLE_SERVICE
+        ));
+
+        assertEquals(IncidentPlanDecision.APPROVED, result.decision());
+        assertEquals(List.of(expectedService), result.plan().affectedServices());
     }
 }
