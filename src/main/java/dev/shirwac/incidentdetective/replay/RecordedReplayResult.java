@@ -37,6 +37,12 @@ public record RecordedReplayResult(
         Instant completedAt,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "0")
         long latencyMs,
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                description = "Machine-readable boundary between the current "
+                        + "verification request and the recorded investigation fixture."
+        )
+        ReplayProvenance provenance,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         Scenario scenario,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
@@ -74,5 +80,34 @@ public record RecordedReplayResult(
 ) {
     public RecordedReplayResult {
         toolEvents = List.copyOf(toolEvents);
+    }
+
+    public record ReplayProvenance(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean synthetic,
+            @Schema(
+                    requiredMode = Schema.RequiredMode.REQUIRED,
+                    allowableValues = "versioned_recorded_fixture"
+            )
+            String source,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean investigationExecutedInThisRun,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean toolCallsExecutedInThisRun,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean modelExecutedInThisRun,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean deterministicVerificationExecutedInThisRun
+    ) {
+        public static ReplayProvenance currentVerificationOfFixture() {
+            return new ReplayProvenance(
+                    true,
+                    "versioned_recorded_fixture",
+                    false,
+                    false,
+                    false,
+                    true
+            );
+        }
     }
 }

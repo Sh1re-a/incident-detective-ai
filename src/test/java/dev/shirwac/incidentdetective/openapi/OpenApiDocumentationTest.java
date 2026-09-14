@@ -58,7 +58,16 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.ScenarioCatalogResponse"
                                 + ".properties.scenarios.items['$ref']"
-                ).value("#/components/schemas/Scenario"));
+                ).value("#/components/schemas/Scenario"))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ScenarioCatalogResponse.required"
+                ).value(containsInAnyOrder(
+                        "contract_version",
+                        "synthetic_only",
+                        "source",
+                        "truth_label",
+                        "scenarios"
+                )));
     }
 
     @Test
@@ -111,6 +120,10 @@ class OpenApiDocumentationTest {
                         "$.components.schemas.RecordedReplayResult.properties.tool_events"
                 ).exists())
                 .andExpect(jsonPath(
+                        "$.components.schemas.RecordedReplayResult.properties.provenance"
+                                + "['$ref']"
+                ).value("#/components/schemas/ReplayProvenance"))
+                .andExpect(jsonPath(
                         "$.components.schemas.RecordedReplayResult.properties.model_id"
                 ).exists())
                 .andExpect(jsonPath(
@@ -146,9 +159,19 @@ class OpenApiDocumentationTest {
                 ).value(containsInAnyOrder(
                         "run_id", "scenario_id", "mode", "truth_label", "status",
                         "started_at", "completed_at", "latency_ms", "scenario",
-                        "tool_events", "diagnosis", "verification", "comparison",
+                        "provenance", "tool_events", "diagnosis", "verification", "comparison",
                         "model_id", "prompt_version", "token_usage",
                         "estimated_cost_usd"
+                )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ReplayProvenance.required"
+                ).value(containsInAnyOrder(
+                        "synthetic",
+                        "source",
+                        "investigation_executed_in_this_run",
+                        "tool_calls_executed_in_this_run",
+                        "model_executed_in_this_run",
+                        "deterministic_verification_executed_in_this_run"
                 )))
                 .andExpect(jsonPath(
                         "$.components.schemas.LiveInvestigationResult.required.length()"

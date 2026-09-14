@@ -90,6 +90,8 @@ public final class RecordedReplayService {
                 startedAt,
                 completedAt,
                 Math.max(0, Duration.between(startedAt, completedAt).toMillis()),
+                RecordedReplayResult.ReplayProvenance
+                        .currentVerificationOfFixture(),
                 scenarioPackage.scenario(),
                 toolResults,
                 scenarioPackage.recordedDiagnosis(),
