@@ -1,0 +1,63 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "summary",
+    "incident_family",
+    "requested_severity",
+    "affected_services",
+    "requested_blast_radius"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["candidate", "unsupported"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240
+    },
+    "incident_family": {
+      "type": ["string", "null"],
+      "enum": [
+        "payment_timeout",
+        "catalog_cache_invalidation",
+        "order_event_backlog",
+        "order_idempotency_failure",
+        null
+      ]
+    },
+    "requested_severity": {
+      "type": ["string", "null"],
+      "enum": ["low", "medium", "high", "critical", null]
+    },
+    "affected_services": {
+      "type": "array",
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "storefront",
+          "checkout_api",
+          "payment_adapter",
+          "catalog_service",
+          "order_service",
+          "order_event_consumer",
+          "inventory_service"
+        ]
+      }
+    },
+    "requested_blast_radius": {
+      "type": "string",
+      "enum": [
+        "single_service",
+        "service_chain",
+        "whole_demo_world",
+        "real_environment"
+      ]
+    }
+  }
+}
