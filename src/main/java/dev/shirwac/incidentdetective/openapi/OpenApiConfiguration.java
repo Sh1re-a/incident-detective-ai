@@ -171,7 +171,8 @@ public class OpenApiConfiguration {
                     )
             );
     private static final Map<String, Set<String>> OPTIONAL_PROPERTIES = Map.of(
-            "GeneratedCaseLiveRequest", Set.of("incident_family")
+            "GeneratedCaseLiveRequest", Set.of("incident_family"),
+            "IncidentLabRunRequest", Set.of("seed", "evidence_mode")
     );
 
     @Bean

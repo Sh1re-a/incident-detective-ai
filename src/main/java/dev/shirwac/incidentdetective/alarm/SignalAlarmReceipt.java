@@ -3,6 +3,7 @@ package dev.shirwac.incidentdetective.alarm;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -56,6 +57,7 @@ public record SignalAlarmReceipt(
             double thresholdValue,
             double observedValue,
             String unit,
+            @Schema(nullable = true)
             Long lookbackSeconds
     ) {
 

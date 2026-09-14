@@ -16,7 +16,9 @@ public record IncidentLabRunRequest(
         Long seed,
         @Schema(
                 nullable = true,
-                description = "Optional evidence mode. Omit it for a reproducible automatic selection from the resolved seed."
+                description = "Optional evidence mode. Omit it for a reproducible "
+                        + "automatic selection from the resolved seed; the literal "
+                        + "value 'auto' is not accepted."
         )
         GeneratedEvidenceMode evidenceMode,
         @Schema(

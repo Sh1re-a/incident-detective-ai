@@ -81,10 +81,11 @@ Make `seed` optional at the public Incident Lab boundary.
 
 ### Phase B — honest uncertainty
 
-Expose a bounded evidence selection:
+Expose a bounded evidence selection. Automatic selection is represented by
+omitting `evidence_mode`; the literal string `auto` is not part of the enum:
 
-- `auto`: backend deterministically selects a diagnostic or incomplete variant
-  from the seed;
+- omitted `evidence_mode`: backend deterministically selects a diagnostic or
+  incomplete variant from the seed;
 - `diagnostic`: sufficient causal evidence is present;
 - `insufficient_evidence`: causal evidence is deliberately absent.
 
