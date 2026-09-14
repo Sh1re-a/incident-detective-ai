@@ -215,8 +215,9 @@ Båda barnen har ett modellsteg och hela körningen har hard cap
 `model_calls = 2`. Svaret får bara ha `outcome = completed` när det observerade
 spåret dessutom visar exakt ett ADK-tool-anrop, rätt agentordning, giltig direkt
 evidensöverlämning, tool-fri diagnosagent, rätt slutlig författare samt godkänt
-schema, citationer och faktastöd. Annars är utfallet `verification_failed` och
-`diagnosis` hålls inne. Om sluttexten inte ens klarar `Diagnosis`-kontraktet
+schema, giltiga citerade ID:n, direkt stöd mellan påstående och källa samt
+faktastöd. Annars är utfallet `verification_failed` och `diagnosis` hålls inne.
+Om sluttexten inte ens klarar `Diagnosis`-kontraktet
 returneras samma inspekterbara HTTP 200-utfall med de verkliga ADK-eventen,
 tool-events och kvittot bevarade. Då är `verification_event.schema_valid = false`
 och `diagnosis`, `verification` samt `comparison` är null; citationer och
@@ -231,8 +232,11 @@ faktastöd kördes inte.
 - `workflow.final_response_author` ska vara `nordly_diagnosis_agent`.
 - `workflow.completed_in_order` är backendens samlade trajectory-utfall.
 - `verification_event` redovisar separat `agent_sequence_valid`,
-  `evidence_handoff_valid`, `tool_boundary_valid`, `final_author_valid` och
-  `answer_released`.
+  `evidence_handoff_valid`, `tool_boundary_valid`, `final_author_valid`,
+  `citations_valid`, `direct_evidence_support_valid` och `answer_released`.
+  `citations_valid` betyder att de citerade ID:na faktiskt lästes;
+  `direct_evidence_support_valid` betyder att varje källa också stöder det
+  exakta påståendet. De två kontrollerna får inte slås ihop i UI:t.
 - `receipt` redovisar modellanrop, ADK-tool-anrop, underliggande read-only-
   operationer, embeddings, registrerade tools, tokens, listprisestimat och
   latency. `write_tools_available` och `action_executed` ska vara `false`.

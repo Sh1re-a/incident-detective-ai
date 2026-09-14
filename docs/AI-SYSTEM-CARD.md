@@ -64,6 +64,10 @@ ADK-flödet har två modellsteg och en hård gräns på två modellanrop. `nordl
   ske direkt när `Diagnosis`-kontraktet brister eller senare när schema,
   citationer, evidensstöd eller syntetiskt facit underkänns. Ett komplett
   ADK post-run-kvitto behålls, men rå modelltext släpps aldrig.
+- `citations_valid` bevisar bara att citerade ID:n fanns i det lästa paketet.
+  `direct_evidence_support_valid` redovisar separat om varje citerad källa
+  faktiskt stödde påståendet. En riktig körning får stoppas även när modellen
+  gissade rätt slutsats men använde en otillräcklig beviskedja.
 - `blocked_before_ai` betyder att Java stoppade input före ADK Runner, Gemini, tools och embeddings; kvittot ska då visa noll anrop och noll actions.
 - Providerfel och timeout visas som explicita fel. Systemet märker aldrig en replay som liveutredning.
 - Rate limit returnerar ett tydligt svar och klienten gör inga automatiska live-retries.

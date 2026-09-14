@@ -202,7 +202,10 @@ De måste hållas isär. En modell kan gissa rätt rotorsak men använda dåliga
 - `run.status = verification_failed` eller ADK-turnens `outcome = verification_failed`
   betyder att Java inte släppte någon diagnos. Antingen bröt själva
   `Diagnosis`-payloaden mot kontraktet, eller så hittade den senare
-  deterministiska kontrollen ett hårt fel, till exempel ett påhittat evidence-ID.
+  deterministiska kontrollen ett hårt fel. Ett evidence-ID kan vara riktigt och
+  ändå vara fel källa för det påstående som modellen gjorde. Då är
+  `citations_valid = true`, `direct_evidence_support_valid = false` och svaret
+  hålls inne trots att huvuddiagnosen råkade matcha testfacit.
 
 Ett `verification_failed`-resultat returneras som HTTP 200 eftersom API-körningen
 lyckades och stoppkvittot är resultatet som ska inspekteras. Vid ett tidigt
