@@ -7,9 +7,11 @@ import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
 import dev.shirwac.incidentdetective.ai.ModelResponseFailureMetadata;
+import dev.shirwac.incidentdetective.domain.diagnosis.ClaimCode;
 import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
 import dev.shirwac.incidentdetective.domain.diagnosis.SafeNextStep;
+import dev.shirwac.incidentdetective.domain.verification.CitationSupportResult;
 import dev.shirwac.incidentdetective.domain.verification.CitationValidity;
 import dev.shirwac.incidentdetective.domain.verification.ClaimCoverage;
 import dev.shirwac.incidentdetective.domain.verification.DiagnosisCorrectness;
@@ -183,6 +185,8 @@ class AdkAgentTurnApiTest {
                         .value(true))
                 .andExpect(jsonPath("$.verification_event.answer_released")
                         .value(true))
+                .andExpect(jsonPath("$.verification_event.evidence_support_valid")
+                        .value(true))
                 .andExpect(jsonPath("$.receipt.model_calls").value(2))
                 .andExpect(jsonPath("$.receipt.adk_tool_calls").value(1))
                 .andExpect(jsonPath("$.diagnosis").isMap());
@@ -244,6 +248,38 @@ class AdkAgentTurnApiTest {
                 .andExpect(jsonPath("$.receipt.model_calls").value(3))
                 .andExpect(jsonPath("$.verification_event.answer_released")
                         .value(false));
+    }
+
+    @Test
+    void unsupportedClaimEvidenceLinkIsNamedInTheWithheldReceipt()
+            throws Exception {
+        stubAdmittedRun(validTrajectory(), 2);
+        when(verifier.verify(any(), any(), any())).thenReturn(
+                unsupportedEvidenceVerification()
+        );
+
+        mockMvc.perform(post(PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request(
+                                "Undersök larmet med endast read-only verktyg.",
+                                true
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome")
+                        .value("verification_failed"))
+                .andExpect(jsonPath("$.diagnosis").value((Object) null))
+                .andExpect(jsonPath("$.verification_event.schema_valid")
+                        .value(true))
+                .andExpect(jsonPath("$.verification_event.citations_valid")
+                        .value(true))
+                .andExpect(jsonPath("$.verification_event.evidence_support_valid")
+                        .value(false))
+                .andExpect(jsonPath("$.verification_event.factual_result_matches_ground_truth")
+                        .value(true))
+                .andExpect(jsonPath("$.verification_event.answer_released")
+                        .value(false))
+                .andExpect(jsonPath("$.verification_event.summary")
+                        .value("Java withheld the diagnosis: direct evidence support failed for 1 of 1 claim-to-evidence links."));
     }
 
     @Test
@@ -468,6 +504,32 @@ class AdkAgentTurnApiTest {
                 true,
                 new CitationValidity(true, List.of()),
                 EvidencePrecision.notApplicable(),
+                ClaimCoverage.notApplicable(),
+                DiagnosisCorrectness.diagnosis(true, true),
+                List.of()
+        );
+        ReplayComparison comparison = new ReplayComparison(
+                DiagnosisStatus.DIAGNOSED,
+                "CATALOG_CACHE_INVALIDATION_FAILURE",
+                "CATALOG_SERVICE",
+                true,
+                true,
+                false
+        );
+        return new CompletedInvestigationVerification(report, comparison);
+    }
+
+    private CompletedInvestigationVerification unsupportedEvidenceVerification() {
+        VerificationReport report = new VerificationReport(
+                true,
+                true,
+                new CitationValidity(true, List.of()),
+                EvidencePrecision.scored(List.of(new CitationSupportResult(
+                        ClaimCode.ROOT_CAUSE,
+                        "CATALOG_CACHE_INVALIDATION_FAILURE",
+                        "evidence-1",
+                        false
+                ))),
                 ClaimCoverage.notApplicable(),
                 DiagnosisCorrectness.diagnosis(true, true),
                 List.of()

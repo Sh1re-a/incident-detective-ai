@@ -171,6 +171,7 @@ public final class AdkAgentTurnService {
                 candidate,
                 seenEvidenceIds
         );
+        boolean evidenceSupportValid = everyCitationDirectlySupported(checked);
         boolean answerReleased = trajectory.completedInOrder()
                 && trajectory.agentSequenceValid()
                 && trajectory.evidenceHandoffValid()
@@ -181,7 +182,7 @@ public final class AdkAgentTurnService {
                 && run.toolInvocationCount() == 1
                 && !run.toolExecutions().isEmpty()
                 && checked.report().hardErrors().isEmpty()
-                && everyCitationDirectlySupported(checked)
+                && evidenceSupportValid
                 && factualResultMatches(checked);
         Instant completedAt = clock.instant();
         long latencyMs = Math.max(
@@ -223,6 +224,7 @@ public final class AdkAgentTurnService {
                         checked,
                         trajectory,
                         completedAt,
+                        evidenceSupportValid,
                         answerReleased
                 ),
                 new ControlReceipt(
@@ -295,6 +297,7 @@ public final class AdkAgentTurnService {
                 new VerificationEvent(
                         "deterministic_java_contract_gate",
                         completedAt,
+                        false,
                         false,
                         false,
                         false,
@@ -432,13 +435,24 @@ public final class AdkAgentTurnService {
             CompletedInvestigationVerification checked,
             AdkAgentRuntime.TrajectoryValidation trajectory,
             Instant executedAt,
+            boolean evidenceSupportValid,
             boolean answerReleased
     ) {
+        int unsupportedLinks = (int) checked.report()
+                .evidencePrecision()
+                .citationSupport()
+                .stream()
+                .filter(result -> !result.supported())
+                .count();
+        int totalLinks = checked.report()
+                .evidencePrecision()
+                .totalTriples();
         return new VerificationEvent(
                 "deterministic_java_verifier",
                 executedAt,
                 checked.report().diagnosisSchemaPass(),
                 checked.report().citationValidity().valid(),
+                evidenceSupportValid,
                 factualResultMatches(checked),
                 trajectory.agentSequenceValid(),
                 trajectory.evidenceHandoffValid(),
@@ -448,7 +462,10 @@ public final class AdkAgentTurnService {
                 answerReleased,
                 answerReleased
                         ? "Java accepted the agent order, function-response handoff, tool boundary, schema, direct citation support, and factual match against the synthetic case."
-                        : "Java withheld the diagnosis because a workflow or evidence verification rule failed."
+                        : !evidenceSupportValid && totalLinks > 0
+                                ? "Java withheld the diagnosis: direct evidence support failed for %d of %d claim-to-evidence links."
+                                        .formatted(unsupportedLinks, totalLinks)
+                                : "Java withheld the diagnosis because a workflow or evidence verification rule failed."
         );
     }
 
