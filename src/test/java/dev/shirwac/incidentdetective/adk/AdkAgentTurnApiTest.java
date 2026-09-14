@@ -17,6 +17,11 @@ import dev.shirwac.incidentdetective.domain.verification.ClaimCoverage;
 import dev.shirwac.incidentdetective.domain.verification.DiagnosisCorrectness;
 import dev.shirwac.incidentdetective.domain.verification.EvidencePrecision;
 import dev.shirwac.incidentdetective.domain.verification.VerificationReport;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeFinding;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeId;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeOutcome;
+import dev.shirwac.incidentdetective.diagnostic.DiagnosticProbeReceipt;
+import dev.shirwac.incidentdetective.generated.GeneratedCase;
 import dev.shirwac.incidentdetective.investigation.CompletedInvestigationVerification;
 import dev.shirwac.incidentdetective.investigation.GroundTruthInvestigationVerifier;
 import dev.shirwac.incidentdetective.investigation.tools.ToolExecution;
@@ -122,6 +127,8 @@ class AdkAgentTurnApiTest {
                 .andExpect(jsonPath("$.workflow").value((Object) null))
                 .andExpect(jsonPath("$.events.length()").value(0))
                 .andExpect(jsonPath("$.tool_events.length()").value(0))
+                .andExpect(jsonPath("$.diagnostic_probe")
+                        .value((Object) null))
                 .andExpect(jsonPath("$.receipt.model_calls").value(0))
                 .andExpect(jsonPath("$.receipt.adk_tool_calls").value(0))
                 .andExpect(jsonPath("$.receipt.embedding_calls").value(0))
@@ -136,7 +143,7 @@ class AdkAgentTurnApiTest {
     @Test
     void completedTurnPublishesTheObservedSequentialWorkflowReceipt()
             throws Exception {
-        stubAdmittedRun(validTrajectory(), 2);
+        stubAdmittedRun(validTrajectory(), 2, true);
 
         mockMvc.perform(post(PATH)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -187,8 +194,19 @@ class AdkAgentTurnApiTest {
                         .value(true))
                 .andExpect(jsonPath("$.verification_event.direct_evidence_support_valid")
                         .value(true))
+                .andExpect(jsonPath("$.diagnostic_probe.probe_id")
+                        .value("service_health"))
+                .andExpect(jsonPath("$.diagnostic_probe.outcome")
+                        .value("observed"))
+                .andExpect(jsonPath("$.diagnostic_probe.read_only")
+                        .value(true))
+                .andExpect(jsonPath("$.diagnostic_probe.action_executed")
+                        .value(false))
+                .andExpect(jsonPath("$.diagnostic_probe.duration_ms")
+                        .value(7))
                 .andExpect(jsonPath("$.receipt.model_calls").value(2))
                 .andExpect(jsonPath("$.receipt.adk_tool_calls").value(1))
+                .andExpect(jsonPath("$.receipt.read_operations").value(2))
                 .andExpect(jsonPath("$.diagnosis").isMap());
     }
 
@@ -222,6 +240,8 @@ class AdkAgentTurnApiTest {
                 .andExpect(jsonPath("$.outcome")
                         .value("verification_failed"))
                 .andExpect(jsonPath("$.diagnosis").value((Object) null))
+                .andExpect(jsonPath("$.diagnostic_probe")
+                        .value((Object) null))
                 .andExpect(jsonPath("$.workflow.completed_in_order")
                         .value(false))
                 .andExpect(jsonPath("$.verification_event.final_author_valid")
@@ -245,6 +265,8 @@ class AdkAgentTurnApiTest {
                 .andExpect(jsonPath("$.outcome")
                         .value("verification_failed"))
                 .andExpect(jsonPath("$.diagnosis").value((Object) null))
+                .andExpect(jsonPath("$.diagnostic_probe")
+                        .value((Object) null))
                 .andExpect(jsonPath("$.receipt.model_calls").value(3))
                 .andExpect(jsonPath("$.verification_event.answer_released")
                         .value(false));
@@ -268,6 +290,8 @@ class AdkAgentTurnApiTest {
                 .andExpect(jsonPath("$.outcome")
                         .value("verification_failed"))
                 .andExpect(jsonPath("$.diagnosis").value((Object) null))
+                .andExpect(jsonPath("$.diagnostic_probe")
+                        .value((Object) null))
                 .andExpect(jsonPath("$.verification_event.schema_valid")
                         .value(true))
                 .andExpect(jsonPath("$.verification_event.citations_valid")
@@ -375,6 +399,8 @@ class AdkAgentTurnApiTest {
                 .andExpect(jsonPath("$.outcome")
                         .value("verification_failed"))
                 .andExpect(jsonPath("$.diagnosis").value((Object) null))
+                .andExpect(jsonPath("$.diagnostic_probe")
+                        .value((Object) null))
                 .andExpect(jsonPath("$.verification").value((Object) null))
                 .andExpect(jsonPath("$.comparison").value((Object) null))
                 .andExpect(jsonPath("$.events.length()").value(1))
@@ -412,6 +438,14 @@ class AdkAgentTurnApiTest {
             AdkAgentRuntime.TrajectoryValidation trajectory,
             int modelCalls
     ) {
+        stubAdmittedRun(trajectory, modelCalls, false);
+    }
+
+    private void stubAdmittedRun(
+            AdkAgentRuntime.TrajectoryValidation trajectory,
+            int modelCalls,
+            boolean includeDiagnosticProbe
+    ) {
         AdkGeminiModelFactory.ModelLease lease = mock(
                 AdkGeminiModelFactory.ModelLease.class
         );
@@ -436,16 +470,20 @@ class AdkAgentTurnApiTest {
                 null
         );
         List<com.google.adk.events.Event> events = List.of();
-        when(runtime.run(any(), anyString(), any())).thenReturn(
-                new AdkAgentRuntime.RunResult(
+        when(runtime.run(any(), anyString(), any())).thenAnswer(invocation -> {
+            GeneratedCase generated = invocation.getArgument(0);
+            return new AdkAgentRuntime.RunResult(
                         "session-42",
                         "turn-42",
                         events,
                         List.of(execution),
+                        includeDiagnosticProbe
+                                ? diagnosticProbeReceipt(generated)
+                                : null,
                         modelCalls,
                         1
-                )
-        );
+                );
+        });
         when(runtime.validateTrajectory(events)).thenReturn(trajectory);
         when(runtime.finalText(events)).thenReturn("{}");
         when(runtime.projectEvents(events, false)).thenReturn(List.of());
@@ -471,6 +509,30 @@ class AdkAgentTurnApiTest {
                 nullable(dev.shirwac.incidentdetective.replay.ModelTokenUsage.class)
         )).thenReturn(
                 new ModelCostEstimate(null, null, "Not reported by test provider.")
+        );
+    }
+
+    private DiagnosticProbeReceipt diagnosticProbeReceipt(
+            GeneratedCase generated
+    ) {
+        String evidenceId = generated.investigationData()
+                .evidenceInventory().getFirst().evidenceId();
+        return new DiagnosticProbeReceipt(
+                generated.scenario().scenarioId(),
+                DiagnosticProbeId.SERVICE_HEALTH,
+                DiagnosticProbeOutcome.OBSERVED,
+                "Inspected request-local service health signals.",
+                List.of(new DiagnosticProbeFinding(
+                        "service_health",
+                        "CATALOG_SERVICE",
+                        "degraded",
+                        "Observed one bounded failure signal.",
+                        List.of(evidenceId)
+                )),
+                false,
+                7,
+                true,
+                false
         );
     }
 
