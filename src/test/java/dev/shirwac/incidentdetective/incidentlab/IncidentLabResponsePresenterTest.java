@@ -98,6 +98,42 @@ class IncidentLabResponsePresenterTest {
         assertFalse(allText(result).contains(UNTRUSTED_PROSE));
         assertFalse(result.actionReceipt().actionExecuted());
         assertTrue(result.actionReceipt().humanApprovalRequired());
+        assertEquals(
+                result.businessResponse(),
+                result.localizedPresentations().sv().businessResponse()
+        );
+        assertEquals(
+                result.developerResponse(),
+                result.localizedPresentations().sv().developerResponse()
+        );
+        assertEquals(
+                result.actionReceipt(),
+                result.localizedPresentations().sv().actionReceipt()
+        );
+        IncidentLabRunResponse.LocalizedPresentation english =
+                result.localizedPresentations().en();
+        assertEquals(
+                "The root cause is verified in the synthetic case",
+                english.businessResponse().headline()
+        );
+        assertEquals(
+                result.developerResponse().rootCauseCode(),
+                english.developerResponse().rootCauseCode()
+        );
+        assertEquals(
+                result.developerResponse().verifiedClaims(),
+                english.developerResponse().verifiedClaims()
+        );
+        assertEquals(
+                result.developerResponse().highlightedLogEvidenceIds(),
+                english.developerResponse().highlightedLogEvidenceIds()
+        );
+        assertEquals(result.actionReceipt().readOperations(),
+                english.actionReceipt().readOperations());
+        assertEquals(result.actionReceipt().status(),
+                english.actionReceipt().status());
+        assertFalse(english.actionReceipt().actionExecuted());
+        assertTrue(english.actionReceipt().humanApprovalRequired());
         assertNull(sanitized.comparison());
         assertNull(sanitized.diagnosis());
         assertNull(sanitized.events().getFirst().text());
@@ -138,6 +174,14 @@ class IncidentLabResponsePresenterTest {
                 result.developerResponse().missingEvidenceCodes());
         assertTrue(result.businessResponse().headline()
                 .contains("rotorsaken är inte fastställd"));
+        assertTrue(result.localizedPresentations().en()
+                .businessResponse().headline()
+                .contains("root cause is not established"));
+        assertEquals(
+                result.developerResponse().missingEvidenceCodes(),
+                result.localizedPresentations().en()
+                        .developerResponse().missingEvidenceCodes()
+        );
         assertFalse(allText(result).contains(UNTRUSTED_PROSE));
         assertNull(sanitized.diagnosis());
     }
@@ -180,6 +224,18 @@ class IncidentLabResponsePresenterTest {
         assertFalse(allText(result).contains(UNTRUSTED_PROSE));
         assertEquals("not_proposed", result.actionReceipt().status());
         assertNull(result.actionReceipt().proposedNextStep());
+        assertEquals(
+                "Answer withheld after verification",
+                result.localizedPresentations().en()
+                        .businessResponse().headline()
+        );
+        assertEquals(
+                result.developerResponse().failedVerificationChecks(),
+                result.localizedPresentations().en()
+                        .developerResponse().failedVerificationChecks()
+        );
+        assertNull(result.localizedPresentations().en()
+                .actionReceipt().proposedNextStep());
     }
 
     @Test
@@ -222,6 +278,41 @@ class IncidentLabResponsePresenterTest {
         assertNull(sanitized.diagnosis());
         assertNull(sanitized.comparison());
         assertNull(result.developerResponse().rootCauseCode());
+    }
+
+    @Test
+    void noAlarmReturnsCompleteBackendOwnedCopyInBothLanguages() {
+        IncidentLabResponsePresenter.Presentation result = presenter.present(
+                generated.scenario(),
+                logs,
+                null,
+                null
+        );
+
+        assertEquals(
+                IncidentLabRunResponse.AnswerState.NOT_STARTED,
+                result.answerState()
+        );
+        assertEquals(
+                "Ingen utredning startades",
+                result.localizedPresentations().sv()
+                        .businessResponse().headline()
+        );
+        assertEquals(
+                "No investigation was started",
+                result.localizedPresentations().en()
+                        .businessResponse().headline()
+        );
+        assertEquals(
+                result.localizedPresentations().sv()
+                        .developerResponse().verifiedClaims(),
+                result.localizedPresentations().en()
+                        .developerResponse().verifiedClaims()
+        );
+        assertEquals(0, result.localizedPresentations().en()
+                .actionReceipt().readOperations());
+        assertFalse(result.localizedPresentations().en()
+                .actionReceipt().actionExecuted());
     }
 
     @Test
@@ -359,6 +450,7 @@ class IncidentLabResponsePresenterTest {
     private String allText(IncidentLabResponsePresenter.Presentation result) {
         return result.businessResponse().toString()
                 + result.developerResponse()
-                + result.actionReceipt();
+                + result.actionReceipt()
+                + result.localizedPresentations();
     }
 }

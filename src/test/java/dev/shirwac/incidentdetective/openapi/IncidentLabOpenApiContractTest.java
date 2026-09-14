@@ -63,6 +63,13 @@ class IncidentLabOpenApiContractTest {
                                 + "requestBody/content/application~1json/schema/$ref"
                 ).asText()
         );
+        assertEquals(
+                "#/components/schemas/IncidentLabRunResponse",
+                document.at(
+                        "/paths/~1api~1v1~1incident-lab~1runs/post/"
+                                + "responses/200/content/application~1json/schema/$ref"
+                ).asText()
+        );
 
         JsonNode schemas = document.at("/components/schemas");
         JsonNode request = schemas.get("IncidentLabRunRequest");
@@ -105,6 +112,45 @@ class IncidentLabOpenApiContractTest {
         assertTrue(
                 allowsNull(observation.get("properties").get("lookback_seconds")),
                 "lookback_seconds must allow null when a rule has no time window"
+        );
+
+        JsonNode runResponse = schemas.get("IncidentLabRunResponse");
+        assertTrue(
+                textValues(runResponse.get("required"))
+                        .contains("localized_presentations")
+        );
+        assertEquals(
+                "#/components/schemas/LocalizedPresentations",
+                runResponse.get("properties")
+                        .get("localized_presentations")
+                        .get("$ref")
+                        .asText()
+        );
+        assertTrue(
+                runResponse.get("properties")
+                        .get("localized_presentations")
+                        .get("description")
+                        .asText()
+                        .contains("never model translations")
+        );
+
+        JsonNode localized = schemas.get("LocalizedPresentations");
+        assertEquals(Set.of("sv", "en"), textValues(localized.get("required")));
+        assertEquals(
+                "#/components/schemas/LocalizedPresentation",
+                localized.get("properties").get("sv").get("$ref").asText()
+        );
+        assertEquals(
+                "#/components/schemas/LocalizedPresentation",
+                localized.get("properties").get("en").get("$ref").asText()
+        );
+        assertEquals(
+                Set.of(
+                        "business_response",
+                        "developer_response",
+                        "action_receipt"
+                ),
+                textValues(schemas.get("LocalizedPresentation").get("required"))
         );
     }
 

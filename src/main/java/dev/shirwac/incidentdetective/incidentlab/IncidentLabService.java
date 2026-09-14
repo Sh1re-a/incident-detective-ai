@@ -164,6 +164,7 @@ public final class IncidentLabService {
                 presentation.businessResponse(),
                 presentation.developerResponse(),
                 presentation.actionReceipt(),
+                presentation.localizedPresentations(),
                 canonicalPlan,
                 generation.receipt(),
                 generated.scenario(),

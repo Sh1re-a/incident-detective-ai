@@ -186,9 +186,11 @@ class IncidentLabApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(catalogRunRequestJson()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contract_version")
+                        .value("incident-lab-run-v3"))
                 .andExpect(jsonPath("$.answer_state").value("diagnosed"))
                 .andExpect(jsonPath("$.business_response.headline")
-                        .value("Rotorsaken är verifierad"))
+                        .value("Rotorsaken är verifierad i det syntetiska fallet"))
                 .andExpect(jsonPath("$.developer_response.root_cause_code")
                         .value("CATALOG_CACHE_INVALIDATION_FAILURE"))
                 .andExpect(jsonPath("$.action_receipt.write_tools_available")
@@ -197,6 +199,24 @@ class IncidentLabApiTest {
                         .value(false))
                 .andExpect(jsonPath("$.action_receipt.human_approval_required")
                         .value(true))
+                .andExpect(jsonPath(
+                        "$.localized_presentations.sv.business_response.headline"
+                ).value("Rotorsaken är verifierad i det syntetiska fallet"))
+                .andExpect(jsonPath(
+                        "$.localized_presentations.en.business_response.headline"
+                ).value("The root cause is verified in the synthetic case"))
+                .andExpect(jsonPath(
+                        "$.localized_presentations.en.developer_response.root_cause_code"
+                ).value("CATALOG_CACHE_INVALIDATION_FAILURE"))
+                .andExpect(jsonPath(
+                        "$.localized_presentations.en.action_receipt.read_operations"
+                ).value(4))
+                .andExpect(jsonPath(
+                        "$.localized_presentations.en.action_receipt.action_executed"
+                ).value(false))
+                .andExpect(jsonPath(
+                        "$.localized_presentations.en.action_receipt.human_approval_required"
+                ).value(true))
                 .andExpect(jsonPath("$.generation_receipt.generator_version")
                         .value(GeneratedCaseFactory.GENERATOR_VERSION))
                 .andExpect(jsonPath("$.generation_receipt.variant.variant_id")
@@ -228,7 +248,16 @@ class IncidentLabApiTest {
                 .andExpect(jsonPath("$.action_receipt.action_executed")
                         .value(false))
                 .andExpect(jsonPath("$.action_receipt.human_approval_required")
-                        .value(true));
+                        .value(true))
+                .andExpect(jsonPath(
+                        "$.localized_presentations.sv.business_response.headline"
+                ).value("Ingen utredning startades"))
+                .andExpect(jsonPath(
+                        "$.localized_presentations.en.business_response.headline"
+                ).value("No investigation was started"))
+                .andExpect(jsonPath(
+                        "$.localized_presentations.en.action_receipt.read_operations"
+                ).value(0));
     }
 
     @ParameterizedTest
@@ -321,11 +350,16 @@ class IncidentLabApiTest {
                 )),
                 new SafeNextStep("Review the cited configuration.", true)
         );
-        IncidentLabRunResponse.VerifiedClaim verifiedClaim =
-                new IncidentLabRunResponse.VerifiedClaim(
-                        "root_cause",
-                        "CATALOG_CACHE_INVALIDATION_FAILURE",
-                        List.of(evidenceId)
+        AdkAgentTurnResponse rawAgentTurn = completedAgentTurn(
+                generated.scenario(),
+                diagnosis
+        );
+        IncidentLabResponsePresenter.Presentation presentation =
+                new IncidentLabResponsePresenter().present(
+                        generated.scenario(),
+                        logs(generated),
+                        alarm,
+                        rawAgentTurn
                 );
         return new IncidentLabRunResponse(
                 IncidentLabRunResponse.CONTRACT_VERSION,
@@ -333,42 +367,17 @@ class IncidentLabApiTest {
                 IncidentLabRunResponse.DELIVERY,
                 IncidentLabRunResponse.TRUTH_LABEL,
                 IncidentLabRunResponse.AnswerState.DIAGNOSED,
-                new IncidentLabRunResponse.BusinessResponse(
-                        "Rotorsaken är verifierad",
-                        "Ett syntetiskt kataloglarm löste ut.",
-                        "Syntetiska katalogvärden blev inaktuella.",
-                        List.of("Larmet är verifierat."),
-                        List.of("Verklig miljö har inte undersökts."),
-                        "Granska citerat underlag.",
-                        "Verifierad i syntetiskt fall",
-                        true
-                ),
-                new IncidentLabRunResponse.DeveloperResponse(
-                        "Java frisläppte diagnosen.",
-                        "CATALOG_CACHE_INVALIDATION_FAILURE",
-                        "CATALOG_SERVICE",
-                        List.of(verifiedClaim),
-                        List.of(),
-                        List.of(),
-                        List.of(),
-                        "Granska citerat underlag."
-                ),
-                new IncidentLabRunResponse.ActionReceipt(
-                        "proposed_only",
-                        4,
-                        false,
-                        false,
-                        true,
-                        "Granska citerat underlag.",
-                        "Ingen åtgärd kördes."
-                ),
+                presentation.businessResponse(),
+                presentation.developerResponse(),
+                presentation.actionReceipt(),
+                presentation.localizedPresentations(),
                 catalogPlan(),
                 generationReceipt(generated, request),
                 generated.scenario(),
                 logs(generated),
                 alarm,
                 IncidentLabResponsePresenter.sanitizeAgentTurn(
-                        completedAgentTurn(generated.scenario(), diagnosis),
+                        rawAgentTurn,
                         IncidentLabRunResponse.AnswerState.DIAGNOSED
                 ),
                 List.of("Synthetic only.")
@@ -378,41 +387,23 @@ class IncidentLabApiTest {
     private IncidentLabRunResponse noAlarmRunResponse() {
         GeneratedCaseRequest request = generatedRequest();
         GeneratedCase generated = generatedCase(request);
+        IncidentLabResponsePresenter.Presentation presentation =
+                new IncidentLabResponsePresenter().present(
+                        generated.scenario(),
+                        logs(generated),
+                        null,
+                        null
+                );
         return new IncidentLabRunResponse(
                 IncidentLabRunResponse.CONTRACT_VERSION,
                 "no_alarm",
                 IncidentLabRunResponse.DELIVERY,
                 IncidentLabRunResponse.TRUTH_LABEL,
                 IncidentLabRunResponse.AnswerState.NOT_STARTED,
-                new IncidentLabRunResponse.BusinessResponse(
-                        "Ingen utredning startades",
-                        "Ingen larmregel löste ut.",
-                        "Ingen påverkan är bedömd.",
-                        List.of("Scenariot skapades."),
-                        List.of("Rotorsaken har inte utretts."),
-                        "Fortsätt samla syntetisk telemetri.",
-                        "Inte bedömd",
-                        true
-                ),
-                new IncidentLabRunResponse.DeveloperResponse(
-                        "ADK kördes inte.",
-                        null,
-                        null,
-                        List.of(),
-                        List.of(),
-                        List.of(),
-                        List.of(),
-                        "Fortsätt samla syntetisk telemetri."
-                ),
-                new IncidentLabRunResponse.ActionReceipt(
-                        "not_proposed",
-                        0,
-                        false,
-                        false,
-                        true,
-                        null,
-                        "Ingen åtgärd kördes."
-                ),
+                presentation.businessResponse(),
+                presentation.developerResponse(),
+                presentation.actionReceipt(),
+                presentation.localizedPresentations(),
                 catalogPlan(),
                 generationReceipt(generated, request),
                 generated.scenario(),

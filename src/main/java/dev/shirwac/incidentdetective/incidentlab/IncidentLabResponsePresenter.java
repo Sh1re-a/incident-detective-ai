@@ -22,7 +22,7 @@ import java.util.Set;
 
 import static dev.shirwac.incidentdetective.incidentlab.IncidentLabRunResponse.AnswerState;
 
-/** Builds Swedish UI copy only from Java-owned or released structured facts. */
+/** Builds Swedish and English UI copy only from Java-owned verified facts. */
 final class IncidentLabResponsePresenter {
 
     Presentation present(
@@ -35,17 +35,66 @@ final class IncidentLabResponsePresenter {
         backendLogs = backendLogs == null ? List.of() : List.copyOf(backendLogs);
 
         if (alarm == null) {
-            return notStarted(scenario);
+            return localized(notStarted(scenario), notStartedEnglish(scenario));
         }
         requireSafeControlReceipt(agentTurn);
         if (!released(agentTurn, scenario, alarm)) {
-            return withheld(scenario, backendLogs, alarm, agentTurn);
+            return localized(
+                    withheld(scenario, backendLogs, alarm, agentTurn),
+                    withheldEnglish(scenario, backendLogs, alarm, agentTurn)
+            );
         }
 
         Diagnosis diagnosis = agentTurn.diagnosis();
-        return diagnosis.status() == DiagnosisStatus.DIAGNOSED
-                ? diagnosed(scenario, backendLogs, alarm, agentTurn, diagnosis)
-                : insufficient(scenario, backendLogs, alarm, agentTurn, diagnosis);
+        if (diagnosis.status() == DiagnosisStatus.DIAGNOSED) {
+            return localized(
+                    diagnosed(scenario, backendLogs, alarm, agentTurn, diagnosis),
+                    diagnosedEnglish(
+                            scenario,
+                            backendLogs,
+                            alarm,
+                            agentTurn,
+                            diagnosis
+                    )
+            );
+        }
+        return localized(
+                insufficient(scenario, backendLogs, alarm, agentTurn, diagnosis),
+                insufficientEnglish(
+                        scenario,
+                        backendLogs,
+                        alarm,
+                        agentTurn,
+                        diagnosis
+                )
+        );
+    }
+
+    private Presentation localized(Presentation swedish, Presentation english) {
+        if (swedish.answerState() != english.answerState()) {
+            throw new IllegalStateException(
+                    "Localized presentations must share the same answer state"
+            );
+        }
+        IncidentLabRunResponse.LocalizedPresentation sv =
+                new IncidentLabRunResponse.LocalizedPresentation(
+                        swedish.businessResponse(),
+                        swedish.developerResponse(),
+                        swedish.actionReceipt()
+                );
+        IncidentLabRunResponse.LocalizedPresentation en =
+                new IncidentLabRunResponse.LocalizedPresentation(
+                        english.businessResponse(),
+                        english.developerResponse(),
+                        english.actionReceipt()
+                );
+        return new Presentation(
+                swedish.answerState(),
+                swedish.businessResponse(),
+                swedish.developerResponse(),
+                swedish.actionReceipt(),
+                new IncidentLabRunResponse.LocalizedPresentations(sv, en)
+        );
     }
 
     static AdkAgentTurnResponse sanitizeAgentTurn(
@@ -275,6 +324,178 @@ final class IncidentLabResponsePresenter {
         );
     }
 
+    private Presentation diagnosedEnglish(
+            Scenario scenario,
+            List<LogEvidence> backendLogs,
+            SignalAlarmReceipt alarm,
+            AdkAgentTurnResponse agentTurn,
+            Diagnosis diagnosis
+    ) {
+        List<IncidentLabRunResponse.VerifiedClaim> claims = claims(diagnosis);
+        String rootCause = rootCauseEnglish(diagnosis.rootCauseCode());
+        String service = serviceEnglish(diagnosis.affectedService());
+        String nextRead = diagnosedNextReadEnglish(diagnosis.rootCauseCode());
+        String alarmText = alarmTextEnglish(alarm);
+        return new Presentation(
+                AnswerState.DIAGNOSED,
+                new IncidentLabRunResponse.BusinessResponse(
+                        "The root cause is verified in the synthetic case",
+                        alarmText,
+                        impactEnglish(scenario, alarm.incidentFamily()),
+                        List.of(
+                                alarmText,
+                                "Verified cause: " + rootCause + " in "
+                                        + service + "."
+                        ),
+                        List.of(
+                                "Whether the same pattern exists outside the synthetic case has not been investigated."
+                        ),
+                        nextRead,
+                        "Verified in the synthetic case",
+                        true
+                ),
+                new IncidentLabRunResponse.DeveloperResponse(
+                        "Java released the diagnosis after verification. Root-cause code "
+                                + diagnosis.rootCauseCode() + " applies to service "
+                                + diagnosis.affectedService() + ". "
+                                + receiptSummaryEnglish(agentTurn),
+                        diagnosis.rootCauseCode(),
+                        diagnosis.affectedService(),
+                        claims,
+                        highlightedLogs(backendLogs, alarm, claims),
+                        missingEvidenceCodes(diagnosis),
+                        List.of(),
+                        nextRead
+                ),
+                actionReceiptEnglish(agentTurn, "proposed_only", nextRead)
+        );
+    }
+
+    private Presentation insufficientEnglish(
+            Scenario scenario,
+            List<LogEvidence> backendLogs,
+            SignalAlarmReceipt alarm,
+            AdkAgentTurnResponse agentTurn,
+            Diagnosis diagnosis
+    ) {
+        List<IncidentLabRunResponse.VerifiedClaim> claims = claims(diagnosis);
+        List<String> missingCodes = missingEvidenceCodes(diagnosis);
+        List<String> known = new ArrayList<>();
+        known.add(alarmTextEnglish(alarm));
+        diagnosis.claims().stream()
+                .filter(claim -> claim.claimCode() == ClaimCode.OBSERVED_SYMPTOM)
+                .map(claim -> "Observed: "
+                        + symptomEnglish(claim.claimValueCode()) + ".")
+                .distinct()
+                .forEach(known::add);
+        List<String> unknown = new ArrayList<>();
+        unknown.add("The root cause has not been established.");
+        missingCodes.stream()
+                .map(code -> "Missing evidence: "
+                        + missingEvidenceEnglish(code) + ".")
+                .forEach(unknown::add);
+        String nextRead = insufficientNextReadEnglish(missingCodes);
+        return new Presentation(
+                AnswerState.INSUFFICIENT_EVIDENCE,
+                new IncidentLabRunResponse.BusinessResponse(
+                        "Alarm triggered – the root cause is not established",
+                        alarmTextEnglish(alarm),
+                        impactEnglish(scenario, alarm.incidentFamily()),
+                        known,
+                        unknown,
+                        nextRead,
+                        "Limited – the root cause is not established",
+                        true
+                ),
+                new IncidentLabRunResponse.DeveloperResponse(
+                        "Java released only an insufficient-evidence answer. "
+                                + "No root cause or affected service is returned as fact. "
+                                + receiptSummaryEnglish(agentTurn),
+                        null,
+                        null,
+                        claims,
+                        highlightedLogs(backendLogs, alarm, claims),
+                        missingCodes,
+                        List.of(),
+                        nextRead
+                ),
+                actionReceiptEnglish(agentTurn, "proposed_only", nextRead)
+        );
+    }
+
+    private Presentation withheldEnglish(
+            Scenario scenario,
+            List<LogEvidence> backendLogs,
+            SignalAlarmReceipt alarm,
+            AdkAgentTurnResponse agentTurn
+    ) {
+        List<String> failures = failedChecks(agentTurn, scenario, alarm);
+        String nextRead = "Review the verification receipt and the existing "
+                + "read receipts; do not make a change based on this answer.";
+        return new Presentation(
+                AnswerState.WITHHELD,
+                new IncidentLabRunResponse.BusinessResponse(
+                        "Answer withheld after verification",
+                        alarmTextEnglish(alarm),
+                        impactEnglish(scenario, alarm.incidentFamily()),
+                        List.of(
+                                alarmTextEnglish(alarm),
+                                "Java has not released a diagnosis."
+                        ),
+                        List.of(
+                                "The root cause and affected service have not been established."
+                        ),
+                        nextRead,
+                        "No conclusion was released",
+                        true
+                ),
+                new IncidentLabRunResponse.DeveloperResponse(
+                        "The agent answer was not released. Failed or missing checks: "
+                                + String.join(", ", failures) + ". "
+                                + receiptSummaryEnglish(agentTurn),
+                        null,
+                        null,
+                        List.of(),
+                        highlightedLogs(backendLogs, alarm, List.of()),
+                        List.of(),
+                        failures,
+                        nextRead
+                ),
+                actionReceiptEnglish(agentTurn, "not_proposed", null)
+        );
+    }
+
+    private Presentation notStartedEnglish(Scenario scenario) {
+        String nextRead = "Keep collecting synthetic telemetry and start the "
+                + "agent only after a deterministic alarm rule triggers.";
+        return new Presentation(
+                AnswerState.NOT_STARTED,
+                new IncidentLabRunResponse.BusinessResponse(
+                        "No investigation was started",
+                        "No deterministic alarm rule triggered, so no agent was called.",
+                        impactEnglish(scenario, null),
+                        List.of(
+                                "The synthetic scenario was created without a triggered alarm."
+                        ),
+                        List.of("The root cause has not been investigated."),
+                        nextRead,
+                        "Not assessed",
+                        true
+                ),
+                new IncidentLabRunResponse.DeveloperResponse(
+                        "No alarm_receipt exists and ADK did not run.",
+                        null,
+                        null,
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        nextRead
+                ),
+                actionReceiptEnglish(null, "not_proposed", null)
+        );
+    }
+
     private boolean released(
             AdkAgentTurnResponse agentTurn,
             Scenario scenario,
@@ -425,6 +646,29 @@ final class IncidentLabResponsePresenter {
         );
     }
 
+    private IncidentLabRunResponse.ActionReceipt actionReceiptEnglish(
+            AdkAgentTurnResponse agentTurn,
+            String status,
+            String proposedNextStep
+    ) {
+        int reads = agentTurn == null || agentTurn.receipt() == null
+                ? 0
+                : agentTurn.receipt().readOperations();
+        String summary = reads == 0
+                ? "No action was executed. No write tools were available, and every change requires human approval."
+                : "Only " + reads + " read operations were performed. No action "
+                        + "was executed, and every change requires human approval.";
+        return new IncidentLabRunResponse.ActionReceipt(
+                status,
+                reads,
+                false,
+                false,
+                true,
+                proposedNextStep,
+                summary
+        );
+    }
+
     private void requireSafeControlReceipt(AdkAgentTurnResponse agentTurn) {
         if (agentTurn == null) {
             return;
@@ -462,6 +706,18 @@ final class IncidentLabResponsePresenter {
                 + unit(alarm.signal().unit()) + ".";
     }
 
+    private String alarmTextEnglish(SignalAlarmReceipt alarm) {
+        String window = alarm.signal().lookbackSeconds() == null
+                ? ""
+                : " over " + alarm.signal().lookbackSeconds() + " seconds";
+        return "The alarm triggered when " + signalEnglish(alarm.incidentFamily())
+                + " reached " + numberEnglish(alarm.signal().observedValue())
+                + " " + unitEnglish(alarm.signal().unit()) + window
+                + "; the threshold is at least "
+                + numberEnglish(alarm.signal().thresholdValue()) + " "
+                + unitEnglish(alarm.signal().unit()) + ".";
+    }
+
     private String receiptSummary(AdkAgentTurnResponse agentTurn) {
         int tools = agentTurn.toolEvents() == null ? 0 : agentTurn.toolEvents().size();
         String probe = agentTurn.diagnosticProbe() == null
@@ -470,6 +726,16 @@ final class IncidentLabResponsePresenter {
                         + " med utfallet "
                         + agentTurn.diagnosticProbe().outcome().name();
         return "Kvittot visar " + tools + " verktygshändelser och " + probe + ".";
+    }
+
+    private String receiptSummaryEnglish(AdkAgentTurnResponse agentTurn) {
+        int tools = agentTurn.toolEvents() == null ? 0 : agentTurn.toolEvents().size();
+        String probe = agentTurn.diagnosticProbe() == null
+                ? "no diagnostic probe"
+                : "probe " + agentTurn.diagnosticProbe().probeId().name()
+                        + " with outcome "
+                        + agentTurn.diagnosticProbe().outcome().name();
+        return "The receipt records " + tools + " tool events and " + probe + ".";
     }
 
     private String impact(Scenario scenario, GeneratedIncidentFamily family) {
@@ -485,12 +751,36 @@ final class IncidentLabResponsePresenter {
         };
     }
 
+    private String impactEnglish(
+            Scenario scenario,
+            GeneratedIncidentFamily family
+    ) {
+        if (family == null) {
+            return "The synthetic scenario impact remains in the scenario receipt; no cause has been assessed.";
+        }
+        return switch (family) {
+            case PAYMENT_TIMEOUT -> "Payments failed at checkout in the synthetic case.";
+            case CATALOG_CACHE_INVALIDATION -> "Stale prices or inventory values were shown in the synthetic case.";
+            case ORDER_EVENT_BACKLOG -> "Order confirmations and downstream order processing were delayed in the synthetic case.";
+            case ORDER_IDEMPOTENCY_FAILURE -> "Duplicate orders were created after a retry in the synthetic case.";
+        };
+    }
+
     private String signal(GeneratedIncidentFamily family) {
         return switch (family) {
             case PAYMENT_TIMEOUT -> "antalet HTTP 5xx-svar";
             case CATALOG_CACHE_INVALIDATION -> "antalet avvikande katalogversioner";
             case ORDER_EVENT_BACKLOG -> "orderkonsumentens fördröjning";
             case ORDER_IDEMPOTENCY_FAILURE -> "antalet dubbelskapade ordrar";
+        };
+    }
+
+    private String signalEnglish(GeneratedIncidentFamily family) {
+        return switch (family) {
+            case PAYMENT_TIMEOUT -> "the number of HTTP 5xx responses";
+            case CATALOG_CACHE_INVALIDATION -> "the number of divergent catalog versions";
+            case ORDER_EVENT_BACKLOG -> "the order consumer lag";
+            case ORDER_IDEMPOTENCY_FAILURE -> "the number of duplicate orders";
         };
     }
 
@@ -506,6 +796,18 @@ final class IncidentLabResponsePresenter {
         };
     }
 
+    private String rootCauseEnglish(String code) {
+        return switch (code) {
+            case "PAYMENT_TIMEOUT_CONFIG" -> "the payment adapter timeout configuration";
+            case "INVENTORY_SCHEMA_MISMATCH" -> "a schema mismatch in the inventory service";
+            case "CHECKOUT_DB_POOL_EXHAUSTION" -> "an exhausted database connection pool in checkout";
+            case "CATALOG_CACHE_INVALIDATION_FAILURE" -> "a failed catalog cache invalidation";
+            case "ORDER_EVENT_CONSUMER_BACKLOG" -> "a backlog in the order consumer";
+            case "ORDER_IDEMPOTENCY_FAILURE" -> "an order-service idempotency failure";
+            default -> "root-cause code " + code;
+        };
+    }
+
     private String service(String code) {
         return switch (code) {
             case "PAYMENT_ADAPTER" -> "betalningsadaptern";
@@ -515,6 +817,18 @@ final class IncidentLabResponsePresenter {
             case "ORDER_EVENT_CONSUMER" -> "orderkonsumenten";
             case "ORDER_SERVICE" -> "ordertjänsten";
             default -> "tjänsten " + code;
+        };
+    }
+
+    private String serviceEnglish(String code) {
+        return switch (code) {
+            case "PAYMENT_ADAPTER" -> "the payment adapter";
+            case "INVENTORY_SERVICE" -> "the inventory service";
+            case "CHECKOUT_API" -> "the checkout API";
+            case "CATALOG_SERVICE" -> "the catalog service";
+            case "ORDER_EVENT_CONSUMER" -> "the order consumer";
+            case "ORDER_SERVICE" -> "the order service";
+            default -> "service " + code;
         };
     }
 
@@ -530,6 +844,18 @@ final class IncidentLabResponsePresenter {
         };
     }
 
+    private String symptomEnglish(String code) {
+        return switch (code) {
+            case "PAYMENT_LATENCY_SPIKE" -> "a sharp increase in payment latency";
+            case "INVENTORY_CONTRACT_VALIDATION_ERRORS" -> "inventory contract validation errors";
+            case "DATABASE_POOL_WAIT_SPIKE" -> "a sharp increase in database connection-pool wait time";
+            case "CATALOG_VERSION_DIVERGENCE" -> "divergent catalog versions";
+            case "ORDER_CONSUMER_LAG" -> "order consumer lag";
+            case "DUPLICATE_ORDER_CREATION" -> "duplicate order creation";
+            default -> "symptom code " + code;
+        };
+    }
+
     private String missingEvidence(String code) {
         return switch (code) {
             case "PAYMENT_PROVIDER_RESPONSE" -> "betalningsleverantörens svar";
@@ -539,6 +865,18 @@ final class IncidentLabResponsePresenter {
             case "ORDER_CONSUMER_CONFIG_AUDIT" -> "revision av orderkonsumentens konfiguration";
             case "ORDER_IDEMPOTENCY_STORAGE_AUDIT" -> "revision av ordertjänstens idempotenslagring";
             default -> "underlag med kod " + code;
+        };
+    }
+
+    private String missingEvidenceEnglish(String code) {
+        return switch (code) {
+            case "PAYMENT_PROVIDER_RESPONSE" -> "the payment provider response";
+            case "PAYMENT_TIMEOUT_CONFIG_AUDIT" -> "the payment adapter timeout-configuration audit";
+            case "CATALOG_SOURCE_OF_TRUTH_VERSION" -> "the catalog source-of-truth version";
+            case "CATALOG_TAX_CALCULATION_TRACE" -> "the catalog tax-calculation trace";
+            case "ORDER_CONSUMER_CONFIG_AUDIT" -> "the order consumer configuration audit";
+            case "ORDER_IDEMPOTENCY_STORAGE_AUDIT" -> "the order-service idempotency-storage audit";
+            default -> "evidence code " + code;
         };
     }
 
@@ -557,12 +895,30 @@ final class IncidentLabResponsePresenter {
         };
     }
 
+    private String diagnosedNextReadEnglish(String rootCauseCode) {
+        return switch (rootCauseCode) {
+            case "PAYMENT_TIMEOUT_CONFIG" -> "Review the cited timeout-configuration receipt and prepare a separate change plan.";
+            case "CATALOG_CACHE_INVALIDATION_FAILURE" -> "Review the cited cache and version receipts and prepare a separate change plan.";
+            case "ORDER_EVENT_CONSUMER_BACKLOG" -> "Review the cited order-consumer configuration receipt and prepare a separate change plan.";
+            case "ORDER_IDEMPOTENCY_FAILURE" -> "Review the cited idempotency-storage receipt and prepare a separate change plan.";
+            default -> "Review the cited evidence IDs and prepare a separate change plan.";
+        };
+    }
+
     private String insufficientNextRead(List<String> missingCodes) {
         if (missingCodes.isEmpty()) {
             return "Hämta mer skrivskyddat underlag innan en rotorsak bedöms.";
         }
         return "Hämta nästa skrivskyddade kontroll för "
                 + missingEvidence(missingCodes.getFirst()) + ".";
+    }
+
+    private String insufficientNextReadEnglish(List<String> missingCodes) {
+        if (missingCodes.isEmpty()) {
+            return "Collect more read-only evidence before assessing a root cause.";
+        }
+        return "Run the next read-only check for "
+                + missingEvidenceEnglish(missingCodes.getFirst()) + ".";
     }
 
     private String unit(String raw) {
@@ -574,16 +930,38 @@ final class IncidentLabResponsePresenter {
         };
     }
 
+    private String unitEnglish(String raw) {
+        return switch (raw) {
+            case "count" -> "events";
+            case "versions" -> "versions";
+            case "seconds" -> "seconds";
+            default -> raw;
+        };
+    }
+
     private String number(double value) {
         return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
                 .replace('.', ',');
+    }
+
+    private String numberEnglish(double value) {
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
     }
 
     record Presentation(
             AnswerState answerState,
             IncidentLabRunResponse.BusinessResponse businessResponse,
             IncidentLabRunResponse.DeveloperResponse developerResponse,
-            IncidentLabRunResponse.ActionReceipt actionReceipt
+            IncidentLabRunResponse.ActionReceipt actionReceipt,
+            IncidentLabRunResponse.LocalizedPresentations localizedPresentations
     ) {
+        Presentation(
+                AnswerState answerState,
+                IncidentLabRunResponse.BusinessResponse businessResponse,
+                IncidentLabRunResponse.DeveloperResponse developerResponse,
+                IncidentLabRunResponse.ActionReceipt actionReceipt
+        ) {
+            this(answerState, businessResponse, developerResponse, actionReceipt, null);
+        }
     }
 }
