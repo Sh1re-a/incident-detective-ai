@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "incident-detective.ai.vertex-location=europe-west1",
         "incident-detective.ai.model-id=gemini-3.1-flash-lite",
         "incident-detective.ai.thinking-level=MINIMAL",
-        "incident-detective.ai.prompt-version=gemini-live-v6"
+        "incident-detective.ai.prompt-version=gemini-live-v7"
 })
 @AutoConfigureMockMvc
 class CapabilitiesApiTest {
@@ -99,7 +99,7 @@ class CapabilitiesApiTest {
                         .value("gemini-3.1-flash-lite"))
                 .andExpect(jsonPath("$.live_ai.thinking_level").value("MINIMAL"))
                 .andExpect(jsonPath("$.live_ai.prompt_version")
-                        .value("gemini-live-v6"))
+                        .value("gemini-live-v7"))
                 .andExpect(jsonPath("$.live_ai.budget.max_collection_rounds")
                         .value(2))
                 .andExpect(jsonPath("$.live_ai.budget.max_tool_calls_total")

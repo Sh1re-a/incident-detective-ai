@@ -14,7 +14,7 @@ class DiagnosisContractPropertiesTest {
     @Test
     void acceptsOnlySafeClasspathSchemaResources() {
         assertDoesNotThrow(() -> new DiagnosisContractProperties(
-                "ai/diagnosis-schema-v4.json"
+                GeminiPromptContracts.DIAGNOSIS_SCHEMA_RESOURCE
         ));
         assertThrows(IllegalArgumentException.class,
                 () -> new DiagnosisContractProperties(
@@ -27,7 +27,7 @@ class DiagnosisContractPropertiesTest {
     }
 
     @Test
-    void defaultRuntimeUsesTheCurrentV4DiagnosisSchema() throws Exception {
+    void defaultRuntimeUsesTheCurrentV5DiagnosisSchema() throws Exception {
         Properties properties = new Properties();
         try (var input = new ClassPathResource("application.properties")
                 .getInputStream()) {
@@ -35,7 +35,7 @@ class DiagnosisContractPropertiesTest {
         }
 
         assertEquals(
-                "ai/diagnosis-schema-v4.json",
+                GeminiPromptContracts.DIAGNOSIS_SCHEMA_RESOURCE,
                 properties.getProperty(
                         "incident-detective.ai.diagnosis.schema-resource"
                 )

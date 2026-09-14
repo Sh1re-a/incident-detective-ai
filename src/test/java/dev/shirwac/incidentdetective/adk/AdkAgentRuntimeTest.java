@@ -11,6 +11,7 @@ import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionCallingConfigMode;
 import com.google.genai.types.Part;
 import dev.shirwac.incidentdetective.ai.CollectionToolCall;
+import dev.shirwac.incidentdetective.ai.GeminiPromptContracts;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
 import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
 import dev.shirwac.incidentdetective.domain.evidence.MetricEvidence;
@@ -147,7 +148,9 @@ class AdkAgentRuntimeTest {
         Map<String, Object> expectedSchema = JsonMapper.builder()
                 .build()
                 .readValue(
-                        new ClassPathResource("ai/diagnosis-schema-v4.json")
+                        new ClassPathResource(
+                                GeminiPromptContracts.DIAGNOSIS_SCHEMA_RESOURCE
+                        )
                                 .getContentAsString(StandardCharsets.UTF_8),
                         new TypeReference<LinkedHashMap<String, Object>>() {
                         }
@@ -164,6 +167,13 @@ class AdkAgentRuntimeTest {
                 .findFirst()
                 .orElseThrow();
         assertTrue(requestText(diagnosisRequest).contains(returnedEvidenceId));
+        String diagnosisInstructions = String.join(
+                "\n",
+                diagnosisRequest.getSystemInstructions()
+        );
+        assertTrue(diagnosisInstructions
+                .contains("Decide the status before creating claims"));
+        assertFalse(diagnosisInstructions.contains("ground_truth"));
     }
 
     @Test

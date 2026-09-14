@@ -44,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "incident-detective.ai.live-enabled=true",
         "incident-detective.ai.gemini-api-key=test-only-key",
         "incident-detective.ai.model-id=gemini-3.1-flash-lite",
-        "incident-detective.ai.prompt-version=gemini-live-v6"
+        "incident-detective.ai.prompt-version=gemini-live-v7"
 })
 @AutoConfigureMockMvc
 class LiveInvestigationApiTest {

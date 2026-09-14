@@ -25,6 +25,7 @@ import com.google.genai.types.Part;
 import com.google.genai.types.ThinkingConfig;
 import com.google.genai.types.ToolConfig;
 import dev.shirwac.incidentdetective.ai.CollectionToolCall;
+import dev.shirwac.incidentdetective.ai.GeminiPromptContracts;
 import dev.shirwac.incidentdetective.domain.diagnosis.ClaimValueTaxonomy;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
 import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
@@ -95,9 +96,11 @@ public final class AdkAgentRuntime {
         this.diagnosticProbes = diagnosticProbes;
         this.jsonMapper = jsonMapper;
         synthesisContract = loadText(
-                "ai/prompts/synthesize-gemini-live-v6.txt"
+                GeminiPromptContracts.SYNTHESIS_PROMPT_RESOURCE
         );
-        diagnosisSchemaText = loadText("ai/diagnosis-schema-v4.json");
+        diagnosisSchemaText = loadText(
+                GeminiPromptContracts.DIAGNOSIS_SCHEMA_RESOURCE
+        );
         diagnosisSchema = parseSchema(diagnosisSchemaText);
     }
 

@@ -288,6 +288,32 @@ class DiagnosisTest {
     }
 
     @Test
+    void rejectsDuplicateClaimsWhenEvidenceIsInsufficient() {
+        Diagnosis diagnosis = new Diagnosis(
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                "The symptom is visible, but the cause is not proven.",
+                "The same missing audit must not be reported twice.",
+                List.of(
+                        claim(
+                                ClaimCode.MISSING_EVIDENCE,
+                                "PAYMENT_TIMEOUT_CONFIG_AUDIT",
+                                "ev-gap-001"
+                        ),
+                        claim(
+                                ClaimCode.MISSING_EVIDENCE,
+                                "PAYMENT_TIMEOUT_CONFIG_AUDIT",
+                                "ev-gap-002"
+                        )
+                ),
+                safeNextStep()
+        );
+
+        assertFalse(validator.validate(diagnosis).isEmpty());
+    }
+
+    @Test
     void rejectsANextStepWithoutHumanApproval() {
         Diagnosis diagnosis = new Diagnosis(
                 DiagnosisStatus.DIAGNOSED,

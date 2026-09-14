@@ -49,7 +49,7 @@ public final class AdkAgentTurnService {
     private static final Logger LOG = LoggerFactory.getLogger(
             AdkAgentTurnService.class
     );
-    private static final String ADK_PROMPT_VERSION = "nordly-adk-sequential-v2";
+    private static final String ADK_PROMPT_VERSION = "nordly-adk-sequential-v3";
     private static final String DELIVERY = "synchronous_post_run";
 
     private final AdkProperties adk;

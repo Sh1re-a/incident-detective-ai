@@ -208,7 +208,7 @@ class GeminiInvestigationModelGatewayTest {
                 properties,
                 new GoogleGenAiClientFactory(properties),
                 new DiagnosisContractProperties(
-                        "ai/diagnosis-schema-v3.json"
+                        GeminiPromptContracts.DIAGNOSIS_SCHEMA_RESOURCE
                 ),
                 new GeminiDiagnosisDecoder(
                         mapper,

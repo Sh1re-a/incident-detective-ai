@@ -53,7 +53,7 @@ class CapabilitiesServiceTest {
                 true,
                 "gemini-3.1-flash-lite",
                 GeminiThinkingLevel.MINIMAL,
-                "gemini-live-v6"
+                "gemini-live-v7"
         );
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("replay");
@@ -119,7 +119,7 @@ class CapabilitiesServiceTest {
         assertTrue(response.liveAi().explicitConfirmationRequired());
         assertEquals("gemini-3.1-flash-lite", response.liveAi().modelId());
         assertEquals(GeminiThinkingLevel.MINIMAL, response.liveAi().thinkingLevel());
-        assertEquals("gemini-live-v6", response.liveAi().promptVersion());
+        assertEquals("gemini-live-v7", response.liveAi().promptVersion());
         assertEquals(2, response.liveAi().budget().maxCollectionRounds());
         assertEquals(8, response.liveAi().budget().maxToolCallsTotal());
         assertEquals(3, response.liveAi().budget().maxToolCallsPerRound());
@@ -194,7 +194,7 @@ class CapabilitiesServiceTest {
                 false,
                 "gemini-3.1-flash-lite",
                 GeminiThinkingLevel.MINIMAL,
-                "gemini-live-v6",
+                "gemini-live-v7",
                 GoogleGenAiProvider.VERTEX_AI,
                 "must-never-be-returned",
                 "europe-west1"

@@ -54,7 +54,7 @@ public record AdkAgentTurnResponse(
         ControlReceipt receipt,
         List<String> limitations
 ) {
-    public static final String CONTRACT_VERSION = "nordly-adk-turn-v3";
+    public static final String CONTRACT_VERSION = "nordly-adk-turn-v4";
     public static final String MODE = "adk_live_ai";
     public static final String TRUTH_LABEL =
             "Generated synthetic incident — real Google ADK investigation.";
