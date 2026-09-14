@@ -13,6 +13,7 @@ import dev.shirwac.incidentdetective.ai.GoogleGenAiProviderRoute;
 import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
+import dev.shirwac.incidentdetective.ai.ModelResponseFailureMetadata;
 import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
 import dev.shirwac.incidentdetective.generated.GeneratedCase;
@@ -31,7 +32,6 @@ import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.genai.errors.ApiException;
-import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -60,7 +60,6 @@ public final class AdkAgentTurnService {
     private final AdkGeminiModelFactory models;
     private final AdkAgentRuntime runtime;
     private final GeminiDiagnosisDecoder diagnosisDecoder;
-    private final JsonMapper jsonMapper;
     private final GroundTruthInvestigationVerifier verifier;
     private final GeminiCostEstimator costEstimator;
     private final Clock clock;
@@ -74,7 +73,6 @@ public final class AdkAgentTurnService {
             AdkGeminiModelFactory models,
             AdkAgentRuntime runtime,
             GeminiDiagnosisDecoder diagnosisDecoder,
-            JsonMapper jsonMapper,
             GroundTruthInvestigationVerifier verifier,
             GeminiCostEstimator costEstimator,
             Clock clock
@@ -87,7 +85,6 @@ public final class AdkAgentTurnService {
         this.models = models;
         this.runtime = runtime;
         this.diagnosisDecoder = diagnosisDecoder;
-        this.jsonMapper = jsonMapper;
         this.verifier = verifier;
         this.costEstimator = costEstimator;
         this.clock = clock;
@@ -139,15 +136,20 @@ public final class AdkAgentTurnService {
         try {
             candidate = diagnosisDecoder.decode(finalText);
         } catch (ModelProviderException exception) {
+            ModelResponseFailureMetadata metadata = exception.safeMetadata()
+                    .orElse(null);
             LOG.warn(
-                    "ADK final response rejected: events={}, tools={}, chars={}, object_envelope={}, fields={}",
+                    "ADK final response rejected: failure={}, category={}, reason={}, property_paths={}, events={}, tools={}, chars={}, object_envelope={}",
+                    exception.failure(),
+                    metadata == null ? "unclassified" : metadata.category(),
+                    metadata == null ? "unclassified" : metadata.reason(),
+                    metadata == null ? List.of() : metadata.propertyPaths(),
                     run.events().size(),
                     run.toolExecutions().size(),
                     finalText == null ? 0 : finalText.length(),
                     finalText != null
                             && finalText.startsWith("{")
-                            && finalText.endsWith("}"),
-                    safeTopLevelFields(finalText)
+                            && finalText.endsWith("}")
             );
             throw exception;
         }
@@ -313,19 +315,6 @@ public final class AdkAgentTurnService {
         }
         return candidate.substring(firstLine + 1, candidate.length() - 3)
                 .strip();
-    }
-
-    private List<String> safeTopLevelFields(String json) {
-        try {
-            return jsonMapper.readTree(json)
-                    .properties()
-                    .stream()
-                    .map(java.util.Map.Entry::getKey)
-                    .sorted()
-                    .toList();
-        } catch (Exception ignored) {
-            return List.of("unparseable");
-        }
     }
 
     private SafetyDecision safety(KnowledgeRagSafetyGate.Decision decision) {

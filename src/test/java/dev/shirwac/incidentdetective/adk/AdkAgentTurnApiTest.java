@@ -4,6 +4,9 @@ import com.google.adk.models.BaseLlm;
 import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.GeminiDiagnosisDecoder;
 import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
+import dev.shirwac.incidentdetective.ai.ModelProviderException;
+import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
+import dev.shirwac.incidentdetective.ai.ModelResponseFailureMetadata;
 import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
 import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
 import dev.shirwac.incidentdetective.domain.diagnosis.SafeNextStep;
@@ -20,8 +23,11 @@ import dev.shirwac.incidentdetective.live.GlobalDailyLiveQuota;
 import dev.shirwac.incidentdetective.replay.ReplayComparison;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -41,6 +47,8 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -51,6 +59,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "incident-detective.ai.gemini-api-key=test-only-key"
 })
 @AutoConfigureMockMvc
+@ExtendWith(OutputCaptureExtension.class)
 class AdkAgentTurnApiTest {
 
     private static final String PATH = "/api/v1/agent/turns";
@@ -273,6 +282,50 @@ class AdkAgentTurnApiTest {
 
         verifyNoInteractions(runtime, models);
         verify(quota, never()).tryConsume(anyInt());
+    }
+
+    @Test
+    void logsOnlySafeMetadataWhenTheDiagnosisResponseIsRejected(
+            CapturedOutput output
+    ) throws Exception {
+        stubAdmittedRun(validTrajectory(), 2);
+        String rawModelValue = "DO-NOT-LOG-model-secret";
+        String finalText = "{\"business_summary\":\""
+                + rawModelValue
+                + "\"}";
+        when(runtime.finalText(any())).thenReturn(finalText);
+        when(diagnosisDecoder.decode(finalText)).thenThrow(
+                new ModelProviderException(
+                        ModelProviderFailure.MALFORMED_RESPONSE,
+                        "Gemini returned a response that did not match Diagnosis",
+                        new ModelResponseFailureMetadata(
+                                ModelResponseFailureMetadata.Category.BEAN_VALIDATION,
+                                ModelResponseFailureMetadata.Reason.CONSTRAINT_VIOLATION,
+                                List.of(
+                                        "safeNextStep.requiresHumanApproval",
+                                        "unsafe\n" + rawModelValue
+                                )
+                        )
+                )
+        );
+
+        mockMvc.perform(post(PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request(
+                                "Undersök larmet med endast read-only verktyg.",
+                                true
+                        )))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.code")
+                        .value("MALFORMED_MODEL_RESPONSE"));
+
+        String logs = output.getAll();
+        assertTrue(logs.contains("category=BEAN_VALIDATION"));
+        assertTrue(logs.contains("reason=CONSTRAINT_VIOLATION"));
+        assertTrue(logs.contains(
+                "property_paths=[safeNextStep.requiresHumanApproval]"
+        ));
+        assertFalse(logs.contains(rawModelValue));
     }
 
     private void stubAdmittedRun(
