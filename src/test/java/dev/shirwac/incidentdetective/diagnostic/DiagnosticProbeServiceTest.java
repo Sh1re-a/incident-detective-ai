@@ -61,6 +61,11 @@ class DiagnosticProbeServiceTest {
         assertTrue(receipts.stream().allMatch(receipt ->
                 receipt.scenarioId().equals(generated.scenario().scenarioId())
         ));
+        assertTrue(receipts.stream().allMatch(receipt ->
+                receipt.durationMs() >= 0
+                        && receipt.readOnly()
+                        && !receipt.actionExecuted()
+        ));
         assertTrue(receipts.stream()
                 .flatMap(receipt -> receipt.findings().stream())
                 .flatMap(finding -> finding.evidenceIds().stream())

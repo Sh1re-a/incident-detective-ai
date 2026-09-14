@@ -10,7 +10,10 @@ public record DiagnosticProbeReceipt(
         DiagnosticProbeOutcome outcome,
         String safeSummary,
         List<DiagnosticProbeFinding> findings,
-        boolean truncated
+        boolean truncated,
+        long durationMs,
+        boolean readOnly,
+        boolean actionExecuted
 ) {
     public static final int MAX_SUMMARY_LENGTH = 240;
     public static final int MAX_FINDINGS = 8;
@@ -41,5 +44,51 @@ public record DiagnosticProbeReceipt(
                     "observed receipt must contain at least one finding"
             );
         }
+        if (durationMs < 0) {
+            throw new IllegalArgumentException("durationMs must not be negative");
+        }
+        if (!readOnly) {
+            throw new IllegalArgumentException("diagnostic probes must be read-only");
+        }
+        if (actionExecuted) {
+            throw new IllegalArgumentException(
+                    "diagnostic probes must not execute actions"
+            );
+        }
+    }
+
+    public DiagnosticProbeReceipt(
+            String scenarioId,
+            DiagnosticProbeId probeId,
+            DiagnosticProbeOutcome outcome,
+            String safeSummary,
+            List<DiagnosticProbeFinding> findings,
+            boolean truncated
+    ) {
+        this(
+                scenarioId,
+                probeId,
+                outcome,
+                safeSummary,
+                findings,
+                truncated,
+                0,
+                true,
+                false
+        );
+    }
+
+    DiagnosticProbeReceipt withDurationMs(long measuredDurationMs) {
+        return new DiagnosticProbeReceipt(
+                scenarioId,
+                probeId,
+                outcome,
+                safeSummary,
+                findings,
+                truncated,
+                measuredDurationMs,
+                true,
+                false
+        );
     }
 }

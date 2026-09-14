@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /** Dispatches only allowlisted probes after enforcing request-local isolation. */
 @Service
@@ -93,7 +94,13 @@ public final class DiagnosticProbeService {
                     "The investigation data contains evidence from another case."
             );
         }
-        return handlers.get(request.probeId()).inspect(data);
+        long startedAt = System.nanoTime();
+        DiagnosticProbeReceipt receipt = handlers.get(request.probeId())
+                .inspect(data);
+        long durationMs = TimeUnit.NANOSECONDS.toMillis(
+                Math.max(0, System.nanoTime() - startedAt)
+        );
+        return receipt.withDurationMs(durationMs);
     }
 
     private DiagnosticProbeRejectedException rejection(
