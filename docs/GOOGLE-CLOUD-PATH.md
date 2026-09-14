@@ -5,6 +5,20 @@ Status: next-phase implementation plan, 10 September 2026. The current Phase
 revision may exist, but its URL is not evidence that the current code, ADK
 workflow or data configuration is live.
 
+## Personal cloud boundary
+
+Incident Detective is a personal Applied AI portfolio project. Every future
+cloud operation must use a dedicated personal Google Cloud project, a separate
+`gcloud` configuration, separate ADC and a new runtime identity. Existing
+customer-work projects, configurations, service accounts, registries and
+deployed services must never be reused or updated for this application.
+
+Before the first Vertex or deployment command, verify the selected account,
+project, configuration and ADC identity together. If any value still belongs
+to a customer-work environment, stop. Use `PERSONAL_GCP_PROJECT_ID` as a
+placeholder in documentation until the exact personal project ID and billing
+scope have been explicitly chosen.
+
 ## Current local baseline
 
 - Spring Boot 4.1.1 on Java 21.

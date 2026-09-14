@@ -5,6 +5,12 @@ hur en LLM kan placeras i ett vanligt mjukvarusystem
 utan att modellen får obegränsad kontroll eller automatiskt betraktas som
 korrekt.
 
+Detta är Shirwac Abibs personliga portfolio- och utbildningsprojekt. Nordly
+Commerce AB, dess dokument, kunder och incidenter är helt syntetiska. Projektet
+ska hållas tekniskt separerat från verkliga kundprojekt och kundmiljöer: egen
+repository, egen Google Cloud-konfiguration och inga delade kunddata,
+inloggningsuppgifter eller resurser.
+
 > **Kärnan:** Gemini väljer begränsade read-only functions, den aktiva
 > retrieval-backenden kan hämta relevant runbook-evidens och vanlig Java
 > verifierar om det strukturerade svaret stöds av evidensen modellen faktiskt
