@@ -305,6 +305,18 @@ afterEach(() => {
 });
 
 describe("Nordly PASS A and B", () => {
+  it("frames Nordly as Shirwac's personal Applied AI case study", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(demoWorld)));
+
+    render(<App />);
+
+    expect(screen.getByRole("link", { name: "Shirwac Abib, Applied AI" })).toBeVisible();
+    expect(screen.getAllByText("PERSONLIGT APPLIED AI-ARBETSPROV")[0]).toBeVisible();
+    expect(screen.getByText(/Nordly assistent/i)).toBeVisible();
+    expect(screen.getByText(/Fiktiv miljö · endast syntetisk data/i)).toBeVisible();
+    expect(await screen.findByRole("button", { name: /återbetalning verkar ha tagit semester/i })).toBeVisible();
+  });
+
   it("loads its two visible questions from the backend-owned demo world", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(demoWorld)));
 

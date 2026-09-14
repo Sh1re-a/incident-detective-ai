@@ -111,18 +111,30 @@ summary:focus-visible {
   border-bottom: 1px solid rgba(17, 19, 24, 0.08);
 }
 
-.wordmark {
+.creator-mark {
   width: fit-content;
+  display: grid;
+  gap: 2px;
   color: var(--ink);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
   text-decoration: none;
 }
 
-.wordmark span {
-  margin-left: 1px;
+.creator-mark__name {
+  font-size: 13px;
+  font-weight: 720;
+  letter-spacing: 0.11em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.creator-mark__role {
   color: var(--blue);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
 .scene-nav {
@@ -248,6 +260,18 @@ summary:focus-visible {
   color: var(--muted);
   font-size: clamp(17px, 1.7vw, 20px);
   line-height: 1.55;
+  text-wrap: balance;
+}
+
+.hero__stack {
+  max-width: 780px;
+  margin: 20px auto 0;
+  color: #475467;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+  line-height: 1.65;
   text-wrap: balance;
 }
 
@@ -3899,8 +3923,12 @@ summary:focus-visible {
     gap: 10px;
   }
 
-  .wordmark {
-    font-size: 13px;
+  .creator-mark__name {
+    font-size: 11px;
+  }
+
+  .creator-mark__role {
+    font-size: 9px;
   }
 
   .language-switch button {
@@ -3918,6 +3946,10 @@ summary:focus-visible {
     min-height: 44px;
     padding: 6px 11px;
     font-size: 12px;
+  }
+
+  .scene-nav__hint {
+    display: none;
   }
 
   .drift-canvas {

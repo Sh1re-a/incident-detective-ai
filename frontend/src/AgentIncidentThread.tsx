@@ -76,10 +76,11 @@ const incidentOptions: Record<
 
 const copy = {
   sv: {
-    eyebrow: "NORDLY DRIFTAGENT · FIKTIVT LARM, VERKLIG AI-KÖRNING",
+    eyebrow: "PERSONLIGT APPLIED AI-ARBETSPROV",
     title: "Ett larm väcker agenten. Du ser exakt vad den får göra.",
     lead:
-      "Välj ett syntetiskt problem i Nordlys e-handel. Agenten undersöker det med riktiga backendverktyg, men får varken ändra systemet eller agera på egen hand.",
+      "I Nordlys syntetiska driftmiljö visar jag ett avgränsat Google ADK-flöde: agenten läser loggar, mätvärden och RAG-runbooks, lämnar en källbunden förklaring och får aldrig ändra systemet.",
+    stack: "Google ADK · SequentialAgent · tool calling · RAG · deterministisk Java-verifiering",
     assistantLabel: "Nordly driftagent",
     sceneTitle: "Utred ett larm.",
     boundary: "Kan läsa · kan inte ändra",
@@ -179,10 +180,11 @@ const copy = {
     runId: "Körnings-id",
   },
   en: {
-    eyebrow: "NORDLY INCIDENT AGENT · FICTIONAL ALERT, REAL AI RUN",
+    eyebrow: "PERSONAL APPLIED AI CASE STUDY",
     title: "An alert wakes the agent. You see exactly what it may do.",
     lead:
-      "Choose a synthetic problem in Nordly’s store. The agent investigates it with real backend tools, but cannot change the system or act on its own.",
+      "Inside Nordly’s synthetic operations environment, I show a bounded Google ADK flow: the agent reads logs, metrics and RAG runbooks, returns a source-grounded explanation and can never change the system.",
+    stack: "Google ADK · SequentialAgent · tool calling · RAG · deterministic Java verification",
     assistantLabel: "Nordly incident agent",
     sceneTitle: "Investigate an alert.",
     boundary: "Can read · cannot change",
@@ -782,6 +784,7 @@ export default function AgentIncidentThread({ locale, active }: AgentIncidentThr
         <p className="hero__eyebrow">{labels.eyebrow}</p>
         <h1 id="agent-page-title">{labels.title}</h1>
         <p className="hero__lead">{labels.lead}</p>
+        <p className="hero__stack">{labels.stack}</p>
       </section>
 
       <section className="product-stage agent-product-stage" aria-labelledby="agent-scene-title">

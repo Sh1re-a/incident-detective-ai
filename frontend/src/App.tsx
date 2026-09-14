@@ -19,13 +19,17 @@ type Scene = "help" | "drift";
 
 const copy = {
   sv: {
-    nav: "Kundhjälp",
-    lab: "Driftlabb",
-    labStatus: "Riktig AI",
-    eyebrow: "FIKTIV E-HANDEL · VERKLIG, KONTROLLERAD BACKEND",
+    creatorName: "Shirwac Abib",
+    creatorRole: "Applied AI",
+    nav: "Fråga Nordly",
+    navStatus: "RAG",
+    lab: "Utred larm",
+    labStatus: "ADK",
+    eyebrow: "PERSONLIGT APPLIED AI-ARBETSPROV",
     title: "AI som visar vad den vet – och när den måste stanna.",
     lead:
-      "Nordly svarar från godkända företagsdokument. Vissa kända typer av känsliga frågor stoppas innan AI:n anropas.",
+      "Jag byggde Nordly Commerce som en fiktiv företagsmiljö för att visa hur RAG hittar rätt kunskap, svarar med källor och stoppar känsliga frågor innan AI:n anropas.",
+    stack: "Java · Spring Boot · Gemini embeddings · semantic search · PostgreSQL + pgvector",
     assistantLabel: "Nordly assistent",
     sceneTitle: "Fråga Nordly.",
     readOnly: "Kan läsa · kan inte ändra",
@@ -121,17 +125,22 @@ const copy = {
     loadError: "Nordlys exempel kunde inte hämtas. Du kan fortfarande skriva en fråga.",
     inputBoundary: "Använd bara fiktiva frågor – skriv inga riktiga personuppgifter eller företagshemligheter.",
     runError: "Backenden svarade inte. Försök igen när tjänsten är igång.",
-    footer: "Koncept, produktdesign och implementation av Shirwac Abib",
+    footer: "Skapat av Shirwac Abib · Personligt Applied AI-arbetsprov",
+    fictionalWorld: "Fiktiv miljö · endast syntetisk data",
     language: "Språk",
   },
   en: {
-    nav: "Customer help",
-    lab: "Incident lab",
-    labStatus: "Real AI",
-    eyebrow: "FICTIONAL COMMERCE · REAL, CONTROLLED BACKEND",
+    creatorName: "Shirwac Abib",
+    creatorRole: "Applied AI",
+    nav: "Ask Nordly",
+    navStatus: "RAG",
+    lab: "Investigate",
+    labStatus: "ADK",
+    eyebrow: "PERSONAL APPLIED AI CASE STUDY",
     title: "AI that shows what it knows – and when it must stop.",
     lead:
-      "Nordly answers from approved company documents. Some known types of sensitive questions are stopped before AI is called.",
+      "I built Nordly Commerce as a fictional company environment to show how RAG finds the right knowledge, answers with sources and stops sensitive requests before AI is called.",
+    stack: "Java · Spring Boot · Gemini embeddings · semantic search · PostgreSQL + pgvector",
     assistantLabel: "Nordly assistant",
     sceneTitle: "Ask Nordly.",
     readOnly: "Can read · cannot change",
@@ -226,7 +235,8 @@ const copy = {
     loadError: "Nordly’s examples could not be loaded. You can still type a question.",
     inputBoundary: "Use fictional questions only – do not enter real personal data or company secrets.",
     runError: "The backend did not respond. Try again when the service is running.",
-    footer: "Concept, product design and implementation by Shirwac Abib",
+    footer: "Created by Shirwac Abib · Personal Applied AI case study",
+    fictionalWorld: "Fictional environment · synthetic data only",
     language: "Language",
   },
 } as const;
@@ -688,8 +698,13 @@ function App() {
         {locale === "sv" ? "Hoppa till innehållet" : "Skip to content"}
       </a>
       <header className="site-header">
-        <a className="wordmark" href="#top" aria-label="Nordly, start" translate="no">
-          NORDLY<span aria-hidden="true">°</span>
+        <a
+          className="creator-mark"
+          href="#top"
+          aria-label={`${labels.creatorName}, ${labels.creatorRole}`}
+        >
+          <span className="creator-mark__name">{labels.creatorName}</span>
+          <span className="creator-mark__role">{labels.creatorRole}</span>
         </a>
 
         <nav className="scene-nav" aria-label={locale === "sv" ? "Scener" : "Scenes"}>
@@ -703,6 +718,7 @@ function App() {
             }}
           >
             {labels.nav}
+            <span className="scene-nav__hint">{labels.navStatus}</span>
           </a>
           <a
             className={`scene-nav__item${scene === "drift" ? " scene-nav__item--active" : ""}`}
@@ -739,6 +755,7 @@ function App() {
           <p className="hero__eyebrow">{labels.eyebrow}</p>
           <h1 id="page-title">{labels.title}</h1>
           <p className="hero__lead">{labels.lead}</p>
+          <p className="hero__stack">{labels.stack}</p>
         </section>
 
         <section
@@ -1236,7 +1253,9 @@ function App() {
 
       <footer className="site-footer">
         <span>{labels.footer}</span>
-        <span>{world?.company.display_name ?? "Nordly Commerce AB"} · 2026</span>
+        <span>
+          {world?.company.display_name ?? "Nordly Commerce AB"} · {labels.fictionalWorld}
+        </span>
       </footer>
     </div>
   );
