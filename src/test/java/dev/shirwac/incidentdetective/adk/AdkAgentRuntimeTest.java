@@ -26,9 +26,13 @@ import dev.shirwac.incidentdetective.investigation.tools.InvestigationToolExecut
 import dev.shirwac.incidentdetective.investigation.tools.ToolExecution;
 import io.reactivex.rxjava3.core.Flowable;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,7 +51,8 @@ class AdkAgentRuntimeTest {
             """.strip();
 
     @Test
-    void runsTwoChildrenInOrderWithOneRawToolHandoffAndTwoModelCalls() {
+    void runsTwoChildrenInOrderWithOneRawToolHandoffAndTwoModelCalls()
+            throws Exception {
         GeneratedCase generated = generatedCase();
         InvestigationToolExecutor tools = boundedTools(generated);
         AdkAgentRuntime runtime = runtime(tools);
@@ -92,6 +97,12 @@ class AdkAgentRuntimeTest {
         assertTrue(trajectory.violations().isEmpty());
 
         LlmRequest evidenceRequest = model.requests().getFirst();
+        assertTrue(evidenceRequest.config()
+                .flatMap(config -> config.responseMimeType())
+                .isEmpty());
+        assertTrue(evidenceRequest.config()
+                .flatMap(config -> config.responseJsonSchema())
+                .isEmpty());
         assertEquals(
                 List.of(AdkAgentRuntime.TOOL_NAME),
                 evidenceRequest.tools().keySet().stream().sorted().toList()
@@ -116,6 +127,26 @@ class AdkAgentRuntimeTest {
 
         LlmRequest diagnosisRequest = model.requests().getLast();
         assertTrue(diagnosisRequest.tools().isEmpty());
+        assertEquals(
+                "application/json",
+                diagnosisRequest.config()
+                        .flatMap(config -> config.responseMimeType())
+                        .orElseThrow()
+        );
+        Map<String, Object> expectedSchema = JsonMapper.builder()
+                .build()
+                .readValue(
+                        new ClassPathResource("ai/diagnosis-schema-v4.json")
+                                .getContentAsString(StandardCharsets.UTF_8),
+                        new TypeReference<LinkedHashMap<String, Object>>() {
+                        }
+                );
+        assertEquals(
+                expectedSchema,
+                diagnosisRequest.config()
+                        .flatMap(config -> config.responseJsonSchema())
+                        .orElseThrow()
+        );
         String returnedEvidenceId = result.toolExecutions().stream()
                 .flatMap(execution -> execution.evidence().stream())
                 .map(Evidence::evidenceId)

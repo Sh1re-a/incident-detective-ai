@@ -41,6 +41,7 @@ import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
 import io.reactivex.rxjava3.core.Flowable;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.charset.StandardCharsets;
@@ -78,6 +79,7 @@ public final class AdkAgentRuntime {
     private final JsonMapper jsonMapper;
     private final String synthesisContract;
     private final String diagnosisSchemaText;
+    private final Map<String, Object> diagnosisSchema;
 
     public AdkAgentRuntime(
             InvestigationToolExecutor tools,
@@ -89,6 +91,7 @@ public final class AdkAgentRuntime {
                 "ai/prompts/synthesize-gemini-live-v6.txt"
         );
         diagnosisSchemaText = loadText("ai/diagnosis-schema-v4.json");
+        diagnosisSchema = parseSchema(diagnosisSchemaText);
     }
 
     public RunResult run(
@@ -434,6 +437,8 @@ public final class AdkAgentRuntime {
 
     private GenerateContentConfig diagnosisConfig() {
         return GenerateContentConfig.builder()
+                .responseMimeType("application/json")
+                .responseJsonSchema(diagnosisSchema)
                 .temperature(0.0F)
                 .maxOutputTokens(2_048)
                 .thinkingConfig(ThinkingConfig.builder()
@@ -441,6 +446,22 @@ public final class AdkAgentRuntime {
                         .build())
                 .httpOptions(providerHttpOptions())
                 .build();
+    }
+
+    private Map<String, Object> parseSchema(String schemaText) {
+        try {
+            Map<String, Object> schema = jsonMapper.readValue(
+                    schemaText,
+                    new TypeReference<LinkedHashMap<String, Object>>() {
+                    }
+            );
+            return Map.copyOf(schema);
+        } catch (Exception exception) {
+            throw new IllegalStateException(
+                    "Could not parse ADK diagnosis schema",
+                    exception
+            );
+        }
     }
 
     private HttpOptions providerHttpOptions() {
