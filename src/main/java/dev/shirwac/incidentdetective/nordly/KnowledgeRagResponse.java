@@ -32,7 +32,7 @@ public record KnowledgeRagResponse(
         ErrorDetail error,
         List<String> limitations
 ) {
-    public static final String CONTRACT_VERSION = "nordly-knowledge-rag-v2";
+    public static final String CONTRACT_VERSION = "nordly-knowledge-rag-v3";
     public static final String MODE = "live_rag";
     public static final String BACKEND = "pgvector_exact_cosine";
 
@@ -161,11 +161,20 @@ public record KnowledgeRagResponse(
     }
 
     public record Verification(
+            @Schema(
+                    description = "Whether output verification ran, was not run, or was not applicable because no model answer existed.",
+                    allowableValues = {"completed", "not_run", "not_applicable"}
+            )
+            String evaluationStatus,
             boolean schemaPass,
             boolean citationsWithinRetrievedContext,
             boolean approvedDocumentsOnly,
             boolean outputPiiScanPass,
             boolean outputPolicyScanPass,
+            @Schema(
+                    description = "Always false in this contract: citation membership is checked, semantic claim entailment is not."
+            )
+            boolean semanticClaimSupportEvaluated,
             boolean noWriteCapability,
             String overallOutcome
     ) {

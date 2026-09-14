@@ -53,7 +53,7 @@ class KnowledgeRagApiTest {
                         MediaType.APPLICATION_JSON
                 ))
                 .andExpect(jsonPath("$.contract_version")
-                        .value("nordly-knowledge-rag-v2"))
+                        .value(KnowledgeRagResponse.CONTRACT_VERSION))
                 .andExpect(jsonPath("$.mode")
                         .value(KnowledgeRagResponse.MODE))
                 .andExpect(jsonPath("$.truth_label").value("SYNTHETIC TEST"))
@@ -64,6 +64,11 @@ class KnowledgeRagApiTest {
                         .value("a".repeat(64)))
                 .andExpect(jsonPath("$.retrieval.index_snapshot")
                         .value((Object) null))
+                .andExpect(jsonPath("$.verification.evaluation_status")
+                        .value("not_run"))
+                .andExpect(jsonPath(
+                        "$.verification.semantic_claim_support_evaluated"
+                ).value(false))
                 .andExpect(jsonPath("$.receipt.provider_calls").value(0));
 
         verify(service).ask(any());
@@ -155,13 +160,15 @@ class KnowledgeRagApiTest {
                 ),
                 null,
                 new KnowledgeRagResponse.Verification(
+                        "not_run",
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
                         false,
                         true,
-                        true,
-                        true,
-                        true,
-                        true,
-                        "not_run"
+                        "not_run_confirmation_required"
                 ),
                 new KnowledgeRagResponse.Receipt(
                         0,

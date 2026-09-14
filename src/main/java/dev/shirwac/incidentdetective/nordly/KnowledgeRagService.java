@@ -28,12 +28,24 @@ import java.util.UUID;
 @Profile("rag")
 public final class KnowledgeRagService {
 
-    private static final String TRUTH_LABEL =
+    private static final String LIVE_TRUTH_LABEL =
             "LIVE LOCAL RAG · SYNTETISKA NORDLY-DOKUMENT · "
                     + "MAX 1 EMBEDDING + 1 GEMINI-SYNTES · INGA SKRIVVERKTYG";
-    private static final String TRUTH_LABEL_EN =
+    private static final String LIVE_TRUTH_LABEL_EN =
             "LIVE LOCAL RAG · SYNTHETIC NORDLY DOCUMENTS · "
                     + "MAX 1 EMBEDDING + 1 GEMINI SYNTHESIS · NO WRITE TOOLS";
+    private static final String NO_PROVIDER_TRUTH_LABEL =
+            "KONTROLLERAD RAG-BEGÄRAN · INGET PROVIDERANROP GJORDES · "
+                    + "SYNTETISKA NORDLY-DOKUMENT · INGA SKRIVVERKTYG";
+    private static final String NO_PROVIDER_TRUTH_LABEL_EN =
+            "CONTROLLED RAG REQUEST · NO PROVIDER CALL WAS MADE · "
+                    + "SYNTHETIC NORDLY DOCUMENTS · NO WRITE TOOLS";
+    private static final String ATTEMPTED_TRUTH_LABEL =
+            "LIVE LOCAL RAG FÖRSÖKTES · INGET SVAR FRISLÄPPTES · "
+                    + "SYNTETISKA NORDLY-DOKUMENT · INGA SKRIVVERKTYG";
+    private static final String ATTEMPTED_TRUTH_LABEL_EN =
+            "LIVE LOCAL RAG WAS ATTEMPTED · NO ANSWER WAS RELEASED · "
+                    + "SYNTHETIC NORDLY DOCUMENTS · NO WRITE TOOLS";
     private static final String REDACTED_QUESTION_SV =
             "[STOPPAD OCH MASKERAD AV SÄKERHETSGRINDEN]";
     private static final String REDACTED_QUESTION_EN =
@@ -135,7 +147,7 @@ public final class KnowledgeRagService {
                             safety.summaryEn(),
                             List.of()
                     ),
-                    verification(true, true, true, true,
+                    unperformedVerification("not_applicable",
                             "refused_before_provider"),
                     receipt(0, 0, elapsedMs(runStarted), null, null, null),
                     null
@@ -167,7 +179,7 @@ public final class KnowledgeRagService {
                     phases,
                     emptyRetrieval(),
                     null,
-                    verification(false, true, true, true,
+                    unperformedVerification("not_run",
                             "not_run_confirmation_required"),
                     receipt(0, 0, elapsedMs(runStarted), null, null, null),
                     error(
@@ -187,7 +199,7 @@ public final class KnowledgeRagService {
                     phases,
                     emptyRetrieval(),
                     null,
-                    verification(false, true, true, true,
+                    unperformedVerification("not_run",
                             "not_run_live_ai_disabled"),
                     receipt(0, 0, elapsedMs(runStarted), null, null, null),
                     error(
@@ -207,7 +219,7 @@ public final class KnowledgeRagService {
                     phases,
                     emptyRetrieval(),
                     null,
-                    verification(false, true, true, true,
+                    unperformedVerification("not_run",
                             "not_run_provider_not_configured"),
                     receipt(0, 0, elapsedMs(runStarted), null, null, null),
                     error(
@@ -244,7 +256,7 @@ public final class KnowledgeRagService {
                         phases,
                         retrieval(null, false, List.of(), indexStatus),
                         null,
-                        verification(false, true, true, true,
+                        unperformedVerification("not_run",
                                 "not_run_index_not_ready"),
                         receipt(0, 0, elapsedMs(runStarted), null, null, null),
                         error(
@@ -272,7 +284,7 @@ public final class KnowledgeRagService {
                     phases,
                     emptyRetrieval(),
                     null,
-                    verification(false, true, true, true,
+                    unperformedVerification("not_run",
                             "not_run_database_unavailable"),
                     receipt(0, 0, elapsedMs(runStarted), null, null, null),
                     error(
@@ -347,7 +359,7 @@ public final class KnowledgeRagService {
                     phases,
                     retrieval(null, false, List.of(), indexStatus),
                     null,
-                    verification(false, true, true, true,
+                    unperformedVerification("not_run",
                             "embedding_failed"),
                     receipt(
                             1,
@@ -401,7 +413,7 @@ public final class KnowledgeRagService {
                     phases,
                     retrieval(queryEmbedding, false, List.of(), indexStatus),
                     null,
-                    verification(false, true, true, true,
+                    unperformedVerification("not_run",
                             "vector_database_unavailable"),
                     receipt(
                             1,
@@ -469,7 +481,7 @@ public final class KnowledgeRagService {
                             "I cannot find a sufficiently relevant approved source in Nordly's documents.",
                             List.of()
                     ),
-                    verification(true, true, true, true,
+                    unperformedVerification("not_applicable",
                             "abstained_below_similarity_threshold"),
                     receipt(
                             1,
@@ -520,7 +532,7 @@ public final class KnowledgeRagService {
                     phases,
                     retrieval(queryEmbedding, true, matches, indexStatus),
                     null,
-                    verification(false, true, true, true,
+                    unperformedVerification("not_run",
                             "generation_failed"),
                     receipt(
                             1,
@@ -615,7 +627,7 @@ public final class KnowledgeRagService {
                 retrieval(queryEmbedding, true, matches, indexStatus),
                 answer(generated.answer()),
                 verification(true, true, true, true,
-                        "answered_with_verified_retrieved_citations"),
+                        "answered_with_retrieved_approved_citations"),
                 receipt(
                         1,
                         1,
@@ -747,8 +759,8 @@ public final class KnowledgeRagService {
                 KnowledgeRagResponse.CONTRACT_VERSION,
                 runId,
                 KnowledgeRagResponse.MODE,
-                TRUTH_LABEL,
-                TRUTH_LABEL_EN,
+                truthLabel(receipt, outcome, false),
+                truthLabel(receipt, outcome, true),
                 outcome,
                 providerRoute(receipt.providerCalls()),
                 question,
@@ -821,14 +833,52 @@ public final class KnowledgeRagService {
             String outcome
     ) {
         return new KnowledgeRagResponse.Verification(
+                "completed",
                 schemaPass,
                 citationsWithinContext,
                 approvedOnly,
                 outputPiiScanPass,
                 outputPolicyScanPass,
+                false,
                 true,
                 outcome
         );
+    }
+
+    private KnowledgeRagResponse.Verification unperformedVerification(
+            String evaluationStatus,
+            String outcome
+    ) {
+        return new KnowledgeRagResponse.Verification(
+                evaluationStatus,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                outcome
+        );
+    }
+
+    private String truthLabel(
+            KnowledgeRagResponse.Receipt receipt,
+            String outcome,
+            boolean english
+    ) {
+        if (receipt.providerCalls() == 0) {
+            return english
+                    ? NO_PROVIDER_TRUTH_LABEL_EN
+                    : NO_PROVIDER_TRUTH_LABEL;
+        }
+        if ("unavailable".equals(outcome)
+                || "rejected_output".equals(outcome)) {
+            return english
+                    ? ATTEMPTED_TRUTH_LABEL_EN
+                    : ATTEMPTED_TRUTH_LABEL;
+        }
+        return english ? LIVE_TRUTH_LABEL_EN : LIVE_TRUTH_LABEL;
     }
 
     private KnowledgeRagResponse.Receipt receipt(

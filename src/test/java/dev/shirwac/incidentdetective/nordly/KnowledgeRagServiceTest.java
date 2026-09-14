@@ -108,6 +108,16 @@ class KnowledgeRagServiceTest {
         assertFalse(response.question().text().contains("NORD-2048"));
         assertEquals(0, response.receipt().providerCalls());
         assertNull(response.providerRoute());
+        assertEquals("not_applicable",
+                response.verification().evaluationStatus());
+        assertFalse(response.verification().schemaPass());
+        assertFalse(response.verification().citationsWithinRetrievedContext());
+        assertFalse(response.verification().approvedDocumentsOnly());
+        assertFalse(response.verification().outputPiiScanPass());
+        assertFalse(response.verification().outputPolicyScanPass());
+        assertFalse(response.verification().semanticClaimSupportEvaluated());
+        assertTrue(response.verification().noWriteCapability());
+        assertTrue(response.truthLabel().contains("INGET PROVIDERANROP"));
         assertFalse(response.retrieval().currentVectorSearch());
         assertNull(response.retrieval().indexSnapshot());
         assertFalse(response.retrieval().queryEmbedding().executedInThisRun());
@@ -171,6 +181,10 @@ class KnowledgeRagServiceTest {
         assertEquals(0, response.receipt().providerCalls());
         assertNull(response.providerRoute());
         assertNull(response.retrieval().indexSnapshot());
+        assertEquals("not_run", response.verification().evaluationStatus());
+        assertFalse(response.verification().schemaPass());
+        assertFalse(response.verification().citationsWithinRetrievedContext());
+        assertTrue(response.truthLabelEn().contains("NO PROVIDER CALL"));
         assertEquals("LIVE_AI_CONFIRMATION_REQUIRED", response.error().code());
         verifyNoInteractions(readiness, store, embeddings, answers, liveRunGuard);
     }
@@ -265,6 +279,11 @@ class KnowledgeRagServiceTest {
         assertTrue(response.receipt().costBasis()
                 .contains("USD price is not estimated"));
         assertTrue(response.retrieval().currentVectorSearch());
+        assertEquals("not_applicable",
+                response.verification().evaluationStatus());
+        assertFalse(response.verification().schemaPass());
+        assertFalse(response.verification().semanticClaimSupportEvaluated());
+        assertTrue(response.truthLabel().startsWith("LIVE LOCAL RAG"));
         verifyNoInteractions(answers);
         verify(liveRunGuard).runConfirmed(eq(true), any());
     }
@@ -322,6 +341,12 @@ class KnowledgeRagServiceTest {
                 .citationsWithinRetrievedContext());
         assertTrue(response.verification().outputPiiScanPass());
         assertTrue(response.verification().outputPolicyScanPass());
+        assertEquals("completed", response.verification().evaluationStatus());
+        assertFalse(response.verification().semanticClaimSupportEvaluated());
+        assertEquals(
+                "answered_with_retrieved_approved_citations",
+                response.verification().overallOutcome()
+        );
         assertTrue(response.verification().noWriteCapability());
         assertEquals(List.of("nordly-evidence-refund-timing-card"),
                 response.answer().claims().getFirst().citationIds());
@@ -344,6 +369,9 @@ class KnowledgeRagServiceTest {
         assertNull(response.answer());
         assertFalse(response.verification()
                 .citationsWithinRetrievedContext());
+        assertEquals("completed", response.verification().evaluationStatus());
+        assertFalse(response.verification().semanticClaimSupportEvaluated());
+        assertTrue(response.truthLabelEn().contains("NO ANSWER WAS RELEASED"));
         assertEquals("MODEL_OUTPUT_REJECTED", response.error().code());
         assertEquals(2, response.receipt().providerCalls());
     }
