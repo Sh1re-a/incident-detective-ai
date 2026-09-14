@@ -1,6 +1,7 @@
 package dev.shirwac.incidentdetective.incidentlab;
 
 import dev.shirwac.incidentdetective.adk.AdkAgentTurnResponse;
+import dev.shirwac.incidentdetective.adk.AdkAgentRuntime;
 import dev.shirwac.incidentdetective.alarm.SignalAlarmReceipt;
 import dev.shirwac.incidentdetective.domain.diagnosis.Claim;
 import dev.shirwac.incidentdetective.domain.diagnosis.ClaimCode;
@@ -32,11 +33,11 @@ final class IncidentLabResponsePresenter {
     ) {
         Objects.requireNonNull(scenario, "scenario must not be null");
         backendLogs = backendLogs == null ? List.of() : List.copyOf(backendLogs);
-        requireSafeControlReceipt(agentTurn);
 
         if (alarm == null) {
             return notStarted(scenario);
         }
+        requireSafeControlReceipt(agentTurn);
         if (!released(agentTurn, scenario, alarm)) {
             return withheld(scenario, backendLogs, alarm, agentTurn);
         }
@@ -51,15 +52,9 @@ final class IncidentLabResponsePresenter {
             AdkAgentTurnResponse agentTurn,
             AnswerState answerState
     ) {
+        Objects.requireNonNull(answerState, "answerState must not be null");
         if (agentTurn == null) {
             return null;
-        }
-        boolean released = answerState == AnswerState.DIAGNOSED
-                || answerState == AnswerState.INSUFFICIENT_EVIDENCE;
-        Diagnosis releasedDiagnosis = released ? agentTurn.diagnosis() : null;
-        if (agentTurn.comparison() == null
-                && releasedDiagnosis == agentTurn.diagnosis()) {
-            return agentTurn;
         }
         return new AdkAgentTurnResponse(
                 agentTurn.contractVersion(),
@@ -74,16 +69,42 @@ final class IncidentLabResponsePresenter {
                 agentTurn.safety(),
                 agentTurn.runtime(),
                 agentTurn.workflow(),
-                agentTurn.events(),
+                sanitizeEvents(agentTurn.events()),
                 agentTurn.toolEvents(),
                 agentTurn.diagnosticProbe(),
-                releasedDiagnosis,
+                null,
                 agentTurn.verification(),
                 null,
                 agentTurn.verificationEvent(),
                 agentTurn.receipt(),
                 agentTurn.limitations()
         );
+    }
+
+    private static List<AdkAgentTurnResponse.RuntimeEvent> sanitizeEvents(
+            List<AdkAgentTurnResponse.RuntimeEvent> events
+    ) {
+        if (events == null || events.isEmpty()) {
+            return List.of();
+        }
+        return events.stream()
+                .filter(Objects::nonNull)
+                .map(event -> new AdkAgentTurnResponse.RuntimeEvent(
+                        event.sequence(),
+                        event.eventId(),
+                        event.invocationId(),
+                        event.author(),
+                        event.type(),
+                        event.observedAt(),
+                        event.finalResponse(),
+                        event.contentWithheld() || event.text() != null,
+                        null,
+                        event.functionCalls(),
+                        event.functionResponses(),
+                        event.tokenUsage(),
+                        event.providerModelVersion()
+                ))
+                .toList();
     }
 
     private Presentation diagnosed(
@@ -264,6 +285,7 @@ final class IncidentLabResponsePresenter {
                 || agentTurn.verificationEvent() == null
                 || !agentTurn.verificationEvent().answerReleased()
                 || agentTurn.diagnosis() == null
+                || !safeControlReceipt(agentTurn.receipt())
                 || agentTurn.scenario() == null
                 || !scenario.scenarioId().equals(agentTurn.scenario().scenarioId())
                 || !scenario.scenarioId().equals(alarm.scenarioId())
@@ -404,17 +426,30 @@ final class IncidentLabResponsePresenter {
     }
 
     private void requireSafeControlReceipt(AdkAgentTurnResponse agentTurn) {
-        if (agentTurn == null || agentTurn.receipt() == null) {
+        if (agentTurn == null) {
             return;
         }
-        AdkAgentTurnResponse.ControlReceipt receipt = agentTurn.receipt();
-        if (receipt.writeToolsAvailable()
-                || receipt.actionExecuted()
-                || !receipt.humanApprovalRequired()) {
+        if (!safeControlReceipt(agentTurn.receipt())) {
             throw new IllegalStateException(
-                    "Incident Lab received an unsafe ADK control receipt"
+                    "Incident Lab received a missing or unsafe ADK control receipt"
             );
         }
+    }
+
+    private boolean safeControlReceipt(
+            AdkAgentTurnResponse.ControlReceipt receipt
+    ) {
+        return receipt != null
+                && !receipt.writeToolsAvailable()
+                && !receipt.actionExecuted()
+                && receipt.humanApprovalRequired()
+                && receipt.modelCalls() >= 0
+                && receipt.adkToolCalls() >= 0
+                && receipt.readOperations() >= 0
+                && receipt.embeddingCalls() >= 0
+                && receipt.totalLatencyMs() >= 0
+                && List.of(AdkAgentRuntime.TOOL_NAME)
+                .equals(receipt.registeredTools());
     }
 
     private String alarmText(SignalAlarmReceipt alarm) {

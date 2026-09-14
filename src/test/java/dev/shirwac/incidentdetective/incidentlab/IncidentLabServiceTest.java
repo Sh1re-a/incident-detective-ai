@@ -176,6 +176,7 @@ class IncidentLabServiceTest {
         GeneratedCaseGeneration generation = generation(generated);
         AdkAgentTurnResponse agentTurn = mock(AdkAgentTurnResponse.class);
         when(agentTurn.outcome()).thenReturn("completed");
+        stubSafeReceipt(agentTurn);
         when(generatedCases.generate(any())).thenReturn(generation);
         when(adkAgent.runGeneratedCase(
                 eq(generated),
@@ -190,7 +191,8 @@ class IncidentLabServiceTest {
         assertEquals("alarm_investigated", response.outcome());
         assertTrue(response.alarmReceipt() != null);
         assertEquals(3, response.alarmReceipt().signal().observedValue());
-        assertSame(agentTurn, response.agentTurn());
+        assertNotSame(agentTurn, response.agentTurn());
+        assertNull(response.agentTurn().diagnosis());
         assertTrue(isChronological(response.backendLogs()));
         ArgumentCaptor<GeneratedCaseGenerationRequest> request =
                 ArgumentCaptor.forClass(
@@ -218,6 +220,7 @@ class IncidentLabServiceTest {
         when(agentTurn.outcome()).thenReturn("verification_failed");
         when(agentTurn.diagnosis()).thenReturn(mock(Diagnosis.class));
         when(agentTurn.comparison()).thenReturn(mock(ReplayComparison.class));
+        stubSafeReceipt(agentTurn);
         when(generatedCases.generate(any())).thenReturn(generation);
         when(adkAgent.runGeneratedCase(any(), any(), eq(true)))
                 .thenReturn(agentTurn);
@@ -248,6 +251,7 @@ class IncidentLabServiceTest {
         GeneratedCaseGeneration generation = generation(generated);
         AdkAgentTurnResponse agentTurn = mock(AdkAgentTurnResponse.class);
         when(agentTurn.outcome()).thenReturn("completed");
+        stubSafeReceipt(agentTurn);
         when(generatedCases.generate(any())).thenReturn(generation);
         when(adkAgent.runGeneratedCase(
                 eq(generated),
@@ -327,6 +331,23 @@ class IncidentLabServiceTest {
                 GeneratedIncidentFamily.PAYMENT_TIMEOUT,
                 IncidentService.PAYMENT_ADAPTER
         );
+    }
+
+    private void stubSafeReceipt(AdkAgentTurnResponse agentTurn) {
+        when(agentTurn.receipt()).thenReturn(new AdkAgentTurnResponse.ControlReceipt(
+                2,
+                1,
+                4,
+                1,
+                false,
+                false,
+                true,
+                List.of("inspect_incident_evidence"),
+                null,
+                null,
+                "test",
+                10
+        ));
     }
 
     private IncidentPlan canonicalPlan(

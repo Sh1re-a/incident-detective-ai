@@ -25,7 +25,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -77,18 +77,17 @@ class IncidentLabResponsePresenterTest {
                 new SafeNextStep(UNTRUSTED_PROSE, true)
         );
         AdkAgentTurnResponse raw = agentTurn(diagnosis, true);
-        AdkAgentTurnResponse sanitized =
-                IncidentLabResponsePresenter.sanitizeAgentTurn(
-                        raw,
-                        IncidentLabRunResponse.AnswerState.DIAGNOSED
-                );
-
         IncidentLabResponsePresenter.Presentation result = presenter.present(
                 generated.scenario(),
                 logs,
                 alarm,
-                sanitized
+                raw
         );
+        AdkAgentTurnResponse sanitized =
+                IncidentLabResponsePresenter.sanitizeAgentTurn(
+                        raw,
+                        result.answerState()
+                );
 
         assertEquals(IncidentLabRunResponse.AnswerState.DIAGNOSED,
                 result.answerState());
@@ -100,7 +99,9 @@ class IncidentLabResponsePresenterTest {
         assertFalse(result.actionReceipt().actionExecuted());
         assertTrue(result.actionReceipt().humanApprovalRequired());
         assertNull(sanitized.comparison());
-        assertSame(diagnosis, sanitized.diagnosis());
+        assertNull(sanitized.diagnosis());
+        assertNull(sanitized.events().getFirst().text());
+        assertTrue(sanitized.events().getFirst().contentWithheld());
     }
 
     @Test
@@ -118,15 +119,16 @@ class IncidentLabResponsePresenterTest {
                 ),
                 new SafeNextStep(UNTRUSTED_PROSE, true)
         );
-        AdkAgentTurnResponse sanitized =
-                IncidentLabResponsePresenter.sanitizeAgentTurn(
-                        agentTurn(diagnosis, true),
-                        IncidentLabRunResponse.AnswerState.INSUFFICIENT_EVIDENCE
-                );
+        AdkAgentTurnResponse raw = agentTurn(diagnosis, true);
 
         IncidentLabResponsePresenter.Presentation result = presenter.present(
-                generated.scenario(), logs, alarm, sanitized
+                generated.scenario(), logs, alarm, raw
         );
+        AdkAgentTurnResponse sanitized =
+                IncidentLabResponsePresenter.sanitizeAgentTurn(
+                        raw,
+                        result.answerState()
+                );
 
         assertEquals(IncidentLabRunResponse.AnswerState.INSUFFICIENT_EVIDENCE,
                 result.answerState());
@@ -137,6 +139,7 @@ class IncidentLabResponsePresenterTest {
         assertTrue(result.businessResponse().headline()
                 .contains("rotorsaken är inte fastställd"));
         assertFalse(allText(result).contains(UNTRUSTED_PROSE));
+        assertNull(sanitized.diagnosis());
     }
 
     @Test
@@ -221,6 +224,60 @@ class IncidentLabResponsePresenterTest {
         assertNull(result.developerResponse().rootCauseCode());
     }
 
+    @Test
+    void missingControlReceiptStopsTheIncidentLabResponse() {
+        Diagnosis diagnosis = diagnosed(alarm.evidenceIds().getFirst());
+        AdkAgentTurnResponse response = agentTurn(diagnosis, true);
+        when(response.receipt()).thenReturn(null);
+
+        IllegalStateException failure = assertThrows(
+                IllegalStateException.class,
+                () -> presenter.present(generated.scenario(), logs, alarm, response)
+        );
+
+        assertTrue(failure.getMessage().contains("control receipt"));
+    }
+
+    @Test
+    void unsafeOrUnexpectedControlReceiptStopsTheIncidentLabResponse() {
+        Diagnosis diagnosis = diagnosed(alarm.evidenceIds().getFirst());
+        AdkAgentTurnResponse response = agentTurn(diagnosis, true);
+        when(response.receipt()).thenReturn(new AdkAgentTurnResponse.ControlReceipt(
+                2,
+                1,
+                4,
+                1,
+                true,
+                true,
+                false,
+                List.of("open_terminal"),
+                null,
+                null,
+                "test",
+                10
+        ));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> presenter.present(generated.scenario(), logs, alarm, response)
+        );
+    }
+
+    private Diagnosis diagnosed(String evidenceId) {
+        return new Diagnosis(
+                DiagnosisStatus.DIAGNOSED,
+                "PAYMENT_TIMEOUT_CONFIG",
+                "PAYMENT_ADAPTER",
+                UNTRUSTED_PROSE,
+                UNTRUSTED_PROSE,
+                List.of(
+                        claim(ClaimCode.ROOT_CAUSE, "PAYMENT_TIMEOUT_CONFIG", evidenceId),
+                        claim(ClaimCode.AFFECTED_SERVICE, "PAYMENT_ADAPTER", evidenceId)
+                ),
+                new SafeNextStep(UNTRUSTED_PROSE, true)
+        );
+    }
+
     private Claim claim(ClaimCode code, String value, String evidenceId) {
         return new Claim(code, value, UNTRUSTED_PROSE, List.of(evidenceId));
     }
@@ -258,7 +315,23 @@ class IncidentLabResponsePresenterTest {
                 answerReleased,
                 diagnosis.status() == DiagnosisStatus.INSUFFICIENT_EVIDENCE
         ));
-        when(response.events()).thenReturn(List.of());
+        when(response.events()).thenReturn(List.of(
+                new AdkAgentTurnResponse.RuntimeEvent(
+                        1,
+                        "event-1",
+                        "invocation-1",
+                        "diagnosis_agent",
+                        "text",
+                        Instant.parse("2026-09-01T08:20:00Z"),
+                        true,
+                        false,
+                        UNTRUSTED_PROSE,
+                        List.of(),
+                        List.of(),
+                        null,
+                        "gemini-test"
+                )
+        ));
         when(response.toolEvents()).thenReturn(List.of());
         when(response.limitations()).thenReturn(List.of());
         return response;

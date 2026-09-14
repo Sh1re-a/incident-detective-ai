@@ -189,8 +189,8 @@ class IncidentLabApiTest {
                         .value("catalog_version_divergence_count"))
                 .andExpect(jsonPath("$.alarm_receipt.signal.threshold_value")
                         .value(1.0))
-                .andExpect(jsonPath("$.agent_turn.diagnosis.status")
-                        .value("diagnosed"))
+                .andExpect(jsonPath("$.agent_turn.diagnosis")
+                        .value(nullValue()))
                 .andExpect(jsonPath("$.agent_turn.comparison")
                         .value(nullValue()));
     }
@@ -349,7 +349,10 @@ class IncidentLabApiTest {
                 generated.scenario(),
                 logs(generated),
                 alarm,
-                completedAgentTurn(generated.scenario(), diagnosis),
+                IncidentLabResponsePresenter.sanitizeAgentTurn(
+                        completedAgentTurn(generated.scenario(), diagnosis),
+                        IncidentLabRunResponse.AnswerState.DIAGNOSED
+                ),
                 List.of("Synthetic only.")
         );
     }
