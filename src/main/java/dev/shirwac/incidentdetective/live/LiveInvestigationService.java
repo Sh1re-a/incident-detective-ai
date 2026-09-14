@@ -337,7 +337,10 @@ public final class LiveInvestigationService {
         if (!verification.report().diagnosisSchemaPass()) {
             throw malformed("Model diagnosis failed the validated contract");
         }
-        LiveRunStatus status = verification.report().hardErrors().isEmpty()
+        boolean answerReleased = verification.report().hardErrors().isEmpty()
+                && everyCitationDirectlySupported(verification)
+                && factualResultMatches(verification);
+        LiveRunStatus status = answerReleased
                 ? LiveRunStatus.COMPLETED
                 : LiveRunStatus.VERIFICATION_FAILED;
         ModelTokenUsage usage = aggregateUsage(modelCalls);
@@ -358,9 +361,9 @@ public final class LiveInvestigationService {
                 Math.max(0, Duration.between(startedAt, completedAt).toMillis()),
                 scenario,
                 toolEvents,
-                synthesis.diagnosis(),
+                answerReleased ? synthesis.diagnosis() : null,
                 verification.report(),
-                verification.comparison(),
+                null,
                 properties.modelId(),
                 GeminiPromptContracts.LIVE_PROMPT_VERSION,
                 modelCalls,
@@ -373,6 +376,30 @@ public final class LiveInvestigationService {
                 modelCalls.size(),
                 context.limitations().get()
         );
+    }
+
+    private boolean everyCitationDirectlySupported(
+            CompletedInvestigationVerification verification
+    ) {
+        if (!verification.report().evidencePrecision().applicable()) {
+            return true;
+        }
+        return verification.report().evidencePrecision().citationSupport().stream()
+                .allMatch(result -> result.supported());
+    }
+
+    private boolean factualResultMatches(
+            CompletedInvestigationVerification verification
+    ) {
+        var correctness = verification.report().diagnosisCorrectness();
+        if (!correctness.evaluated()) {
+            return false;
+        }
+        if (correctness.diagnosisApplicable()) {
+            return correctness.rootCauseCorrect()
+                    && correctness.affectedServiceCorrect();
+        }
+        return correctness.abstentionCorrect();
     }
 
     private List<String> limitations() {

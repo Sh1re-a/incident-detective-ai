@@ -45,6 +45,16 @@ class OpenApiNullableReferenceTest {
                 ))
                 .andExpect(nullableReference(
                         "LiveInvestigationResult",
+                        "diagnosis",
+                        "Diagnosis"
+                ))
+                .andExpect(nullableReference(
+                        "LiveInvestigationResult",
+                        "comparison",
+                        "ReplayComparison"
+                ))
+                .andExpect(nullableReference(
+                        "LiveInvestigationResult",
                         "token_usage",
                         "ModelTokenUsage"
                 ))

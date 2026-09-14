@@ -26,7 +26,9 @@ import java.util.function.Supplier;
 
 import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.correctDiagnosis;
 import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.diagnosisWithUnknownCitation;
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.incorrectAbstentionWithSentinel;
 import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.stubCheckoutCollections;
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.WITHHELD_DIAGNOSIS_SENTINEL;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -83,7 +85,7 @@ class LiveInvestigationApiTest {
         );
         when(model.synthesize(any(), anyList(), any())).thenReturn(
                 new SynthesisModelResult(
-                        insufficientEvidence(),
+                        incorrectAbstentionWithSentinel(),
                         metadata(ModelPhase.SYNTHESIZE, 1)
                 )
         );
@@ -96,13 +98,17 @@ class LiveInvestigationApiTest {
                 .andExpect(jsonPath("$.truth_label").value(
                         LiveInvestigationService.TRUTH_LABEL
                 ))
-                .andExpect(jsonPath("$.status").value("completed"))
-                .andExpect(jsonPath("$.diagnosis.status")
-                        .value("insufficient_evidence"))
+                .andExpect(jsonPath("$.status").value("verification_failed"))
+                .andExpect(jsonPath("$.diagnosis").value((Object) null))
+                .andExpect(jsonPath("$.comparison").value((Object) null))
                 .andExpect(jsonPath("$.model_id")
                         .value("gemini-3.1-flash-lite"))
                 .andExpect(jsonPath("$.model_call_count").value(2))
                 .andExpect(jsonPath("$.tool_call_count").value(0))
+                .andExpect(jsonPath("$.verification.diagnosis_schema_pass")
+                        .value(true))
+                .andExpect(jsonPath("$.verification.hard_errors.length()")
+                        .value(0))
                 .andExpect(jsonPath(
                         "$.verification.claim_coverage.matched_claim_count"
                 ).value(0))
@@ -125,7 +131,11 @@ class LiveInvestigationApiTest {
         assertFalse(json.contains("claim_support"));
         assertFalse(json.contains("allowed_evidence_ids"));
         assertFalse(json.contains("\"expected_claims\""));
+        assertFalse(json.contains("\"expected_status\""));
+        assertFalse(json.contains("\"expected_root_cause_code\""));
+        assertFalse(json.contains("\"expected_affected_service\""));
         assertFalse(json.contains("cpt-v1-log-inventory-noise"));
+        assertFalse(json.contains(WITHHELD_DIAGNOSIS_SENTINEL));
     }
 
     @Test
@@ -192,10 +202,7 @@ class LiveInvestigationApiTest {
                         .value(0.8))
                 .andExpect(jsonPath("$.verification.hard_errors.length()")
                         .value(0))
-                .andExpect(jsonPath("$.comparison.root_cause_correct")
-                        .value(true))
-                .andExpect(jsonPath("$.comparison.affected_service_correct")
-                        .value(true))
+                .andExpect(jsonPath("$.comparison").value((Object) null))
                 .andExpect(jsonPath("$.model_calls.length()").value(3))
                 .andExpect(jsonPath("$.model_calls[0].phase").value("collect"))
                 .andExpect(jsonPath("$.model_calls[2].phase")
@@ -234,6 +241,9 @@ class LiveInvestigationApiTest {
         assertFalse(json.contains("\"ground_truth\":"));
         assertFalse(json.contains("allowed_evidence_ids"));
         assertFalse(json.contains("\"expected_claims\""));
+        assertFalse(json.contains("\"expected_status\""));
+        assertFalse(json.contains("\"expected_root_cause_code\""));
+        assertFalse(json.contains("\"expected_affected_service\""));
         assertFalse(json.contains("cpt-v1-log-inventory-noise"));
     }
 
@@ -260,10 +270,8 @@ class LiveInvestigationApiTest {
                 ).value("model-invented-evidence-id"))
                 .andExpect(jsonPath("$.verification.hard_errors[0]")
                         .value("unknown_evidence_id"))
-                .andExpect(jsonPath("$.comparison.root_cause_correct")
-                        .value(true))
-                .andExpect(jsonPath("$.comparison.affected_service_correct")
-                        .value(true));
+                .andExpect(jsonPath("$.diagnosis").value((Object) null))
+                .andExpect(jsonPath("$.comparison").value((Object) null));
     }
 
     @Test
@@ -435,18 +443,4 @@ class LiveInvestigationApiTest {
         );
     }
 
-    private Diagnosis insufficientEvidence() {
-        return new Diagnosis(
-                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
-                null,
-                null,
-                "More evidence is required.",
-                "No read-only evidence was returned by the model-selected tools.",
-                List.of(),
-                new SafeNextStep(
-                        "Collect more evidence after human approval.",
-                        true
-                )
-        );
-    }
 }

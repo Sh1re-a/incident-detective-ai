@@ -21,14 +21,19 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.call;
 import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.correctDiagnosis;
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.diagnosisWithUnsupportedCitation;
 import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.diagnosisWithUnknownCitation;
+import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.incorrectAbstentionWithSupportedCitation;
 import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.metadata;
 import static dev.shirwac.incidentdetective.live.LiveInvestigationTestFixtures.stubCheckoutCollections;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,9 +62,16 @@ class LiveInvestigationServiceTest {
     @MockitoBean
     private InvestigationModelGateway model;
 
+    @MockitoBean
+    private LiveInvestigationAdmissionGuard admissionGuard;
+
     @BeforeEach
     void resetModel() {
-        reset(model);
+        reset(model, admissionGuard);
+        when(admissionGuard.admit(any())).thenAnswer(invocation -> {
+            Supplier<?> action = invocation.getArgument(0);
+            return action.get();
+        });
     }
 
     @Test
@@ -118,8 +130,8 @@ class LiveInvestigationServiceTest {
                 "not a provider invoice"
         ));
         assertTrue(result.verification().hardErrors().isEmpty());
-        assertTrue(result.comparison().rootCauseCorrect());
-        assertTrue(result.comparison().affectedServiceCorrect());
+        assertNotNull(result.diagnosis());
+        assertNull(result.comparison());
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Evidence>> evidenceCaptor = ArgumentCaptor
@@ -179,6 +191,68 @@ class LiveInvestigationServiceTest {
                 result.verification().hardErrors()
         );
         assertFalse(result.verification().citationValidity().valid());
+        assertNull(result.diagnosis());
+        assertNull(result.comparison());
+    }
+
+    @Test
+    void withholdsASchemaValidDiagnosisWithUnsupportedCitation() {
+        stubCheckoutCollections(model);
+        when(model.synthesize(any(), anyList(), any())).thenReturn(
+                new SynthesisModelResult(
+                        diagnosisWithUnsupportedCitation(),
+                        metadata(ModelPhase.SYNTHESIZE, 1, 500, 200)
+                )
+        );
+
+        LiveInvestigationResult result = service.investigate(
+                SCENARIO_ID,
+                new LiveInvestigationRequest(true)
+        );
+
+        assertEquals(LiveRunStatus.VERIFICATION_FAILED, result.status());
+        assertTrue(result.verification().diagnosisSchemaPass());
+        assertTrue(result.verification().hardErrors().isEmpty());
+        assertTrue(result.verification().citationValidity().valid());
+        assertTrue(result.verification().diagnosisCorrectness()
+                .rootCauseCorrect());
+        assertTrue(result.verification().diagnosisCorrectness()
+                .affectedServiceCorrect());
+        assertTrue(result.verification().evidencePrecision().citationSupport()
+                .stream()
+                .anyMatch(support -> !support.supported()));
+        assertNull(result.diagnosis());
+        assertNull(result.comparison());
+    }
+
+    @Test
+    void withholdsASchemaValidDiagnosisWithWrongFactualResult() {
+        stubCheckoutCollections(model);
+        when(model.synthesize(any(), anyList(), any())).thenReturn(
+                new SynthesisModelResult(
+                        incorrectAbstentionWithSupportedCitation(),
+                        metadata(ModelPhase.SYNTHESIZE, 1, 500, 200)
+                )
+        );
+
+        LiveInvestigationResult result = service.investigate(
+                SCENARIO_ID,
+                new LiveInvestigationRequest(true)
+        );
+
+        assertEquals(LiveRunStatus.VERIFICATION_FAILED, result.status());
+        assertTrue(result.verification().diagnosisSchemaPass());
+        assertTrue(result.verification().hardErrors().isEmpty());
+        assertTrue(result.verification().citationValidity().valid());
+        assertTrue(result.verification().evidencePrecision().totalTriples() > 0);
+        assertTrue(result.verification().evidencePrecision().citationSupport()
+                .stream()
+                .allMatch(support -> support.supported()));
+        assertTrue(result.verification().diagnosisCorrectness().evaluated());
+        assertFalse(result.verification().diagnosisCorrectness()
+                .abstentionCorrect());
+        assertNull(result.diagnosis());
+        assertNull(result.comparison());
     }
 
     @Test

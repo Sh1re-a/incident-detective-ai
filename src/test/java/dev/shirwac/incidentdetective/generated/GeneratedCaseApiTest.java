@@ -228,9 +228,8 @@ class GeneratedCaseApiTest {
                 .andExpect(jsonPath(
                         "$.investigation.verification.claim_coverage.score"
                 ).value(1.0))
-                .andExpect(jsonPath(
-                        "$.investigation.comparison.root_cause_correct"
-                ).value(true))
+                .andExpect(jsonPath("$.investigation.comparison")
+                        .value((Object) null))
                 .andExpect(jsonPath(
                         "$.investigation.tool_events[*].tool_name"
                 ).value(containsInAnyOrder(
@@ -256,6 +255,7 @@ class GeneratedCaseApiTest {
         assertNull(response.get("hidden_ground_truth"));
         assertNull(response.get("investigation").get("hidden_ground_truth"));
         assertNull(response.get("investigation").get("ground_truth"));
+        assertTrue(response.get("investigation").get("comparison").isNull());
     }
 
     @Test
@@ -286,9 +286,7 @@ class GeneratedCaseApiTest {
                 "CATALOG_CACHE_INVALIDATION_FAILURE",
                 response.at("/investigation/diagnosis/root_cause_code").asText()
         );
-        assertTrue(
-                response.at("/investigation/comparison/root_cause_correct").asBoolean()
-        );
+        assertTrue(response.get("investigation").get("comparison").isNull());
     }
 
     @Test
