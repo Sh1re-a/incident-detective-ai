@@ -11,6 +11,7 @@ import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
 import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
 import dev.shirwac.incidentdetective.domain.scenario.Scenario;
 import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
+import dev.shirwac.incidentdetective.live.LiveToolEvent;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -516,7 +517,7 @@ final class IncidentLabResponsePresenter {
                 || agentTurn.verificationEvent() == null
                 || !agentTurn.verificationEvent().answerReleased()
                 || agentTurn.diagnosis() == null
-                || !safeControlReceipt(agentTurn.receipt())
+                || !safeControlReceipt(agentTurn)
                 || agentTurn.scenario() == null
                 || !scenario.scenarioId().equals(agentTurn.scenario().scenarioId())
                 || !scenario.scenarioId().equals(alarm.scenarioId())
@@ -689,14 +690,35 @@ final class IncidentLabResponsePresenter {
         if (agentTurn == null) {
             return;
         }
-        if (!safeControlReceipt(agentTurn.receipt())) {
+        if (!safeControlReceipt(agentTurn)) {
             throw new InvalidAdkControlReceiptException();
         }
     }
 
     private boolean safeControlReceipt(
-            AdkAgentTurnResponse.ControlReceipt receipt
+            AdkAgentTurnResponse agentTurn
     ) {
+        AdkAgentTurnResponse.ControlReceipt receipt = agentTurn.receipt();
+        List<AdkAgentTurnResponse.RuntimeEvent> events = agentTurn.events();
+        List<LiveToolEvent> toolEvents = agentTurn.toolEvents();
+        if (receipt == null || events == null || toolEvents == null) {
+            return false;
+        }
+        long observedModelCalls = events.stream()
+                .filter(event -> !event.functionCalls().isEmpty()
+                        || event.finalResponse())
+                .count();
+        long observedAdkToolCalls = events.stream()
+                .mapToLong(event -> event.functionResponses().size())
+                .sum();
+        int observedReadOperations = toolEvents.size()
+                + (agentTurn.diagnosticProbe() == null ? 0 : 1);
+        long observedEmbeddingCalls = toolEvents.stream()
+                .map(LiveToolEvent::runbookRetrieval)
+                .filter(Objects::nonNull)
+                .map(metadata -> metadata.queryEmbedding())
+                .filter(Objects::nonNull)
+                .count();
         return receipt != null
                 && !receipt.writeToolsAvailable()
                 && !receipt.actionExecuted()
@@ -706,6 +728,10 @@ final class IncidentLabResponsePresenter {
                 && receipt.readOperations() >= 0
                 && receipt.embeddingCalls() >= 0
                 && receipt.totalLatencyMs() >= 0
+                && receipt.modelCalls() == observedModelCalls
+                && receipt.adkToolCalls() == observedAdkToolCalls
+                && receipt.readOperations() == observedReadOperations
+                && receipt.embeddingCalls() == observedEmbeddingCalls
                 && List.of(AdkAgentRuntime.TOOL_NAME)
                 .equals(receipt.registeredTools());
     }

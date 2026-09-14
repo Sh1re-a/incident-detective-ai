@@ -19,7 +19,9 @@ import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
 import dev.shirwac.incidentdetective.generated.NordlyIncidentGeneratedCaseGenerator;
 import dev.shirwac.incidentdetective.generated.PaymentTimeoutGeneratedCaseGenerator;
 import dev.shirwac.incidentdetective.investigation.InvestigationData;
+import dev.shirwac.incidentdetective.investigation.tools.ToolName;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
+import dev.shirwac.incidentdetective.live.LiveToolEvent;
 import dev.shirwac.incidentdetective.nordly.KnowledgeRagSafetyGate;
 import dev.shirwac.incidentdetective.planning.IncidentBlastRadius;
 import dev.shirwac.incidentdetective.planning.IncidentPlan;
@@ -42,6 +44,7 @@ import org.mockito.InOrder;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -334,11 +337,75 @@ class IncidentLabServiceTest {
     }
 
     private void stubSafeReceipt(AdkAgentTurnResponse agentTurn) {
+        when(agentTurn.events()).thenReturn(List.of(
+                new AdkAgentTurnResponse.RuntimeEvent(
+                        1,
+                        "event-call",
+                        "invocation-test",
+                        "nordly_evidence_agent",
+                        "tool_call",
+                        java.time.Instant.parse("2026-09-01T08:20:00Z"),
+                        false,
+                        false,
+                        null,
+                        List.of(new AdkAgentTurnResponse.FunctionCallEvent(
+                                "call-1",
+                                "inspect_incident_evidence",
+                                Map.of("log_query", "timeout")
+                        )),
+                        List.of(),
+                        null,
+                        "gemini-test"
+                ),
+                new AdkAgentTurnResponse.RuntimeEvent(
+                        2,
+                        "event-result",
+                        "invocation-test",
+                        "nordly_evidence_agent",
+                        "tool_result",
+                        java.time.Instant.parse("2026-09-01T08:20:01Z"),
+                        false,
+                        false,
+                        null,
+                        List.of(),
+                        List.of(new AdkAgentTurnResponse.FunctionResponseEvent(
+                                "call-1",
+                                "inspect_incident_evidence",
+                                Map.of("status", "found")
+                        )),
+                        null,
+                        null
+                ),
+                new AdkAgentTurnResponse.RuntimeEvent(
+                        3,
+                        "event-final",
+                        "invocation-test",
+                        "nordly_diagnosis_agent",
+                        "final_response",
+                        java.time.Instant.parse("2026-09-01T08:20:02Z"),
+                        true,
+                        true,
+                        null,
+                        List.of(),
+                        List.of(),
+                        null,
+                        "gemini-test"
+                )
+        ));
+        when(agentTurn.toolEvents()).thenReturn(List.of(new LiveToolEvent(
+                "read-log-1",
+                1,
+                ToolName.SEARCH_LOGS,
+                Map.of("query", "timeout"),
+                "Returned request-local synthetic logs.",
+                List.of(),
+                null
+        )));
         when(agentTurn.receipt()).thenReturn(new AdkAgentTurnResponse.ControlReceipt(
                 2,
                 1,
-                4,
                 1,
+                0,
                 false,
                 false,
                 true,

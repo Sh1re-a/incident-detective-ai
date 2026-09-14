@@ -22,6 +22,8 @@ import dev.shirwac.incidentdetective.generated.GeneratedEvidenceMode;
 import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
 import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
 import dev.shirwac.incidentdetective.generated.NordlyIncidentGeneratedCaseGenerator;
+import dev.shirwac.incidentdetective.investigation.tools.ToolName;
+import dev.shirwac.incidentdetective.live.LiveToolEvent;
 import dev.shirwac.incidentdetective.planning.IncidentBlastRadius;
 import dev.shirwac.incidentdetective.planning.IncidentPlan;
 import dev.shirwac.incidentdetective.planning.IncidentPlanProposal;
@@ -48,6 +50,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.nullValue;
@@ -210,7 +213,7 @@ class IncidentLabApiTest {
                 ).value("CATALOG_CACHE_INVALIDATION_FAILURE"))
                 .andExpect(jsonPath(
                         "$.localized_presentations.en.action_receipt.read_operations"
-                ).value(4))
+                ).value(1))
                 .andExpect(jsonPath(
                         "$.localized_presentations.en.action_receipt.action_executed"
                 ).value(false))
@@ -447,8 +450,70 @@ class IncidentLabApiTest {
                         false
                 ),
                 null,
-                List.of(),
-                List.of(),
+                List.of(
+                        new AdkAgentTurnResponse.RuntimeEvent(
+                                1,
+                                "event-call",
+                                "invocation-api-test",
+                                "nordly_evidence_agent",
+                                "tool_call",
+                                Instant.parse("2026-09-01T08:20:00Z"),
+                                false,
+                                false,
+                                null,
+                                List.of(new AdkAgentTurnResponse.FunctionCallEvent(
+                                        "call-1",
+                                        "inspect_incident_evidence",
+                                        Map.of("log_query", "catalog")
+                                )),
+                                List.of(),
+                                null,
+                                "gemini-test"
+                        ),
+                        new AdkAgentTurnResponse.RuntimeEvent(
+                                2,
+                                "event-result",
+                                "invocation-api-test",
+                                "nordly_evidence_agent",
+                                "tool_result",
+                                Instant.parse("2026-09-01T08:20:01Z"),
+                                false,
+                                false,
+                                null,
+                                List.of(),
+                                List.of(new AdkAgentTurnResponse.FunctionResponseEvent(
+                                        "call-1",
+                                        "inspect_incident_evidence",
+                                        Map.of("status", "found")
+                                )),
+                                null,
+                                null
+                        ),
+                        new AdkAgentTurnResponse.RuntimeEvent(
+                                3,
+                                "event-final",
+                                "invocation-api-test",
+                                "nordly_diagnosis_agent",
+                                "final_response",
+                                Instant.parse("2026-09-01T08:20:02Z"),
+                                true,
+                                true,
+                                null,
+                                List.of(),
+                                List.of(),
+                                null,
+                                "gemini-test"
+                        )
+                ),
+                List.of(new LiveToolEvent(
+                        "read-log-1",
+                        1,
+                        ToolName.SEARCH_LOGS,
+                        Map.of("query", "catalog"),
+                        "Returned request-local synthetic logs.",
+                        List.of(),
+                        null
+                )),
                 null,
                 diagnosis,
                 null,
@@ -470,8 +535,8 @@ class IncidentLabApiTest {
                 new AdkAgentTurnResponse.ControlReceipt(
                         2,
                         1,
-                        4,
                         1,
+                        0,
                         false,
                         false,
                         true,

@@ -19,12 +19,15 @@ import dev.shirwac.incidentdetective.generated.GeneratedEvidenceMode;
 import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
 import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
 import dev.shirwac.incidentdetective.generated.PaymentTimeoutGeneratedCaseGenerator;
+import dev.shirwac.incidentdetective.investigation.tools.ToolName;
+import dev.shirwac.incidentdetective.live.LiveToolEvent;
 import dev.shirwac.incidentdetective.replay.ReplayComparison;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -140,8 +143,8 @@ class IncidentLabResponsePresenterTest {
         assertTrue(english.actionReceipt().humanApprovalRequired());
         assertNull(sanitized.comparison());
         assertNull(sanitized.diagnosis());
-        assertNull(sanitized.events().getFirst().text());
-        assertTrue(sanitized.events().getFirst().contentWithheld());
+        assertNull(sanitized.events().getLast().text());
+        assertTrue(sanitized.events().getLast().contentWithheld());
     }
 
     @Test
@@ -399,6 +402,31 @@ class IncidentLabResponsePresenterTest {
         );
     }
 
+    @Test
+    void unreconciledControlReceiptCountersStopTheIncidentLabResponse() {
+        Diagnosis diagnosis = diagnosed(alarm.evidenceIds().getFirst());
+        AdkAgentTurnResponse response = agentTurn(diagnosis, true);
+        List<AdkAgentTurnResponse.ControlReceipt> invalid = List.of(
+                controlReceipt(1, 1, 2, 0),
+                controlReceipt(2, 0, 2, 0),
+                controlReceipt(2, 1, 3, 0),
+                controlReceipt(2, 1, 2, 1)
+        );
+
+        for (AdkAgentTurnResponse.ControlReceipt receipt : invalid) {
+            when(response.receipt()).thenReturn(receipt);
+            assertThrows(
+                    InvalidAdkControlReceiptException.class,
+                    () -> presenter.present(
+                            generated.scenario(),
+                            logs,
+                            alarm,
+                            response
+                    )
+            );
+        }
+    }
+
     private Diagnosis diagnosed(String evidenceId) {
         return new Diagnosis(
                 DiagnosisStatus.DIAGNOSED,
@@ -429,20 +457,7 @@ class IncidentLabResponsePresenterTest {
         when(response.scenario()).thenReturn(generated.scenario());
         when(response.diagnosis()).thenReturn(diagnosis);
         when(response.verificationEvent()).thenReturn(verification(answerReleased));
-        when(response.receipt()).thenReturn(new AdkAgentTurnResponse.ControlReceipt(
-                2,
-                1,
-                4,
-                1,
-                false,
-                false,
-                true,
-                List.of("inspect_incident_evidence"),
-                null,
-                null,
-                "test",
-                10
-        ));
+        when(response.receipt()).thenReturn(controlReceipt(2, 1, 2, 0));
         when(response.comparison()).thenReturn(new ReplayComparison(
                 diagnosis.status(),
                 "PAYMENT_TIMEOUT_CONFIG",
@@ -456,9 +471,47 @@ class IncidentLabResponsePresenterTest {
                         1,
                         "event-1",
                         "invocation-1",
-                        "diagnosis_agent",
-                        "text",
+                        "nordly_evidence_agent",
+                        "tool_call",
                         Instant.parse("2026-09-01T08:20:00Z"),
+                        false,
+                        false,
+                        null,
+                        List.of(new AdkAgentTurnResponse.FunctionCallEvent(
+                                "call-1",
+                                "inspect_incident_evidence",
+                                Map.of("log_query", "timeout")
+                        )),
+                        List.of(),
+                        null,
+                        "gemini-test"
+                ),
+                new AdkAgentTurnResponse.RuntimeEvent(
+                        2,
+                        "event-2",
+                        "invocation-1",
+                        "nordly_evidence_agent",
+                        "tool_result",
+                        Instant.parse("2026-09-01T08:20:01Z"),
+                        false,
+                        false,
+                        null,
+                        List.of(),
+                        List.of(new AdkAgentTurnResponse.FunctionResponseEvent(
+                                "call-1",
+                                "inspect_incident_evidence",
+                                Map.of("status", "found")
+                        )),
+                        null,
+                        null
+                ),
+                new AdkAgentTurnResponse.RuntimeEvent(
+                        3,
+                        "event-3",
+                        "invocation-1",
+                        "nordly_diagnosis_agent",
+                        "final_response",
+                        Instant.parse("2026-09-01T08:20:02Z"),
                         true,
                         false,
                         UNTRUSTED_PROSE,
@@ -468,9 +521,53 @@ class IncidentLabResponsePresenterTest {
                         "gemini-test"
                 )
         ));
-        when(response.toolEvents()).thenReturn(List.of());
+        when(response.toolEvents()).thenReturn(List.of(new LiveToolEvent(
+                "read-log-1",
+                1,
+                ToolName.SEARCH_LOGS,
+                Map.of("query", "timeout"),
+                "Returned one request-local synthetic log.",
+                List.of(logs.getFirst()),
+                null
+        )));
+        when(response.diagnosticProbe()).thenReturn(new DiagnosticProbeReceipt(
+                generated.scenario().scenarioId(),
+                DiagnosticProbeId.SERVICE_HEALTH,
+                DiagnosticProbeOutcome.OBSERVED,
+                "One request-local error log was observed.",
+                List.of(new DiagnosticProbeFinding(
+                        "service_health",
+                        "PAYMENT_ADAPTER",
+                        "degraded",
+                        "The read-only probe cited one backend log.",
+                        List.of(logs.getFirst().evidenceId())
+                )),
+                false
+        ));
         when(response.limitations()).thenReturn(List.of());
         return response;
+    }
+
+    private AdkAgentTurnResponse.ControlReceipt controlReceipt(
+            int modelCalls,
+            int adkToolCalls,
+            int readOperations,
+            int embeddingCalls
+    ) {
+        return new AdkAgentTurnResponse.ControlReceipt(
+                modelCalls,
+                adkToolCalls,
+                readOperations,
+                embeddingCalls,
+                false,
+                false,
+                true,
+                List.of("inspect_incident_evidence"),
+                null,
+                null,
+                "test",
+                10
+        );
     }
 
     private AdkAgentTurnResponse.VerificationEvent verification(
