@@ -2,13 +2,13 @@ package dev.shirwac.incidentdetective.incidentlab;
 
 import dev.shirwac.incidentdetective.adk.AdkAgentTurnResponse;
 import dev.shirwac.incidentdetective.adk.AdkAgentTurnService;
-import dev.shirwac.incidentdetective.alarm.AlarmReceipt;
-import dev.shirwac.incidentdetective.alarm.Http5xxBurstRule;
+import dev.shirwac.incidentdetective.alarm.GeneratedIncidentAlarmEvaluator;
+import dev.shirwac.incidentdetective.alarm.SignalAlarmReceipt;
 import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
 import dev.shirwac.incidentdetective.generated.GeneratedCase;
-import dev.shirwac.incidentdetective.generated.GeneratedCaseFactory;
-import dev.shirwac.incidentdetective.generated.GeneratedCaseRequest;
-import dev.shirwac.incidentdetective.generated.GeneratedEvidenceMode;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseGeneration;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseGenerationRequest;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseGenerationService;
 import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
 import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
@@ -23,8 +23,6 @@ import dev.shirwac.incidentdetective.planning.IncidentPlanValidator;
 import dev.shirwac.incidentdetective.planning.IncidentPlannerGateway;
 import dev.shirwac.incidentdetective.planning.IncidentPlannerResponse;
 import dev.shirwac.incidentdetective.planning.IncidentPlanningRequest;
-import dev.shirwac.incidentdetective.planning.IncidentService;
-import dev.shirwac.incidentdetective.planning.IncidentSeverity;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
@@ -40,14 +38,13 @@ import java.util.regex.Pattern;
 @Profile("rag")
 public final class IncidentLabService {
 
-    static final String TRUSTED_AGENT_MESSAGE =
-            "Investigate the triggered synthetic PAYMENT_TIMEOUT alarm. "
-                    + "Use only the bounded read-only evidence and runbooks. "
-                    + "Return a diagnosis and a safe next step that requires human approval.";
+    static final String TRUSTED_AGENT_MESSAGE = trustedAgentMessage(
+            GeneratedIncidentFamily.PAYMENT_TIMEOUT
+    );
 
     private static final List<String> PLAN_LIMITATIONS = List.of(
             "The model proposes a plan; deterministic Java owns approval.",
-            "Only PAYMENT_TIMEOUT on PAYMENT_ADAPTER is runnable in v1.",
+            "Java narrows every runnable family to one bounded synthetic core service.",
             "This endpoint does not execute an incident or call an agent.",
             "The handoff is stateless; the run endpoint revalidates every canonical plan field."
     );
@@ -70,15 +67,15 @@ public final class IncidentLabService {
     private final LiveAiRunGuard liveAiRunGuard;
     private final IncidentPlannerGateway planner;
     private final IncidentPlanValidator planValidator;
-    private final GeneratedCaseFactory generatedCases;
-    private final Http5xxBurstRule alarmRule;
+    private final GeneratedCaseGenerationService generatedCases;
+    private final GeneratedIncidentAlarmEvaluator alarmEvaluator;
     private final AdkAgentTurnService adkAgent;
 
     public IncidentLabService(
             KnowledgeRagSafetyGate safetyGate,
             LiveAiRunGuard liveAiRunGuard,
             IncidentPlannerGateway planner,
-            GeneratedCaseFactory generatedCases,
+            GeneratedCaseGenerationService generatedCases,
             AdkAgentTurnService adkAgent
     ) {
         this.safetyGate = safetyGate;
@@ -87,7 +84,7 @@ public final class IncidentLabService {
         this.generatedCases = generatedCases;
         this.adkAgent = adkAgent;
         planValidator = new IncidentPlanValidator();
-        alarmRule = new Http5xxBurstRule();
+        alarmEvaluator = new GeneratedIncidentAlarmEvaluator();
     }
 
     public IncidentLabPlanResponse createPlan(IncidentLabPlanRequest request) {
@@ -114,12 +111,15 @@ public final class IncidentLabService {
     public IncidentLabRunResponse run(IncidentLabRunRequest request) {
         Objects.requireNonNull(request, "request must not be null");
         IncidentPlan canonicalPlan = requireCanonicalPlan(request.plan());
-        GeneratedCase generated = generatedCases.create(new GeneratedCaseRequest(
-                request.seed(),
-                GeneratedIncidentFamily.PAYMENT_TIMEOUT,
-                GeneratedEvidenceMode.DIAGNOSTIC,
-                GeneratedNoiseLevel.LOW
-        ));
+        GeneratedCaseGeneration generation = generatedCases.generate(
+                new GeneratedCaseGenerationRequest(
+                        request.seed(),
+                        canonicalPlan.incidentFamily(),
+                        request.evidenceMode(),
+                        GeneratedNoiseLevel.LOW
+                )
+        );
+        GeneratedCase generated = generation.generatedCase();
         List<LogEvidence> backendLogs = generated.investigationData()
                 .evidenceInventory()
                 .stream()
@@ -127,11 +127,14 @@ public final class IncidentLabService {
                 .map(LogEvidence.class::cast)
                 .sorted(LOG_ORDER)
                 .toList();
-        Optional<AlarmReceipt> alarm = alarmRule.evaluate(backendLogs);
+        Optional<SignalAlarmReceipt> alarm = alarmEvaluator.evaluate(
+                canonicalPlan.incidentFamily(),
+                generated.investigationData()
+        );
         AdkAgentTurnResponse agentTurn = alarm.isPresent()
                 ? adkAgent.runGeneratedCase(
                         generated,
-                        TRUSTED_AGENT_MESSAGE,
+                        trustedAgentMessage(canonicalPlan.incidentFamily()),
                         request.confirmLiveAi()
                 )
                 : null;
@@ -142,6 +145,7 @@ public final class IncidentLabService {
                 IncidentLabRunResponse.DELIVERY,
                 IncidentLabRunResponse.TRUTH_LABEL,
                 canonicalPlan,
+                generation.receipt(),
                 generated.scenario(),
                 backendLogs,
                 alarm.orElse(null),
@@ -216,7 +220,7 @@ public final class IncidentLabService {
     }
 
     private String runOutcome(
-            Optional<AlarmReceipt> alarm,
+            Optional<SignalAlarmReceipt> alarm,
             AdkAgentTurnResponse agentTurn
     ) {
         if (alarm.isEmpty()) {
@@ -259,16 +263,19 @@ public final class IncidentLabService {
         );
         IncidentPlanValidationResult validation = planValidator.validate(proposal);
         if (validation.decision() != IncidentPlanDecision.APPROVED
-                || !submitted.equals(validation.plan())
-                || submitted.incidentFamily()
-                != GeneratedIncidentFamily.PAYMENT_TIMEOUT
-                || submitted.severity() != IncidentSeverity.HIGH
-                || !submitted.affectedServices().equals(
-                List.of(IncidentService.PAYMENT_ADAPTER)
-        )) {
+                || !submitted.equals(validation.plan())) {
             throw new InvalidIncidentLabPlanException();
         }
         return submitted;
+    }
+
+    private static String trustedAgentMessage(
+            GeneratedIncidentFamily family
+    ) {
+        return "Investigate the triggered synthetic " + family.name()
+                + " alarm. Use only the bounded read-only evidence and runbooks. "
+                + "Return a diagnosis or state that evidence is insufficient. "
+                + "Every next step requires human approval.";
     }
 
     private IncidentLabPlanResponse.SafetyReceipt safety(

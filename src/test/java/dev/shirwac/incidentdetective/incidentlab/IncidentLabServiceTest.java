@@ -7,11 +7,15 @@ import dev.shirwac.incidentdetective.domain.evidence.Evidence;
 import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
 import dev.shirwac.incidentdetective.domain.groundtruth.GroundTruth;
 import dev.shirwac.incidentdetective.generated.GeneratedCase;
-import dev.shirwac.incidentdetective.generated.GeneratedCaseFactory;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseGeneration;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseGenerationRequest;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseGenerationService;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseReceipt;
 import dev.shirwac.incidentdetective.generated.GeneratedCaseRequest;
 import dev.shirwac.incidentdetective.generated.GeneratedEvidenceMode;
 import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
 import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
+import dev.shirwac.incidentdetective.generated.NordlyIncidentGeneratedCaseGenerator;
 import dev.shirwac.incidentdetective.generated.PaymentTimeoutGeneratedCaseGenerator;
 import dev.shirwac.incidentdetective.investigation.InvestigationData;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
@@ -56,7 +60,7 @@ class IncidentLabServiceTest {
     private KnowledgeRagSafetyGate safetyGate;
     private LiveAiRunGuard liveAiRunGuard;
     private IncidentPlannerGateway planner;
-    private GeneratedCaseFactory generatedCases;
+    private GeneratedCaseGenerationService generatedCases;
     private AdkAgentTurnService adkAgent;
     private IncidentLabService service;
 
@@ -65,7 +69,7 @@ class IncidentLabServiceTest {
         safetyGate = mock(KnowledgeRagSafetyGate.class);
         liveAiRunGuard = mock(LiveAiRunGuard.class);
         planner = mock(IncidentPlannerGateway.class);
-        generatedCases = mock(GeneratedCaseFactory.class);
+        generatedCases = mock(GeneratedCaseGenerationService.class);
         adkAgent = mock(AdkAgentTurnService.class);
         service = new IncidentLabService(
                 safetyGate,
@@ -154,9 +158,10 @@ class IncidentLabServiceTest {
     void canonicalRunGeneratesOneCaseAndInvokesAdkOnlyAfterAlarm() {
         long seed = 42L;
         GeneratedCase generated = generatedCase(seed);
+        GeneratedCaseGeneration generation = generation(generated);
         AdkAgentTurnResponse agentTurn = mock(AdkAgentTurnResponse.class);
         when(agentTurn.outcome()).thenReturn("completed");
-        when(generatedCases.create(any())).thenReturn(generated);
+        when(generatedCases.generate(any())).thenReturn(generation);
         when(adkAgent.runGeneratedCase(
                 eq(generated),
                 eq(IncidentLabService.TRUSTED_AGENT_MESSAGE),
@@ -169,18 +174,18 @@ class IncidentLabServiceTest {
 
         assertEquals("alarm_investigated", response.outcome());
         assertTrue(response.alarmReceipt() != null);
-        assertEquals(3, response.alarmReceipt().observedFailures());
+        assertEquals(3, response.alarmReceipt().signal().observedValue());
         assertSame(agentTurn, response.agentTurn());
         assertTrue(isChronological(response.backendLogs()));
-        ArgumentCaptor<GeneratedCaseRequest> request = ArgumentCaptor.forClass(
-                GeneratedCaseRequest.class
-        );
-        verify(generatedCases).create(request.capture());
+        ArgumentCaptor<GeneratedCaseGenerationRequest> request =
+                ArgumentCaptor.forClass(
+                        GeneratedCaseGenerationRequest.class
+                );
+        verify(generatedCases).generate(request.capture());
         assertEquals(seed, request.getValue().seed());
         assertEquals(GeneratedIncidentFamily.PAYMENT_TIMEOUT,
                 request.getValue().incidentFamily());
-        assertEquals(GeneratedEvidenceMode.DIAGNOSTIC,
-                request.getValue().evidenceMode());
+        assertNull(request.getValue().evidenceMode());
         assertEquals(GeneratedNoiseLevel.LOW,
                 request.getValue().noiseLevel());
         verify(adkAgent).runGeneratedCase(
@@ -193,9 +198,10 @@ class IncidentLabServiceTest {
     @Test
     void topLevelRunDoesNotMaskAWithheldAdkDiagnosis() {
         GeneratedCase generated = generatedCase(42L);
+        GeneratedCaseGeneration generation = generation(generated);
         AdkAgentTurnResponse agentTurn = mock(AdkAgentTurnResponse.class);
         when(agentTurn.outcome()).thenReturn("verification_failed");
-        when(generatedCases.create(any())).thenReturn(generated);
+        when(generatedCases.generate(any())).thenReturn(generation);
         when(adkAgent.runGeneratedCase(any(), any(), eq(true)))
                 .thenReturn(agentTurn);
 
@@ -211,9 +217,60 @@ class IncidentLabServiceTest {
     }
 
     @Test
+    void catalogPlanUsesItsOwnGeneratorAlarmAndTrustedAgentScope() {
+        long seed = 71L;
+        GeneratedCase generated = new NordlyIncidentGeneratedCaseGenerator()
+                .generate(new GeneratedCaseRequest(
+                        seed,
+                        GeneratedIncidentFamily.CATALOG_CACHE_INVALIDATION,
+                        GeneratedEvidenceMode.INSUFFICIENT_EVIDENCE,
+                        GeneratedNoiseLevel.LOW
+                ));
+        GeneratedCaseGeneration generation = generation(generated);
+        AdkAgentTurnResponse agentTurn = mock(AdkAgentTurnResponse.class);
+        when(agentTurn.outcome()).thenReturn("completed");
+        when(generatedCases.generate(any())).thenReturn(generation);
+        when(adkAgent.runGeneratedCase(
+                eq(generated),
+                any(),
+                eq(true)
+        )).thenReturn(agentTurn);
+
+        IncidentLabRunResponse response = service.run(
+                new IncidentLabRunRequest(
+                        canonicalPlan(
+                                GeneratedIncidentFamily.CATALOG_CACHE_INVALIDATION,
+                                IncidentService.CATALOG_SERVICE
+                        ),
+                        seed,
+                        GeneratedEvidenceMode.INSUFFICIENT_EVIDENCE,
+                        true
+                )
+        );
+
+        assertEquals("alarm_investigated", response.outcome());
+        assertEquals(
+                GeneratedIncidentFamily.CATALOG_CACHE_INVALIDATION,
+                response.alarmReceipt().incidentFamily()
+        );
+        assertEquals(
+                "catalog_version_divergence_count",
+                response.alarmReceipt().signal().name()
+        );
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(adkAgent).runGeneratedCase(
+                eq(generated),
+                message.capture(),
+                eq(true)
+        );
+        assertTrue(message.getValue().contains("CATALOG_CACHE_INVALIDATION"));
+    }
+
+    @Test
     void noAlarmReturnsLogsWithoutInvokingAdk() {
         GeneratedCase withoutAlarm = withoutAlarm(generatedCase(42L));
-        when(generatedCases.create(any())).thenReturn(withoutAlarm);
+        GeneratedCaseGeneration generation = generation(withoutAlarm);
+        when(generatedCases.generate(any())).thenReturn(generation);
 
         IncidentLabRunResponse response = service.run(
                 new IncidentLabRunRequest(canonicalPlan(), 42L, true)
@@ -242,12 +299,29 @@ class IncidentLabServiceTest {
                 InvalidIncidentLabPlanException.class,
                 () -> service.run(new IncidentLabRunRequest(changed, 42L, true))
         );
-        verify(generatedCases, never()).create(any());
+        verify(generatedCases, never()).generate(any());
         verifyNoInteractions(adkAgent);
     }
 
     private IncidentPlan canonicalPlan() {
-        return new IncidentPlanValidator().validate(exactProposal()).plan();
+        return canonicalPlan(
+                GeneratedIncidentFamily.PAYMENT_TIMEOUT,
+                IncidentService.PAYMENT_ADAPTER
+        );
+    }
+
+    private IncidentPlan canonicalPlan(
+            GeneratedIncidentFamily family,
+            IncidentService service
+    ) {
+        return new IncidentPlanValidator().validate(new IncidentPlanProposal(
+                IncidentPlanProposalStatus.CANDIDATE,
+                "Synthetic incident.",
+                family,
+                IncidentSeverity.HIGH,
+                List.of(service),
+                IncidentBlastRadius.SINGLE_SERVICE
+        )).plan();
     }
 
     private IncidentPlanProposal exactProposal() {
@@ -305,6 +379,13 @@ class IncidentLabServiceTest {
                 new InvestigationData(generated.scenario(), evidence),
                 groundTruth
         );
+    }
+
+    private GeneratedCaseGeneration generation(GeneratedCase generated) {
+        GeneratedCaseGeneration generation = mock(GeneratedCaseGeneration.class);
+        when(generation.generatedCase()).thenReturn(generated);
+        when(generation.receipt()).thenReturn(mock(GeneratedCaseReceipt.class));
+        return generation;
     }
 
     private boolean isHttp5xx(LogEvidence log) {
