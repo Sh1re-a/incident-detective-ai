@@ -90,3 +90,28 @@ Vertex AI deployment or a successful insufficient-evidence answer. The next
 bounded improvement is a general abstention instruction that reduces
 unsupported extra claims across all incomplete incident families. The failed
 run remains part of the evidence after that change.
+
+## Post-v7 observation — incomplete live receipt
+
+After the general abstention contract was updated to prompt v7 and diagnosis
+schema v5, one separate catalog request was sent with a direct canonical plan.
+The planner was not part of this request.
+
+- The request used a new server-generated seed and explicitly selected
+  `insufficient_evidence`.
+- The endpoint returned HTTP 502 after approximately two seconds.
+- The command used fail-on-HTTP-error behavior, so the sanitized response body
+  and backend error code were not retained.
+- No automatic retry was made.
+- The application health endpoint still reported `UP` after the response.
+
+Because the response body was not captured, this observation cannot establish
+whether the failure was a provider error, a rejected model response, invalid
+tool arguments or another documented 502 path. It also cannot prove whether
+the ADK agents or read tools had started. This is therefore evidence of an
+honest failed request, not a completed post-v7 validation and not evidence that
+prompt v7 caused the failure.
+
+The next live validation must capture both HTTP status and the sanitized JSON
+body without printing secrets. It remains a separate, explicit cost-bearing
+run; it must not be triggered as an automatic retry.

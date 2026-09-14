@@ -1,10 +1,33 @@
 # Incident Lab Backend v2
 
-Status: implementation plan
+Status: implemented locally; 444 tests passed; post-v7 live validation pending
 
 Scope: synthetic Nordly incidents, local backend first
 
 Frontend: unchanged until the backend acceptance gate passes
+
+## Current checkpoint
+
+Implemented and verified locally:
+
+- server-generated and client-replayable incident seeds;
+- four deterministic alarm families;
+- Google ADK `SequentialAgent` with an evidence agent followed by a tool-free
+  diagnosis agent;
+- one bounded ADK function backed by typed log, metric, trace, runbook and
+  diagnostic-probe reads;
+- embeddings and pgvector retrieval with explicit receipts;
+- business, developer and action receipts derived from verified backend state;
+- strict Java release control for supported, insufficient and withheld answers;
+- OpenAPI coverage for optional inputs and safe failure responses;
+- the full Maven suite: 444 tests, zero failures.
+
+Live evidence is intentionally split from test evidence. One pre-v7 run crossed
+Gemini, ADK, embeddings and pgvector and was safely withheld by Java. A later
+post-v7 request returned HTTP 502, but its response body was not retained, so
+the exact safe backend code and the reached workflow stage remain unknown. No
+automatic retry was made. A captured post-v7 live run is therefore the only
+remaining backend acceptance item before frontend integration.
 
 ## Product outcome
 
