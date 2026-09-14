@@ -1,8 +1,27 @@
 package dev.shirwac.incidentdetective.incidentlab;
 
+import dev.shirwac.incidentdetective.adk.AdkAgentTurnResponse;
+import dev.shirwac.incidentdetective.alarm.GeneratedIncidentAlarmEvaluator;
+import dev.shirwac.incidentdetective.alarm.SignalAlarmReceipt;
 import dev.shirwac.incidentdetective.api.ApiProblemResponse;
 import dev.shirwac.incidentdetective.api.ApiCorsProperties;
+import dev.shirwac.incidentdetective.domain.diagnosis.Claim;
+import dev.shirwac.incidentdetective.domain.diagnosis.ClaimCode;
+import dev.shirwac.incidentdetective.domain.diagnosis.Diagnosis;
+import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
+import dev.shirwac.incidentdetective.domain.diagnosis.SafeNextStep;
+import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
+import dev.shirwac.incidentdetective.domain.scenario.Scenario;
+import dev.shirwac.incidentdetective.generated.GeneratedCase;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseFactory;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseReceipt;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseRequest;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseSeed;
+import dev.shirwac.incidentdetective.generated.GeneratedCaseVariant;
+import dev.shirwac.incidentdetective.generated.GeneratedEvidenceMode;
 import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
+import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
+import dev.shirwac.incidentdetective.generated.NordlyIncidentGeneratedCaseGenerator;
 import dev.shirwac.incidentdetective.planning.IncidentBlastRadius;
 import dev.shirwac.incidentdetective.planning.IncidentPlan;
 import dev.shirwac.incidentdetective.planning.IncidentPlanProposal;
@@ -27,9 +46,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
@@ -137,6 +158,61 @@ class IncidentLabApiTest {
                         .value("INVALID_REQUEST_BODY"));
     }
 
+    @Test
+    void runEndpointSerializesTheDualResponseAndGenericReceipts()
+            throws Exception {
+        IncidentLabRunResponse response = diagnosedRunResponse();
+        when(service.run(any())).thenReturn(response);
+
+        mockMvc.perform(post(RUNS)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(catalogRunRequestJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer_state").value("diagnosed"))
+                .andExpect(jsonPath("$.business_response.headline")
+                        .value("Rotorsaken är verifierad"))
+                .andExpect(jsonPath("$.developer_response.root_cause_code")
+                        .value("CATALOG_CACHE_INVALIDATION_FAILURE"))
+                .andExpect(jsonPath("$.action_receipt.write_tools_available")
+                        .value(false))
+                .andExpect(jsonPath("$.action_receipt.action_executed")
+                        .value(false))
+                .andExpect(jsonPath("$.action_receipt.human_approval_required")
+                        .value(true))
+                .andExpect(jsonPath("$.generation_receipt.generator_version")
+                        .value(GeneratedCaseFactory.GENERATOR_VERSION))
+                .andExpect(jsonPath("$.generation_receipt.variant.variant_id")
+                        .isNotEmpty())
+                .andExpect(jsonPath("$.alarm_receipt.incident_family")
+                        .value("catalog_cache_invalidation"))
+                .andExpect(jsonPath("$.alarm_receipt.signal.name")
+                        .value("catalog_version_divergence_count"))
+                .andExpect(jsonPath("$.alarm_receipt.signal.threshold_value")
+                        .value(1.0))
+                .andExpect(jsonPath("$.agent_turn.diagnosis.status")
+                        .value("diagnosed"))
+                .andExpect(jsonPath("$.agent_turn.comparison")
+                        .value(nullValue()));
+    }
+
+    @Test
+    void noAlarmRunSerializesNullAlarmAndAgentReceipts() throws Exception {
+        IncidentLabRunResponse response = noAlarmRunResponse();
+        when(service.run(any())).thenReturn(response);
+
+        mockMvc.perform(post(RUNS)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(catalogRunRequestJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer_state").value("not_started"))
+                .andExpect(jsonPath("$.alarm_receipt").value(nullValue()))
+                .andExpect(jsonPath("$.agent_turn").value(nullValue()))
+                .andExpect(jsonPath("$.action_receipt.action_executed")
+                        .value(false))
+                .andExpect(jsonPath("$.action_receipt.human_approval_required")
+                        .value(true));
+    }
+
     @ParameterizedTest
     @MethodSource("plannerFailures")
     void plannerFailuresBecomeDocumentedProblemDetails(
@@ -204,6 +280,270 @@ class IncidentLabApiTest {
                 List.of(IncidentService.PAYMENT_ADAPTER),
                 IncidentBlastRadius.SINGLE_SERVICE
         );
+    }
+
+    private IncidentLabRunResponse diagnosedRunResponse() {
+        GeneratedCaseRequest request = generatedRequest();
+        GeneratedCase generated = generatedCase(request);
+        SignalAlarmReceipt alarm = new GeneratedIncidentAlarmEvaluator()
+                .evaluate(request.incidentFamily(), generated.investigationData())
+                .orElseThrow();
+        String evidenceId = alarm.evidenceIds().getFirst();
+        Diagnosis diagnosis = new Diagnosis(
+                DiagnosisStatus.DIAGNOSED,
+                "CATALOG_CACHE_INVALIDATION_FAILURE",
+                "CATALOG_SERVICE",
+                "Verified generated diagnosis.",
+                "Verified generated diagnosis.",
+                List.of(new Claim(
+                        ClaimCode.ROOT_CAUSE,
+                        "CATALOG_CACHE_INVALIDATION_FAILURE",
+                        "Verified root cause.",
+                        List.of(evidenceId)
+                )),
+                new SafeNextStep("Review the cited configuration.", true)
+        );
+        IncidentLabRunResponse.VerifiedClaim verifiedClaim =
+                new IncidentLabRunResponse.VerifiedClaim(
+                        "root_cause",
+                        "CATALOG_CACHE_INVALIDATION_FAILURE",
+                        List.of(evidenceId)
+                );
+        return new IncidentLabRunResponse(
+                IncidentLabRunResponse.CONTRACT_VERSION,
+                "alarm_investigated",
+                IncidentLabRunResponse.DELIVERY,
+                IncidentLabRunResponse.TRUTH_LABEL,
+                IncidentLabRunResponse.AnswerState.DIAGNOSED,
+                new IncidentLabRunResponse.BusinessResponse(
+                        "Rotorsaken är verifierad",
+                        "Ett syntetiskt kataloglarm löste ut.",
+                        "Syntetiska katalogvärden blev inaktuella.",
+                        List.of("Larmet är verifierat."),
+                        List.of("Verklig miljö har inte undersökts."),
+                        "Granska citerat underlag.",
+                        "Verifierad i syntetiskt fall",
+                        true
+                ),
+                new IncidentLabRunResponse.DeveloperResponse(
+                        "Java frisläppte diagnosen.",
+                        "CATALOG_CACHE_INVALIDATION_FAILURE",
+                        "CATALOG_SERVICE",
+                        List.of(verifiedClaim),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        "Granska citerat underlag."
+                ),
+                new IncidentLabRunResponse.ActionReceipt(
+                        "proposed_only",
+                        4,
+                        false,
+                        false,
+                        true,
+                        "Granska citerat underlag.",
+                        "Ingen åtgärd kördes."
+                ),
+                catalogPlan(),
+                generationReceipt(generated, request),
+                generated.scenario(),
+                logs(generated),
+                alarm,
+                completedAgentTurn(generated.scenario(), diagnosis),
+                List.of("Synthetic only.")
+        );
+    }
+
+    private IncidentLabRunResponse noAlarmRunResponse() {
+        GeneratedCaseRequest request = generatedRequest();
+        GeneratedCase generated = generatedCase(request);
+        return new IncidentLabRunResponse(
+                IncidentLabRunResponse.CONTRACT_VERSION,
+                "no_alarm",
+                IncidentLabRunResponse.DELIVERY,
+                IncidentLabRunResponse.TRUTH_LABEL,
+                IncidentLabRunResponse.AnswerState.NOT_STARTED,
+                new IncidentLabRunResponse.BusinessResponse(
+                        "Ingen utredning startades",
+                        "Ingen larmregel löste ut.",
+                        "Ingen påverkan är bedömd.",
+                        List.of("Scenariot skapades."),
+                        List.of("Rotorsaken har inte utretts."),
+                        "Fortsätt samla syntetisk telemetri.",
+                        "Inte bedömd",
+                        true
+                ),
+                new IncidentLabRunResponse.DeveloperResponse(
+                        "ADK kördes inte.",
+                        null,
+                        null,
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        "Fortsätt samla syntetisk telemetri."
+                ),
+                new IncidentLabRunResponse.ActionReceipt(
+                        "not_proposed",
+                        0,
+                        false,
+                        false,
+                        true,
+                        null,
+                        "Ingen åtgärd kördes."
+                ),
+                catalogPlan(),
+                generationReceipt(generated, request),
+                generated.scenario(),
+                logs(generated),
+                null,
+                null,
+                List.of("Synthetic only.")
+        );
+    }
+
+    private AdkAgentTurnResponse completedAgentTurn(
+            Scenario scenario,
+            Diagnosis diagnosis
+    ) {
+        return new AdkAgentTurnResponse(
+                AdkAgentTurnResponse.CONTRACT_VERSION,
+                "run-api-test",
+                "session-api-test",
+                "turn-api-test",
+                AdkAgentTurnResponse.MODE,
+                AdkAgentTurnResponse.TRUTH_LABEL,
+                "completed",
+                null,
+                scenario,
+                new AdkAgentTurnResponse.SafetyDecision(
+                        "allowed",
+                        "none",
+                        "Tillåten.",
+                        "Allowed."
+                ),
+                new AdkAgentTurnResponse.RuntimeProvenance(
+                        "google-adk",
+                        "test",
+                        "nordly_investigation",
+                        "gemini-test",
+                        "test",
+                        "in_memory",
+                        "post_run",
+                        "adk_events",
+                        true,
+                        false
+                ),
+                null,
+                List.of(),
+                List.of(),
+                null,
+                diagnosis,
+                null,
+                null,
+                new AdkAgentTurnResponse.VerificationEvent(
+                        "deterministic_java_verifier",
+                        Instant.parse("2026-09-01T08:20:00Z"),
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        "Released."
+                ),
+                new AdkAgentTurnResponse.ControlReceipt(
+                        2,
+                        1,
+                        4,
+                        1,
+                        false,
+                        false,
+                        true,
+                        List.of("inspect_incident_evidence"),
+                        null,
+                        null,
+                        "test",
+                        10
+                ),
+                List.of("Synthetic only.")
+        );
+    }
+
+    private GeneratedCaseRequest generatedRequest() {
+        return new GeneratedCaseRequest(
+                71L,
+                GeneratedIncidentFamily.CATALOG_CACHE_INVALIDATION,
+                GeneratedEvidenceMode.DIAGNOSTIC,
+                GeneratedNoiseLevel.LOW
+        );
+    }
+
+    private GeneratedCase generatedCase(GeneratedCaseRequest request) {
+        return new NordlyIncidentGeneratedCaseGenerator().generate(request);
+    }
+
+    private GeneratedCaseReceipt generationReceipt(
+            GeneratedCase generated,
+            GeneratedCaseRequest request
+    ) {
+        String scenarioId = generated.scenario().scenarioId();
+        return new GeneratedCaseReceipt(
+                GeneratedCaseFactory.GENERATOR_VERSION,
+                request.seed(),
+                GeneratedCaseSeed.Origin.EXPLICIT,
+                request.incidentFamily(),
+                request.evidenceMode(),
+                request.noiseLevel(),
+                scenarioId,
+                GeneratedCaseVariant.from(
+                        GeneratedCaseFactory.GENERATOR_VERSION,
+                        request,
+                        scenarioId
+                )
+        );
+    }
+
+    private List<LogEvidence> logs(GeneratedCase generated) {
+        return generated.investigationData().evidenceInventory().stream()
+                .filter(LogEvidence.class::isInstance)
+                .map(LogEvidence.class::cast)
+                .toList();
+    }
+
+    private IncidentPlan catalogPlan() {
+        return new IncidentPlanValidator().validate(new IncidentPlanProposal(
+                IncidentPlanProposalStatus.CANDIDATE,
+                "Synthetic catalog incident.",
+                GeneratedIncidentFamily.CATALOG_CACHE_INVALIDATION,
+                IncidentSeverity.HIGH,
+                List.of(IncidentService.CATALOG_SERVICE),
+                IncidentBlastRadius.SINGLE_SERVICE
+        )).plan();
+    }
+
+    private String catalogRunRequestJson() {
+        IncidentPlan plan = catalogPlan();
+        return """
+                {
+                  "plan": {
+                    "contract_version": "%s",
+                    "incident_family": "catalog_cache_invalidation",
+                    "severity": "high",
+                    "affected_services": ["catalog_service"],
+                    "summary": "%s",
+                    "synthetic_only": true,
+                    "write_actions_allowed": false,
+                    "human_approval_required": true
+                  },
+                  "seed": 71,
+                  "evidence_mode": "diagnostic",
+                  "confirm_live_ai": true
+                }
+                """.formatted(plan.contractVersion(), plan.summary());
     }
 
     private String runRequestJson() {
