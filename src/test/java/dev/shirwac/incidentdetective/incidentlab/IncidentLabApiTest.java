@@ -159,6 +159,24 @@ class IncidentLabApiTest {
     }
 
     @Test
+    void invalidAdkControlReceiptReturnsStableWithheldProblem() throws Exception {
+        when(service.run(any())).thenThrow(
+                new InvalidAdkControlReceiptException()
+        );
+
+        mockMvc.perform(post(RUNS)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(runRequestJson()))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.title").value("ADK result withheld"))
+                .andExpect(jsonPath("$.detail").value(
+                        "The investigation did not provide a valid read-only control receipt. No diagnosis was returned."
+                ))
+                .andExpect(jsonPath("$.code")
+                        .value("ADK_CONTROL_RECEIPT_INVALID"));
+    }
+
+    @Test
     void runEndpointSerializesTheDualResponseAndGenericReceipts()
             throws Exception {
         IncidentLabRunResponse response = diagnosedRunResponse();

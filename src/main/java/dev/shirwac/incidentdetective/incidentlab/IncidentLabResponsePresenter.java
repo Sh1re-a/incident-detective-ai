@@ -430,9 +430,7 @@ final class IncidentLabResponsePresenter {
             return;
         }
         if (!safeControlReceipt(agentTurn.receipt())) {
-            throw new IllegalStateException(
-                    "Incident Lab received a missing or unsafe ADK control receipt"
-            );
+            throw new InvalidAdkControlReceiptException();
         }
     }
 

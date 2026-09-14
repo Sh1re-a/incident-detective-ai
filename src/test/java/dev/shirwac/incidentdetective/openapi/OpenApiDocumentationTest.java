@@ -185,6 +185,7 @@ class OpenApiDocumentationTest {
                         "MODEL_PROVIDER_RATE_LIMITED",
                         "MODEL_PROVIDER_ERROR",
                         "MALFORMED_MODEL_RESPONSE",
+                        "ADK_CONTROL_RECEIPT_INVALID",
                         "INVALID_MODEL_TOOL_ARGUMENTS",
                         "RAG_INDEX_NOT_READY",
                         "RAG_EMBEDDING_NOT_CONFIGURED",

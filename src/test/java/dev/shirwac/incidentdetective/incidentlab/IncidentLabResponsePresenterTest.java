@@ -230,8 +230,8 @@ class IncidentLabResponsePresenterTest {
         AdkAgentTurnResponse response = agentTurn(diagnosis, true);
         when(response.receipt()).thenReturn(null);
 
-        IllegalStateException failure = assertThrows(
-                IllegalStateException.class,
+        InvalidAdkControlReceiptException failure = assertThrows(
+                InvalidAdkControlReceiptException.class,
                 () -> presenter.present(generated.scenario(), logs, alarm, response)
         );
 
@@ -258,7 +258,7 @@ class IncidentLabResponsePresenterTest {
         ));
 
         assertThrows(
-                IllegalStateException.class,
+                InvalidAdkControlReceiptException.class,
                 () -> presenter.present(generated.scenario(), logs, alarm, response)
         );
     }

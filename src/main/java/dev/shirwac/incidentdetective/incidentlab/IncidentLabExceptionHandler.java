@@ -8,6 +8,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import static dev.shirwac.incidentdetective.api.ApiProblemResponse.Code.ADK_CONTROL_RECEIPT_INVALID;
 import static dev.shirwac.incidentdetective.api.ApiProblemResponse.Code.INVALID_REQUEST_BODY;
 import static dev.shirwac.incidentdetective.api.ApiProblemResponse.Code.LIVE_AI_DISABLED;
 import static dev.shirwac.incidentdetective.api.ApiProblemResponse.Code.LIVE_AI_NOT_CONFIGURED;
@@ -19,6 +20,18 @@ import static dev.shirwac.incidentdetective.api.ApiProblemResponse.Code.MODEL_PR
 @RestControllerAdvice(basePackageClasses = IncidentLabController.class)
 @Profile("rag")
 public final class IncidentLabExceptionHandler {
+
+    @ExceptionHandler(InvalidAdkControlReceiptException.class)
+    ProblemDetail handleInvalidControlReceipt(
+            InvalidAdkControlReceiptException exception
+    ) {
+        return ApiProblemFactory.create(
+                HttpStatus.BAD_GATEWAY,
+                "ADK result withheld",
+                "The investigation did not provide a valid read-only control receipt. No diagnosis was returned.",
+                ADK_CONTROL_RECEIPT_INVALID
+        );
+    }
 
     @ExceptionHandler(InvalidIncidentLabPlanException.class)
     ProblemDetail handleInvalidPlan(InvalidIncidentLabPlanException exception) {
