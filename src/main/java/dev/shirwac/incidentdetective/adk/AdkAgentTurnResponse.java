@@ -164,7 +164,7 @@ public record AdkAgentTurnResponse(
             Instant executedAt,
             boolean schemaValid,
             boolean citationsValid,
-            boolean evidenceSupportValid,
+            boolean directEvidenceSupportValid,
             boolean factualResultMatchesGroundTruth,
             boolean agentSequenceValid,
             boolean evidenceHandoffValid,

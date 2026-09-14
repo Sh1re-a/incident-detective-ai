@@ -171,7 +171,7 @@ public final class AdkAgentTurnService {
                 candidate,
                 seenEvidenceIds
         );
-        boolean evidenceSupportValid = everyCitationDirectlySupported(checked);
+        boolean directEvidenceSupportValid = everyCitationDirectlySupported(checked);
         boolean answerReleased = trajectory.completedInOrder()
                 && trajectory.agentSequenceValid()
                 && trajectory.evidenceHandoffValid()
@@ -182,7 +182,7 @@ public final class AdkAgentTurnService {
                 && run.toolInvocationCount() == 1
                 && !run.toolExecutions().isEmpty()
                 && checked.report().hardErrors().isEmpty()
-                && evidenceSupportValid
+                && directEvidenceSupportValid
                 && factualResultMatches(checked);
         Instant completedAt = clock.instant();
         long latencyMs = Math.max(
@@ -224,7 +224,7 @@ public final class AdkAgentTurnService {
                         checked,
                         trajectory,
                         completedAt,
-                        evidenceSupportValid,
+                        directEvidenceSupportValid,
                         answerReleased
                 ),
                 new ControlReceipt(
@@ -435,7 +435,7 @@ public final class AdkAgentTurnService {
             CompletedInvestigationVerification checked,
             AdkAgentRuntime.TrajectoryValidation trajectory,
             Instant executedAt,
-            boolean evidenceSupportValid,
+            boolean directEvidenceSupportValid,
             boolean answerReleased
     ) {
         int unsupportedLinks = (int) checked.report()
@@ -452,7 +452,7 @@ public final class AdkAgentTurnService {
                 executedAt,
                 checked.report().diagnosisSchemaPass(),
                 checked.report().citationValidity().valid(),
-                evidenceSupportValid,
+                directEvidenceSupportValid,
                 factualResultMatches(checked),
                 trajectory.agentSequenceValid(),
                 trajectory.evidenceHandoffValid(),
@@ -462,7 +462,7 @@ public final class AdkAgentTurnService {
                 answerReleased,
                 answerReleased
                         ? "Java accepted the agent order, function-response handoff, tool boundary, schema, direct citation support, and factual match against the synthetic case."
-                        : !evidenceSupportValid && totalLinks > 0
+                        : !directEvidenceSupportValid && totalLinks > 0
                                 ? "Java withheld the diagnosis: direct evidence support failed for %d of %d claim-to-evidence links."
                                         .formatted(unsupportedLinks, totalLinks)
                                 : "Java withheld the diagnosis because a workflow or evidence verification rule failed."
