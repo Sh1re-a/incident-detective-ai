@@ -112,11 +112,7 @@ public final class GeminiIncidentPlannerGateway
                     0,
                     Duration.between(startedAt, Instant.now()).toMillis()
             );
-            rejectMissingOrTruncated(response);
-            IncidentPlanProposal proposal = jsonMapper.readValue(
-                    response.text(),
-                    IncidentPlanProposal.class
-            );
+            IncidentPlanProposal proposal = decodeProposal(response);
             String model = response.modelVersion()
                     .filter(value -> !value.isBlank())
                     .orElse(properties.modelId());
@@ -206,6 +202,24 @@ public final class GeminiIncidentPlannerGateway
                     IncidentPlannerFailure.MALFORMED_RESPONSE,
                     "Gemini incident plan proposal was truncated",
                     null
+            );
+        }
+    }
+
+    IncidentPlanProposal decodeProposal(GenerateContentResponse response) {
+        rejectMissingOrTruncated(response);
+        try {
+            return jsonMapper.readValue(
+                    response.text(),
+                    IncidentPlanProposal.class
+            );
+        } catch (IncidentPlannerException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw failure(
+                    IncidentPlannerFailure.MALFORMED_RESPONSE,
+                    "Incident planning response was invalid",
+                    exception
             );
         }
     }
