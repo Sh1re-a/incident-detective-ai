@@ -5,6 +5,8 @@ import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.GeminiPromptContracts;
 import dev.shirwac.incidentdetective.ai.GeminiThinkingLevel;
 import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
+import dev.shirwac.incidentdetective.ai.ModelProviderException;
+import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
 import dev.shirwac.incidentdetective.live.LiveAiOperation;
 import dev.shirwac.incidentdetective.rag.EmbeddingGateway;
@@ -512,6 +514,45 @@ class KnowledgeRagServiceTest {
         assertTrue(response.truthLabelEn().contains("NO ANSWER WAS RELEASED"));
         assertEquals("MODEL_OUTPUT_REJECTED", response.error().code());
         assertEquals(2, response.receipt().providerCalls());
+    }
+
+    @Test
+    void malformedGenerationFailsClosedWithoutReturningProviderDetails() {
+        arrangeMatch();
+        String privateProviderDetail = "PRIVATE-MODEL-PAYLOAD-MUST-NOT-ESCAPE";
+        when(answers.generate(anyString(), anyList())).thenThrow(
+                new ModelProviderException(
+                        ModelProviderFailure.MALFORMED_RESPONSE,
+                        privateProviderDetail
+                )
+        );
+
+        KnowledgeRagResponse response = service(LIVE_AI).ask(
+                request("När syns en godkänd återbetalning?", true)
+        );
+
+        assertEquals("unavailable", response.outcome());
+        assertNull(response.answer());
+        assertEquals("MALFORMED_MODEL_RESPONSE", response.error().code());
+        assertEquals("not_run", response.verification().evaluationStatus());
+        assertEquals("generation_failed",
+                response.verification().overallOutcome());
+        assertEquals(2, response.receipt().providerCalls());
+        assertEquals(1, response.receipt().embeddingCalls());
+        assertEquals(1, response.receipt().generationCalls());
+        assertFalse(response.receipt().writeToolsAvailable());
+        assertFalse(response.receipt().actionExecuted());
+        assertEquals("failed", response.phases().stream()
+                .filter(phase -> "generation".equals(phase.id()))
+                .findFirst()
+                .orElseThrow()
+                .status());
+        assertEquals("skipped", response.phases().stream()
+                .filter(phase -> "java_verification".equals(phase.id()))
+                .findFirst()
+                .orElseThrow()
+                .status());
+        assertFalse(response.toString().contains(privateProviderDetail));
     }
 
     @Test

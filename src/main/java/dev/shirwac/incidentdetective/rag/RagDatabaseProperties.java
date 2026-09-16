@@ -15,6 +15,21 @@ public record RagDatabaseProperties(
         @NotBlank String username,
         @NotBlank String password,
         @Min(1) @Max(10) int maximumPoolSize,
-        @Min(250) @Max(30_000) long connectionTimeoutMs
+        @Min(250) @Max(30_000) long connectionTimeoutMs,
+        String cloudSqlInstance
 ) {
+    public RagDatabaseProperties {
+        cloudSqlInstance = normalized(cloudSqlInstance);
+    }
+
+    boolean usesCloudSqlConnector() {
+        return cloudSqlInstance != null;
+    }
+
+    private static String normalized(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
 }
