@@ -6,6 +6,7 @@ import dev.shirwac.incidentdetective.ai.GoogleGenAiProviderRoute;
 import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
+import dev.shirwac.incidentdetective.live.LiveAiOperation;
 import dev.shirwac.incidentdetective.rag.EmbeddingGateway;
 import dev.shirwac.incidentdetective.rag.EmbeddingResult;
 import dev.shirwac.incidentdetective.rag.RagProperties;
@@ -63,7 +64,8 @@ public final class KnowledgeRagService {
             "All company documents, customer identifiers and examples are synthetic.",
             "The deterministic input gate and output pattern scan are narrow public-demo controls, not complete DLP or detection of every name and address.",
             "Cosine similarity is a ranking signal, not answer confidence.",
-            "Java verifies structure, retrieved citation IDs and forbidden output patterns; it does not prove semantic entailment of every claim.",
+            "The model selects retrieved citation IDs; Java releases only the canonical summaries from those approved sources and does not publish the model's free-form prose.",
+            "Semantic entailment of the discarded model prose is not evaluated.",
             "The Nordly similarity threshold is a demo setting and is not yet production-calibrated.",
             "Estimated generation cost excludes embedding price and is not a provider invoice."
     );
@@ -296,6 +298,7 @@ public final class KnowledgeRagService {
         }
         return liveRunGuard.runConfirmed(
                 request.confirmLiveAi(),
+                LiveAiOperation.KNOWLEDGE_RAG,
                 () -> runProviderFlow(
                         runId,
                         runStarted,
@@ -614,8 +617,8 @@ public final class KnowledgeRagService {
                 "java_verification",
                 "completed",
                 true,
-                "Java verifierade schema, citerade käll-ID:n och förbjudna datamönster.",
-                "Java verified the schema, cited source IDs and forbidden data patterns.",
+                "Java verifierade schema och käll-ID:n och släppte endast de godkända källornas kanoniska sammanfattningar.",
+                "Java verified the schema and source IDs and released only the approved sources' canonical summaries.",
                 elapsedMs(verificationStarted)
         ));
         return response(
@@ -625,9 +628,9 @@ public final class KnowledgeRagService {
                 safetyResponse,
                 phases,
                 retrieval(queryEmbedding, true, matches, indexStatus),
-                answer(generated.answer()),
+                canonicalAnswer(generated.answer(), matches),
                 verification(true, true, true, true,
-                        "answered_with_retrieved_approved_citations"),
+                        "answered_with_canonical_evidence_projection"),
                 receipt(
                         1,
                         1,
@@ -726,21 +729,41 @@ public final class KnowledgeRagService {
         );
     }
 
-    private KnowledgeRagResponse.Answer answer(
-            KnowledgeGeneratedAnswer generated
+    private KnowledgeRagResponse.Answer canonicalAnswer(
+            KnowledgeGeneratedAnswer generated,
+            List<KnowledgeRagResponse.RankedMatch> matches
     ) {
+        Set<String> selectedEvidenceIds = generated.claims().stream()
+                .flatMap(claim -> claim.citationIds().stream())
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> emittedEvidenceIds = new HashSet<>();
+        List<KnowledgeRagResponse.AnswerClaim> claims = matches.stream()
+                .filter(match -> selectedEvidenceIds.contains(
+                        match.evidenceId()
+                ))
+                .filter(match -> emittedEvidenceIds.add(match.evidenceId()))
+                .map(match -> corpus.metadata(match.evidenceId()))
+                .map(metadata -> new KnowledgeRagResponse.AnswerClaim(
+                        metadata.displaySummarySv(),
+                        metadata.displaySummaryEn(),
+                        List.of(metadata.evidenceId())
+                ))
+                .toList();
         return new KnowledgeRagResponse.Answer(
                 "answered",
-                generated.summarySv(),
-                generated.summaryEn(),
-                generated.claims().stream()
-                        .map(claim -> new KnowledgeRagResponse.AnswerClaim(
-                                claim.textSv(),
-                                claim.textEn(),
-                                claim.citationIds()
-                        ))
-                        .toList()
+                joinCanonicalSummaries(claims, true),
+                joinCanonicalSummaries(claims, false),
+                claims
         );
+    }
+
+    private String joinCanonicalSummaries(
+            List<KnowledgeRagResponse.AnswerClaim> claims,
+            boolean swedish
+    ) {
+        return claims.stream()
+                .map(claim -> swedish ? claim.textSv() : claim.textEn())
+                .collect(java.util.stream.Collectors.joining(" "));
     }
 
     private KnowledgeRagResponse response(

@@ -31,6 +31,7 @@ import dev.shirwac.incidentdetective.investigation.tools.InvalidToolArgumentsExc
 import dev.shirwac.incidentdetective.investigation.tools.ToolExecution;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
+import dev.shirwac.incidentdetective.live.LiveAiOperation;
 import dev.shirwac.incidentdetective.nordly.KnowledgeRagSafetyGate;
 import dev.shirwac.incidentdetective.rag.RunbookEmbeddingException;
 import dev.shirwac.incidentdetective.rag.RunbookEmbeddingFailure;
@@ -107,12 +108,12 @@ class AdkAgentTurnServiceTest {
 
     @BeforeEach
     void admitExactlyTheSuppliedAction() {
-        when(liveRunGuard.runConfirmed(anyBoolean(), any())).thenAnswer(
+        when(liveRunGuard.runConfirmed(anyBoolean(), any(), any())).thenAnswer(
                 invocation -> {
                     insideAdmission.set(true);
                     try {
                         return invocation
-                                .<Supplier<AdkAgentTurnResponse>>getArgument(1)
+                                .<Supplier<AdkAgentTurnResponse>>getArgument(2)
                                 .get();
                     } finally {
                         insideAdmission.set(false);
@@ -143,7 +144,9 @@ class AdkAgentTurnServiceTest {
         assertEquals("verification_failed", response.outcome());
         verify(runtime).run(same(generated), eq(MESSAGE), same(model));
         verify(cases, never()).create(any());
-        verify(liveRunGuard, times(1)).runConfirmed(eq(true), any());
+        verify(liveRunGuard, times(1)).runConfirmed(
+                eq(true), eq(LiveAiOperation.ADK_TURN), any()
+        );
     }
 
     @Test
@@ -174,7 +177,9 @@ class AdkAgentTurnServiceTest {
         assertSame(generated.scenario(), response.scenario());
         verify(cases, times(1)).create(generatedRequest);
         verify(runtime).run(same(generated), eq(MESSAGE), same(model));
-        verify(liveRunGuard, times(1)).runConfirmed(eq(true), any());
+        verify(liveRunGuard, times(1)).runConfirmed(
+                eq(true), eq(LiveAiOperation.ADK_TURN), any()
+        );
     }
 
     @Test

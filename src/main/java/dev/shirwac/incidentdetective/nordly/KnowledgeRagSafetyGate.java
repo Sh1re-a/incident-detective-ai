@@ -26,15 +26,34 @@ public final class KnowledgeRagSafetyGate {
             "(?i)(?:\\bAIza[0-9a-z_-]{20,}\\b|\\bsk-[0-9a-z_-]{16,}\\b|"
                     + "\\b(?:api[-_ ]?key|password|secret|token)\\s*[:=]\\s*\\S+)"
     );
+    private static final String CANCEL_ACTION_TERM =
+            "(?:avbestall(?:a|er|t)?|avbryt(?:a|er|it)?|"
+                    + "avboka(?:r|t)?|annullera(?:r|t)?|cancel(?:led)?)\\b";
+    private static final String RETURN_CREATE_TERM =
+            "(?:(?:skapa|starta|oppna|create|start|open).{0,15}"
+                    + "(?:en retur|a return)"
+                    + "(?: (?:at mig|for mig|for me|"
+                    + "for (?:min (?:bestallning|order|vara)|"
+                    + "bestallningen|ordern|my (?:order|item))))?)";
+    private static final String REFUND_POLICY_TERM =
+            "(?:aterbetal\\w*|pengar(?:na)? tillbaka|refund\\w*)";
+    private static final String RETURN_POLICY_TERM =
+            "(?:retur\\w*|return\\w*)";
 
     private static final List<Pattern> PII_REQUESTS = patterns(
-            "(?:visa|ge(?: mig)?|hamta|lista|skriv ut|beratta|show|give me|"
-                    + "fetch|list|print|tell me|provide)"
+            "(?:\\b(?:visa\\w*|hamta|lista|skriv ut|beratta|show|give me|"
+                    + "fetch|list|print|tell me|provide)\\b|\\bge(?: mig)?\\b)"
                     + ".{0,45}(?:personlig information|personuppgifter|kunddata|"
                     + "namn|e-post|epost|mejl|mail|adress|telefon|personnummer|"
                     + "personal information|customer data|name|email|address|"
                     + "phone|ssn)",
-            "(?:vem ar kunden|who is the customer)"
+            "(?:vem ar kunden|vad heter kunden|who is the customer)",
+            "(?:beratta|sag|tell me).{0,35}(?:vad )?"
+                    + "(?:kunden heter|the customer(?:'?s)? name)",
+            "(?:vad ar|vilken ar|what is|what'?s).{0,35}"
+                    + "(?:kundens|customer(?:'?s)?).{0,25}"
+                    + "(?:namn|e-post|epost|mejl|mail|adress|telefon|personnummer|"
+                    + "name|email|address|phone|ssn)"
     );
     private static final List<Pattern> SECRET_REQUESTS = patterns(
             "(?:visa|ge(?: mig)?|hamta|lista|skriv ut|avsloja|beratta|show|"
@@ -61,7 +80,8 @@ public final class KnowledgeRagSafetyGate {
                     + "(?:vd|ceo|chef|i manaden|per manad|per month)"
     );
     private static final List<Pattern> PROMPT_INJECTIONS = patterns(
-            "(?:ignorera|bortse fran|ignore|disregard|forget).{0,45}"
+            "(?:ignorera|bortse fran|strunta i|glom|ignore|disregard|forget|override)"
+                    + ".{0,45}"
                     + "(?:regler|instruktioner|tidigare|previous|prior|rules|"
                     + "instructions|directions)",
             "(?:folj inte|do not follow|dont follow).{0,45}"
@@ -72,23 +92,99 @@ public final class KnowledgeRagSafetyGate {
             "(?:system prompt|systemprompt|developer message|jailbreak|bypass|"
                     + "kringga|override instructions)",
             "(?:anvand|use).{0,35}(?:alla interna dokument|every internal document|"
-                    + "unsafe documents|osakra dokument)"
+                    + "unsafe documents|osakra dokument)",
+            "(?:glom|forget).{0,45}(?:allt|everything|vad du fatt veta|"
+                    + "what you (?:know|were told))",
+            "(?:latsas|pretend).{0,45}(?:regler|rules).{0,30}"
+                    + "(?:inte galler|do not apply|dont apply|not apply)"
     );
     private static final List<Pattern> FINANCIAL_ACTIONS = patterns(
             "(?:aterbetala|genomfor en aterbetalning|utfor en aterbetalning|"
                     + "gor en aterbetalning|issue a refund|process a refund|"
                     + "execute a refund|refund (?:order|customer))",
+            "(?:kan (?:du|ni)|skulle (?:du|ni) kunna|jag vill att (?:du|ni)|snalla|"
+                    + "can you|could you|would you|please|i want you to|"
+                    + "i need you to|i would like you to).{0,35}"
+                    + "(?:aterbetala|betala tillbaka|issue (?:a )?refund|"
+                    + "process (?:a )?refund|refund (?:it|me|my order)|"
+                    + "ge mig pengar(?:na)? tillbaka|returnera\\w*|"
+                    + "return (?:it|my order|my item)|" + RETURN_CREATE_TERM + ")",
+            "^(?:jag (?:vill|behover|onskar) (?!veta)|"
+                    + "i (?:want|need|would like) to (?!know)).{0,35}"
+                    + "(?:aterbetala|betala tillbaka|issue (?:a )?refund|"
+                    + "process (?:a )?refund|refund (?:it|me|my order)|"
+                    + "ge mig pengar(?:na)? tillbaka|returnera\\w*|"
+                    + "return (?:it|my order|my item)|" + RETURN_CREATE_TERM + ")",
+            "(?:jag vill (?:ha|fa)|i want (?:to (?:get|request) )?)"
+                    + ".{0,5}(?:en aterbetalning|a refund)",
+            "i would like a refund",
+            "(?:jag vill ha|i want).{0,15}pengar(?:na)? tillbaka",
+            "^(?:jag (?:vill|behover|onskar) (?:fa|ha) tillbaka pengarna|"
+                    + "i (?:want|need) (?:my )?money back)[.!?]*$",
+            "^(?:refund (?:me|it|my order)|skapa|starta|oppna|create|start|open)"
+                    + ".{0,20}(?:retur|return|refund)?[.!?]*$",
+            "^" + RETURN_CREATE_TERM
+                    + "(?: (?:tack|please|nu|now))*[.!?]*$",
+            "(?:[.!?;]\\s*|,\\s*)(?:aterbetala\\w*|betala tillbaka|"
+                    + "issue (?:a )?refund|process (?:a )?refund|"
+                    + "refund (?:it|me|my order)|give me (?:my )?money back|"
+                    + "returnera\\w*|return (?:it|my order|my item)|"
+                    + RETURN_CREATE_TERM + ")"
+                    + "(?: (?:den|det|varan|ordern|min order|it|my order|my item))?"
+                    + "(?: (?:at mig|for me|tack|please|nu|now))*[.!?]*$",
+            "(?:,? (?:och|and) )(?:aterbetala\\w*|betala tillbaka|"
+                    + "issue (?:a )?refund|process (?:a )?refund|"
+                    + "refund (?:it|me|my order)|returnera\\w*|"
+                    + "return (?:it|my order|my item)|"
+                    + RETURN_CREATE_TERM + ")"
+                    + "(?: (?:den|det|varan|ordern|min order|it|my order|my item))?"
+                    + "(?: (?:at mig|for me|tack|please|nu|now))*[.!?]*$",
+            REFUND_POLICY_TERM + ".{0,100}"
+                    + "(?:gor det|utfor det|genomfor det|do it|go ahead|"
+                    + "give me (?:my )?money back)"
+                    + "(?: (?:at mig|for me|tack|please|nu|now))*[.!?]*$",
+            RETURN_POLICY_TERM + ".{0,100}"
+                    + "(?:gor det|utfor det|genomfor det|starta den|skapa den|"
+                    + "do it|go ahead|start it|create it)"
+                    + "(?: (?:at mig|for me|tack|please|nu|now))*[.!?]*$",
+            "^(?:jag behover|jag onskar|i need|i would like)"
+                    + " (?:en aterbetalning|a refund)[.!?]*$",
             "(?:debitera|dra pengar|charge (?:the )?(?:card|customer)|"
                     + "capture (?:the )?payment)"
     );
     private static final List<Pattern> WRITE_ACTIONS = patterns(
-            "(?:avboka|radera|andra|uppdatera|publicera|skicka|kontakta|"
+            "(?:andra|uppdatera|byta|change|update|switch).{0,35}"
+                    + "(?:leveransadress\\w*|leverans adress\\w*|"
+                    + "delivery address|shipping address)",
+            "(?:radera|andra|uppdatera|publicera|skicka|kontakta|"
                     + "deploya|rulla (?:tillbaka|tillbaks)).{0,30}"
                     + "(?:order|konto|kund|data|"
                     + "meddelande|release|system)",
-            "(?:cancel|delete|change|update|publish|send|contact|deploy|"
+            "(?:delete|change|update|publish|send|contact|deploy|"
                     + "rollback|roll back)"
                     + ".{0,30}(?:order|account|customer|data|message|release|system)",
+            "(?:kan (?:du|ni)|skulle (?:du|ni) kunna|jag vill att (?:du|ni)|snalla|"
+                    + "can you|could you|would you|please|i want you to|"
+                    + "i need you to|i would like you to)"
+                    + ".{0,35}"
+                    + CANCEL_ACTION_TERM,
+            "^(?:jag (?:vill|behover|onskar) (?!veta)|"
+                    + "i (?:want|need|would like) to (?!know)).{0,35}"
+                    + CANCEL_ACTION_TERM,
+            "^" + CANCEL_ACTION_TERM
+                    + ".{0,55}$",
+            "(?:[.!?;]\\s*|,\\s*)" + CANCEL_ACTION_TERM
+                    + "(?: (?:den|det|ordern|bestallningen|min order|min bestallning|"
+                    + "it|me|my order))?"
+                    + "(?: (?:at mig|for me|tack|please|nu|now))*[.!?]*$",
+            "(?:,? (?:och|and) )" + CANCEL_ACTION_TERM
+                    + "(?: (?:den|det|ordern|bestallningen|min order|min bestallning|"
+                    + "it|me|my order))?"
+                    + "(?: (?:at mig|for me|tack|please|nu|now))*[.!?]*$",
+            "(?:avbestall\\w*|avbryt\\w*|avboka\\w*|annullera\\w*|cancel\\w*)"
+                    + ".{0,100}"
+                    + "(?:gor det|utfor det|genomfor det|do it|go ahead)"
+                    + "(?: (?:at mig|for me|tack|please|nu|now))*[.!?]*$",
             "(?:rollback|roll back|rulla (?:tillbaka|tillbaks))"
                     + "(?: nu| now| omedelbart)?$"
     );
@@ -168,6 +264,8 @@ public final class KnowledgeRagSafetyGate {
                 Normalizer.Form.NFD
         );
         return decomposed.replaceAll("\\p{M}", "")
+                .replace('’', '\'')
+                .replace('‘', '\'')
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("\\s+", " ")
                 .strip();
@@ -193,8 +291,8 @@ public final class KnowledgeRagSafetyGate {
             return new Decision(
                     true,
                     ReasonCode.NONE,
-                    "Frågan får gå vidare till den begränsade kunskapssökningen.",
-                    "The question may continue to the bounded knowledge search."
+                    "Frågan passerade säkerhetskontrollen och får gå vidare inom den begränsade assistenten.",
+                    "The question passed the safety check and may continue within the bounded assistant."
             );
         }
 

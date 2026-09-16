@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -119,7 +120,12 @@ final class IncidentLabResponsePresenter {
                 agentTurn.safety(),
                 agentTurn.runtime(),
                 agentTurn.workflow(),
-                sanitizeEvents(agentTurn.events()),
+                sanitizeEvents(
+                        agentTurn.events(),
+                        agentTurn.scenario() == null
+                                ? null
+                                : agentTurn.scenario().scenarioId()
+                ),
                 agentTurn.toolEvents(),
                 agentTurn.diagnosticProbe(),
                 null,
@@ -132,7 +138,8 @@ final class IncidentLabResponsePresenter {
     }
 
     private static List<AdkAgentTurnResponse.RuntimeEvent> sanitizeEvents(
-            List<AdkAgentTurnResponse.RuntimeEvent> events
+            List<AdkAgentTurnResponse.RuntimeEvent> events,
+            String scenarioId
     ) {
         if (events == null || events.isEmpty()) {
             return List.of();
@@ -150,11 +157,79 @@ final class IncidentLabResponsePresenter {
                         event.contentWithheld() || event.text() != null,
                         null,
                         event.functionCalls(),
-                        event.functionResponses(),
+                        sanitizeFunctionResponses(
+                                event.functionResponses(),
+                                scenarioId
+                        ),
                         event.tokenUsage(),
                         event.providerModelVersion()
                 ))
                 .toList();
+    }
+
+    private static List<AdkAgentTurnResponse.FunctionResponseEvent>
+    sanitizeFunctionResponses(
+            List<AdkAgentTurnResponse.FunctionResponseEvent> responses,
+            String scenarioId
+    ) {
+        if (responses == null || responses.isEmpty()) {
+            return List.of();
+        }
+        return responses.stream()
+                .filter(Objects::nonNull)
+                .map(response -> new AdkAgentTurnResponse.FunctionResponseEvent(
+                        response.id(),
+                        response.name(),
+                        publicFunctionResponse(response.response(), scenarioId)
+                ))
+                .toList();
+    }
+
+    private static Map<String, Object> publicFunctionResponse(
+            Map<String, Object> response,
+            String scenarioId
+    ) {
+        Objects.requireNonNull(response, "function response must not be null");
+        String publicScenarioId = scenarioId == null
+                ? requiredString(response, "scenario_id")
+                : scenarioId;
+        return Map.of(
+                "status", requiredString(response, "status"),
+                "safe_summary", requiredString(response, "safe_summary"),
+                "scenario_id", publicScenarioId,
+                "evidence_ids", requiredStringList(response, "evidence_ids"),
+                "source_refs", requiredStringList(response, "source_refs"),
+                "write_capability", false,
+                "action_executed", false
+        );
+    }
+
+    private static String requiredString(
+            Map<String, Object> response,
+            String field
+    ) {
+        Object value = response.get(field);
+        if (!(value instanceof String text) || text.isBlank()) {
+            throw new IllegalStateException(
+                    "Public function response requires " + field
+            );
+        }
+        return text;
+    }
+
+    private static List<String> requiredStringList(
+            Map<String, Object> response,
+            String field
+    ) {
+        Object value = response.get(field);
+        if (!(value instanceof List<?> values)
+                || values.stream().anyMatch(item -> !(item instanceof String))) {
+            throw new IllegalStateException(
+                    "Public function response requires a string list for "
+                            + field
+            );
+        }
+        return values.stream().map(String.class::cast).toList();
     }
 
     private Presentation diagnosed(

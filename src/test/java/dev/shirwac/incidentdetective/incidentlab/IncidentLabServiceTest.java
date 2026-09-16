@@ -7,6 +7,7 @@ import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
 import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
 import dev.shirwac.incidentdetective.domain.groundtruth.GroundTruth;
+import dev.shirwac.incidentdetective.domain.scenario.Scenario;
 import dev.shirwac.incidentdetective.generated.GeneratedCase;
 import dev.shirwac.incidentdetective.generated.GeneratedCaseGeneration;
 import dev.shirwac.incidentdetective.generated.GeneratedCaseGenerationRequest;
@@ -21,6 +22,7 @@ import dev.shirwac.incidentdetective.generated.PaymentTimeoutGeneratedCaseGenera
 import dev.shirwac.incidentdetective.investigation.InvestigationData;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
+import dev.shirwac.incidentdetective.live.LiveAiOperation;
 import dev.shirwac.incidentdetective.live.LiveToolEvent;
 import dev.shirwac.incidentdetective.nordly.KnowledgeRagSafetyGate;
 import dev.shirwac.incidentdetective.planning.IncidentBlastRadius;
@@ -117,7 +119,11 @@ class IncidentLabServiceTest {
             "Undersök verklig kunddata",
             "Inspect live infrastructure",
             "Kör mot skarpt system",
-            "Hämta riktiga användare"
+            "Hämta riktiga användare",
+            "kubectl delete namespace checkout",
+            "rm -rf /srv/checkout",
+            "DROP DATABASE nordly",
+            "terraform destroy -auto-approve"
     })
     void explicitProductionScopeStopsBeforeGenericSafetyOrProvider(
             String instruction
@@ -150,9 +156,9 @@ class IncidentLabServiceTest {
                 18
         );
         when(safetyGate.evaluate(any())).thenReturn(allowed);
-        doAnswer(invocation -> ((Supplier<?>) invocation.getArgument(1)).get())
+        doAnswer(invocation -> ((Supplier<?>) invocation.getArgument(2)).get())
                 .when(liveAiRunGuard)
-                .runConfirmed(eq(true), any());
+                .runConfirmed(eq(true), eq(LiveAiOperation.INCIDENT_PLAN), any());
         when(planner.propose(any())).thenReturn(
                 new IncidentPlannerResponse(proposal, receipt)
         );
@@ -168,7 +174,9 @@ class IncidentLabServiceTest {
         assertSame(receipt, response.providerReceipt());
         InOrder order = inOrder(safetyGate, liveAiRunGuard, planner);
         order.verify(safetyGate).evaluate(any());
-        order.verify(liveAiRunGuard).runConfirmed(eq(true), any());
+        order.verify(liveAiRunGuard).runConfirmed(
+                eq(true), eq(LiveAiOperation.INCIDENT_PLAN), any()
+        );
         order.verify(planner).propose(any());
     }
 
@@ -179,7 +187,7 @@ class IncidentLabServiceTest {
         GeneratedCaseGeneration generation = generation(generated);
         AdkAgentTurnResponse agentTurn = mock(AdkAgentTurnResponse.class);
         when(agentTurn.outcome()).thenReturn("completed");
-        stubSafeReceipt(agentTurn);
+        stubSafeReceipt(agentTurn, generated.scenario());
         when(generatedCases.generate(any())).thenReturn(generation);
         when(adkAgent.runGeneratedCase(
                 eq(generated),
@@ -223,7 +231,7 @@ class IncidentLabServiceTest {
         when(agentTurn.outcome()).thenReturn("verification_failed");
         when(agentTurn.diagnosis()).thenReturn(mock(Diagnosis.class));
         when(agentTurn.comparison()).thenReturn(mock(ReplayComparison.class));
-        stubSafeReceipt(agentTurn);
+        stubSafeReceipt(agentTurn, generated.scenario());
         when(generatedCases.generate(any())).thenReturn(generation);
         when(adkAgent.runGeneratedCase(any(), any(), eq(true)))
                 .thenReturn(agentTurn);
@@ -254,7 +262,7 @@ class IncidentLabServiceTest {
         GeneratedCaseGeneration generation = generation(generated);
         AdkAgentTurnResponse agentTurn = mock(AdkAgentTurnResponse.class);
         when(agentTurn.outcome()).thenReturn("completed");
-        stubSafeReceipt(agentTurn);
+        stubSafeReceipt(agentTurn, generated.scenario());
         when(generatedCases.generate(any())).thenReturn(generation);
         when(adkAgent.runGeneratedCase(
                 eq(generated),
@@ -336,7 +344,11 @@ class IncidentLabServiceTest {
         );
     }
 
-    private void stubSafeReceipt(AdkAgentTurnResponse agentTurn) {
+    private void stubSafeReceipt(
+            AdkAgentTurnResponse agentTurn,
+            Scenario scenario
+    ) {
+        when(agentTurn.scenario()).thenReturn(scenario);
         when(agentTurn.events()).thenReturn(List.of(
                 new AdkAgentTurnResponse.RuntimeEvent(
                         1,
@@ -371,7 +383,16 @@ class IncidentLabServiceTest {
                         List.of(new AdkAgentTurnResponse.FunctionResponseEvent(
                                 "call-1",
                                 "inspect_incident_evidence",
-                                Map.of("status", "found")
+                                Map.of(
+                                        "status", "found",
+                                        "safe_summary",
+                                        "Returned bounded synthetic evidence.",
+                                        "scenario_id", scenario.scenarioId(),
+                                        "evidence_ids", List.of(),
+                                        "source_refs", List.of(),
+                                        "write_capability", false,
+                                        "action_executed", false
+                                )
                         )),
                         null,
                         null

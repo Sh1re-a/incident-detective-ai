@@ -76,17 +76,17 @@ class RagProfileApplicationIT {
         assertEquals("0.8.6", jdbc.sql("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
                 .query(String.class)
                 .single());
-        assertEquals("6", flyway.info().current().getVersion().getVersion());
+        assertEquals("7", flyway.info().current().getVersion().getVersion());
         assertEquals(0L, jdbc.sql("SELECT COUNT(*) FROM runbook_embeddings")
                 .query(Long.class)
                 .single());
         assertEquals(13, nordlyKnowledgeCorpus.eligibleDocumentCount());
-        assertEquals(27, nordlyKnowledgeCorpus.eligibleChunkCount());
+        assertEquals(28, nordlyKnowledgeCorpus.eligibleChunkCount());
         RunbookIndexStatus nordlyIndex = nordlyKnowledgeIndexReadiness.inspect();
         assertFalse(nordlyIndex.ready());
         assertEquals(0, nordlyIndex.indexedChunks());
         assertEquals(0, nordlyIndex.currentChunks());
-        assertEquals(27, nordlyIndex.expectedChunks());
+        assertEquals(28, nordlyIndex.expectedChunks());
         CapabilitiesResponse.VectorIndexCapability index = capabilities
                 .describe()
                 .retrieval()
@@ -97,15 +97,22 @@ class RagProfileApplicationIT {
         assertEquals(0, index.currentChunks());
         assertEquals(12, index.expectedChunks());
 
-        GlobalDailyLiveQuota.Decision first = dailyLiveQuota.tryConsume(2);
-        GlobalDailyLiveQuota.Decision second = dailyLiveQuota.tryConsume(2);
-        GlobalDailyLiveQuota.Decision rejected = dailyLiveQuota.tryConsume(2);
+        GlobalDailyLiveQuota.Decision first = dailyLiveQuota.tryConsume(
+                2, 100, 10
+        );
+        GlobalDailyLiveQuota.Decision second = dailyLiveQuota.tryConsume(
+                2, 100, 10
+        );
+        GlobalDailyLiveQuota.Decision rejected = dailyLiveQuota.tryConsume(
+                2, 100, 10
+        );
         assertTrue(first.allowed());
         assertEquals(1, first.consumed());
         assertTrue(second.allowed());
         assertEquals(2, second.consumed());
         assertFalse(rejected.allowed());
         assertEquals(2, rejected.consumed());
+        assertEquals(20, rejected.consumedMicroUsd());
         assertEquals(1L, jdbc.sql("SELECT COUNT(*) FROM global_live_daily_quota")
                 .query(Long.class)
                 .single());

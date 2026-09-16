@@ -138,6 +138,34 @@ class AdkAgentRuntimeTest {
                         .flatMap(config -> config.allowedFunctionNames())
                         .orElseThrow()
         );
+        String evidenceInstructions = String.join(
+                "\n",
+                evidenceRequest.getSystemInstructions()
+        );
+        assertTrue(evidenceInstructions.contains(
+                "Set log_query to exactly one uppercase service value"
+        ));
+        assertTrue(evidenceInstructions.contains(
+                "copied from scenario.affectedServices"
+        ));
+        assertTrue(evidenceInstructions.contains(
+                "Do not append an error, symptom, or other words"
+        ));
+        assertTrue(evidenceInstructions.contains("PAYMENT_ADAPTER"));
+        String logQueryDescription = evidenceRequest.tools()
+                .get(AdkAgentRuntime.TOOL_NAME)
+                .declaration()
+                .flatMap(declaration -> declaration.parameters())
+                .flatMap(parameters -> parameters.properties())
+                .map(properties -> properties.get("log_query"))
+                .flatMap(schema -> schema.description())
+                .orElseThrow();
+        assertTrue(logQueryDescription.contains(
+                "Exactly one uppercase service value"
+        ));
+        assertTrue(logQueryDescription.contains(
+                "do not append other terms"
+        ));
 
         LlmRequest diagnosisRequest = model.requests().getLast();
         assertTrue(diagnosisRequest.tools().isEmpty());

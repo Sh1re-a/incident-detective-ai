@@ -6,6 +6,7 @@ import dev.shirwac.incidentdetective.ai.GeminiPromptContracts;
 import dev.shirwac.incidentdetective.ai.GeminiThinkingLevel;
 import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
+import dev.shirwac.incidentdetective.live.LiveAiOperation;
 import dev.shirwac.incidentdetective.rag.EmbeddingGateway;
 import dev.shirwac.incidentdetective.rag.EmbeddingResult;
 import dev.shirwac.incidentdetective.rag.RagProperties;
@@ -81,9 +82,9 @@ class KnowledgeRagServiceTest {
         when(corpus.corpusContentSha256()).thenReturn(CORPUS_SHA256);
         when(corpus.eligibleDocumentCount()).thenReturn(10);
         when(corpus.eligibleChunkCount()).thenReturn(18);
-        when(liveRunGuard.runConfirmed(anyBoolean(), any())).thenAnswer(
+        when(liveRunGuard.runConfirmed(anyBoolean(), any(), any())).thenAnswer(
                 invocation -> invocation
-                        .<Supplier<KnowledgeRagResponse>>getArgument(1)
+                        .<Supplier<KnowledgeRagResponse>>getArgument(2)
                         .get()
         );
     }
@@ -285,14 +286,17 @@ class KnowledgeRagServiceTest {
         assertFalse(response.verification().semanticClaimSupportEvaluated());
         assertTrue(response.truthLabel().startsWith("LIVE LOCAL RAG"));
         verifyNoInteractions(answers);
-        verify(liveRunGuard).runConfirmed(eq(true), any());
+        verify(liveRunGuard).runConfirmed(
+                eq(true), eq(LiveAiOperation.KNOWLEDGE_RAG), any()
+        );
     }
 
     @Test
     void guardFailurePreventsEveryProviderBearingInteraction() {
         when(readiness.inspect()).thenReturn(new RunbookIndexStatus(18, 18, 18));
         RuntimeException rejected = new RuntimeException("guard rejected");
-        doThrow(rejected).when(liveRunGuard).runConfirmed(anyBoolean(), any());
+        doThrow(rejected).when(liveRunGuard)
+                .runConfirmed(anyBoolean(), any(), any());
 
         RuntimeException thrown = assertThrows(
                 RuntimeException.class,
@@ -303,7 +307,9 @@ class KnowledgeRagServiceTest {
 
         assertSame(rejected, thrown);
         verify(readiness).inspect();
-        verify(liveRunGuard).runConfirmed(eq(true), any());
+        verify(liveRunGuard).runConfirmed(
+                eq(true), eq(LiveAiOperation.KNOWLEDGE_RAG), any()
+        );
         verifyNoInteractions(embeddings, store, answers);
     }
 
@@ -344,14 +350,146 @@ class KnowledgeRagServiceTest {
         assertEquals("completed", response.verification().evaluationStatus());
         assertFalse(response.verification().semanticClaimSupportEvaluated());
         assertEquals(
-                "answered_with_retrieved_approved_citations",
+                "answered_with_canonical_evidence_projection",
                 response.verification().overallOutcome()
         );
         assertTrue(response.verification().noWriteCapability());
+        assertEquals(
+                "Kortåterbetalningen kan ta 2–5 bankdagar.",
+                response.answer().summarySv()
+        );
+        assertEquals(
+                "An approved card refund may take 2–5 banking days.",
+                response.answer().summaryEn()
+        );
         assertEquals(List.of("nordly-evidence-refund-timing-card"),
                 response.answer().claims().getFirst().citationIds());
         verify(embeddings).embedQuery(anyString());
         verify(answers).generate(anyString(), anyList());
+    }
+
+    @Test
+    void neverReleasesFalseModelProseEvenWhenItCitesAValidEvidenceId() {
+        arrangeMatch();
+        when(answers.generate(anyString(), anyList())).thenReturn(generated(
+                new KnowledgeGeneratedAnswer(
+                        "FALSK MODELLSUMMERING SOM INTE FÅR VISAS.",
+                        "FALSE MODEL SUMMARY THAT MUST NOT BE SHOWN.",
+                        List.of(new KnowledgeGeneratedAnswer.GeneratedClaim(
+                                "Alla ordrar återbetalas automatiskt samma minut.",
+                                "Every order is refunded automatically in the same minute.",
+                                List.of("nordly-evidence-refund-timing-card")
+                        ))
+                )
+        ));
+
+        KnowledgeRagResponse response = service(LIVE_AI).ask(
+                request("När syns en godkänd återbetalning?", true)
+        );
+
+        assertEquals("answered", response.outcome());
+        assertEquals(
+                "Kortåterbetalningen kan ta 2–5 bankdagar.",
+                response.answer().summarySv()
+        );
+        assertEquals(
+                "Kortåterbetalningen kan ta 2–5 bankdagar.",
+                response.answer().claims().getFirst().textSv()
+        );
+        assertFalse(response.answer().summarySv().contains("FALSK"));
+        assertFalse(response.answer().claims().getFirst().textSv()
+                .contains("automatiskt"));
+        assertFalse(response.verification().semanticClaimSupportEvaluated());
+        assertEquals(
+                "answered_with_canonical_evidence_projection",
+                response.verification().overallOutcome()
+        );
+    }
+
+    @Test
+    void projectsSelectedSourcesOnceInRetrievedRankOrder() {
+        when(readiness.inspect()).thenReturn(new RunbookIndexStatus(18, 18, 18));
+        when(embeddings.embedQuery(anyString())).thenReturn(embedding());
+        RunbookCorpusEntry first = entry(
+                "evidence-first",
+                "Första godkända faktan."
+        );
+        RunbookCorpusEntry second = entry(
+                "evidence-second",
+                "Andra godkända faktan."
+        );
+        RunbookCorpusEntry third = entry(
+                "evidence-third",
+                "Tredje godkända faktan."
+        );
+        when(store.search(
+                anyString(),
+                any(),
+                anyList(),
+                anyInt(),
+                anyDouble()
+        )).thenReturn(List.of(
+                new RunbookSearchHit(first, 0.93),
+                new RunbookSearchHit(second, 0.91),
+                new RunbookSearchHit(third, 0.89)
+        ));
+        when(corpus.metadata(first.evidenceId())).thenReturn(metadata(
+                first,
+                "First approved fact."
+        ));
+        when(corpus.metadata(second.evidenceId())).thenReturn(metadata(
+                second,
+                "Second approved fact."
+        ));
+        when(corpus.metadata(third.evidenceId())).thenReturn(metadata(
+                third,
+                "Third approved fact."
+        ));
+        when(answers.generate(anyString(), anyList())).thenReturn(generated(
+                new KnowledgeGeneratedAnswer(
+                        "Modelltext som inte ska styra ordningen.",
+                        "Model text that must not control ordering.",
+                        List.of(
+                                new KnowledgeGeneratedAnswer.GeneratedClaim(
+                                        "Tredje och andra.",
+                                        "Third and second.",
+                                        List.of(
+                                                third.evidenceId(),
+                                                second.evidenceId()
+                                        )
+                                ),
+                                new KnowledgeGeneratedAnswer.GeneratedClaim(
+                                        "Andra igen och första.",
+                                        "Second again and first.",
+                                        List.of(
+                                                second.evidenceId(),
+                                                first.evidenceId()
+                                        )
+                                )
+                        )
+                )
+        ));
+
+        KnowledgeRagResponse response = service(LIVE_AI).ask(
+                request("Sammanfatta de godkända reglerna.", true)
+        );
+
+        assertEquals(
+                List.of(
+                        first.evidenceId(),
+                        second.evidenceId(),
+                        third.evidenceId()
+                ),
+                response.answer().claims().stream()
+                        .map(claim -> claim.citationIds().getFirst())
+                        .toList()
+        );
+        assertEquals(
+                "Första godkända faktan. Andra godkända faktan. Tredje godkända faktan.",
+                response.answer().summarySv()
+        );
+        assertEquals(3, response.answer().claims().size());
+        assertFalse(response.answer().summarySv().contains("Modelltext"));
     }
 
     @Test
@@ -446,27 +584,52 @@ class KnowledgeRagServiceTest {
                 anyDouble()
         )).thenReturn(List.of(new RunbookSearchHit(entry, 0.91)));
         when(corpus.metadata(entry.evidenceId())).thenReturn(
-                new NordlyKnowledgeCorpus.EntryMetadata(
-                        "APPROVED",
-                        entry.documentId(),
-                        entry.chunkId(),
-                        entry.documentVersion(),
-                        entry.title(),
-                        "When an approved card refund appears",
-                        "Customer Operations",
-                        entry.sourceRef(),
-                        entry.evidenceId(),
-                        entry.displaySummary(),
-                        "An approved card refund may take 2–5 banking days.",
-                        entry.text()
+                metadata(
+                        entry,
+                        "An approved card refund may take 2–5 banking days."
                 )
         );
         return entry;
     }
 
+    private RunbookCorpusEntry entry(
+            String evidenceId,
+            String displaySummarySv
+    ) {
+        return new RunbookCorpusEntry(
+                evidenceId,
+                "document-" + evidenceId,
+                "1.0",
+                "chunk-" + evidenceId,
+                "Approved facts",
+                displaySummarySv,
+                "knowledge/" + evidenceId,
+                "Approved synthetic source text for " + evidenceId
+        );
+    }
+
+    private NordlyKnowledgeCorpus.EntryMetadata metadata(
+            RunbookCorpusEntry entry,
+            String displaySummaryEn
+    ) {
+        return new NordlyKnowledgeCorpus.EntryMetadata(
+                "APPROVED",
+                entry.documentId(),
+                entry.chunkId(),
+                entry.documentVersion(),
+                entry.title(),
+                "Approved section",
+                "Customer Operations",
+                entry.sourceRef(),
+                entry.evidenceId(),
+                entry.displaySummary(),
+                displaySummaryEn,
+                entry.text()
+        );
+    }
+
     private KnowledgeGenerationResult generated(String citationId) {
-        return new KnowledgeGenerationResult(
-                new KnowledgeGeneratedAnswer(
+        return generated(new KnowledgeGeneratedAnswer(
                         "En godkänd kortåterbetalning syns normalt inom 2–5 bankdagar.",
                         "An approved card refund normally appears within 2–5 banking days.",
                         List.of(new KnowledgeGeneratedAnswer.GeneratedClaim(
@@ -474,7 +637,14 @@ class KnowledgeRagServiceTest {
                                 "The bank normally needs 2–5 banking days.",
                                 List.of(citationId)
                         ))
-                ),
+                ));
+    }
+
+    private KnowledgeGenerationResult generated(
+            KnowledgeGeneratedAnswer answer
+    ) {
+        return new KnowledgeGenerationResult(
+                answer,
                 "provider-response-id",
                 "gemini-3.1-flash-lite",
                 new ModelTokenUsage(100, 40, 140),

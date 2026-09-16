@@ -69,7 +69,7 @@ class CapabilitiesApiTest {
                 ).value(13))
                 .andExpect(jsonPath(
                         "$.knowledge_corpus.eligible_chunk_count"
-                ).value(27))
+                ).value(28))
                 .andExpect(jsonPath("$.modes[*].mode").value(contains(
                         "recorded_replay",
                         "live_ai"

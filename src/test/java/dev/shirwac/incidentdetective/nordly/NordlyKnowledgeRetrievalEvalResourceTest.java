@@ -46,12 +46,18 @@ class NordlyKnowledgeRetrievalEvalResourceTest {
         assertEquals("gemini-embedding-2", suite.retrievalContract().model());
         assertEquals(768, suite.retrievalContract().dimensions());
         assertEquals(3, suite.retrievalContract().topK());
-        assertEquals(12, suite.cases().size());
-        assertEquals(5, suite.cases().stream()
+        assertEquals(16, suite.cases().size());
+        assertEquals(6, suite.cases().stream()
                 .filter(item -> "development".equals(item.split()))
                 .count());
-        assertEquals(7, suite.cases().stream()
+        assertEquals(10, suite.cases().stream()
                 .filter(item -> "held_out".equals(item.split()))
+                .count());
+        assertEquals(14, suite.cases().stream()
+                .filter(item -> !item.expectedEmpty())
+                .count());
+        assertEquals(2, suite.cases().stream()
+                .filter(RetrievalCase::expectedEmpty)
                 .count());
         assertTrue(suite.cases().stream().anyMatch(item -> "sv".equals(item.locale())));
         assertTrue(suite.cases().stream().anyMatch(item -> "en".equals(item.locale())));
@@ -59,6 +65,10 @@ class NordlyKnowledgeRetrievalEvalResourceTest {
         Set<String> caseIds = new HashSet<>();
         for (RetrievalCase evalCase : suite.cases()) {
             assertTrue(caseIds.add(evalCase.caseId()), evalCase.caseId());
+            assertTrue(
+                    safetyGate.evaluate(evalCase.query()).allowed(),
+                    evalCase.caseId() + " must reach bounded retrieval"
+            );
             if (evalCase.expectedEmpty()) {
                 assertEquals("no_match", evalCase.caseType());
                 assertTrue(evalCase.relevantEvidenceIds().isEmpty());
@@ -90,7 +100,7 @@ class NordlyKnowledgeRetrievalEvalResourceTest {
     void keepsRiskCasesBlockedBeforeEmbeddingOrGeneration() throws Exception {
         EvalSuite suite = readSuite();
 
-        assertEquals(5, suite.inputGateCases().size());
+        assertEquals(9, suite.inputGateCases().size());
         Set<String> caseIds = new HashSet<>();
         for (InputGateCase evalCase : suite.inputGateCases()) {
             assertTrue(caseIds.add(evalCase.caseId()), evalCase.caseId());

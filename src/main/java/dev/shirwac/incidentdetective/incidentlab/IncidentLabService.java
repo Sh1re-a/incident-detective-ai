@@ -12,6 +12,7 @@ import dev.shirwac.incidentdetective.generated.GeneratedCaseGenerationService;
 import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
 import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
+import dev.shirwac.incidentdetective.live.LiveAiOperation;
 import dev.shirwac.incidentdetective.nordly.KnowledgeRagSafetyGate;
 import dev.shirwac.incidentdetective.planning.IncidentBlastRadius;
 import dev.shirwac.incidentdetective.planning.IncidentPlan;
@@ -65,6 +66,14 @@ public final class IncidentLabService {
                     + "(?:riktig|verklig)(?:a)? kund(?:er|erna|ernas|ers)?|"
                     + "real customers?)\\b"
     );
+    private static final Pattern DIRECT_OPERATION_COMMAND = Pattern.compile(
+            "(?:^|\\s)(?:"
+                    + "kubectl\\s+(?:delete|apply|patch|replace|scale|rollout|exec)\\b|"
+                    + "terraform\\s+(?:apply|destroy)\\b|"
+                    + "(?:drop\\s+(?:database|schema|table)|truncate\\s+table)\\b|"
+                    + "rm\\s+-(?=[a-z]*r)(?=[a-z]*f)[a-z]+\\s+\\S+"
+                    + ")"
+    );
 
     private final KnowledgeRagSafetyGate safetyGate;
     private final LiveAiRunGuard liveAiRunGuard;
@@ -109,6 +118,7 @@ public final class IncidentLabService {
 
         return liveAiRunGuard.runConfirmed(
                 request.confirmLiveAi(),
+                LiveAiOperation.INCIDENT_PLAN,
                 () -> proposeAndValidate(planningRequest, safety)
         );
     }
@@ -269,7 +279,8 @@ public final class IncidentLabService {
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("\\s+", " ")
                 .strip();
-        return EXPLICIT_REAL_SCOPE.matcher(normalized).find();
+        return EXPLICIT_REAL_SCOPE.matcher(normalized).find()
+                || DIRECT_OPERATION_COMMAND.matcher(normalized).find();
     }
 
     private IncidentPlan requireCanonicalPlan(IncidentPlan submitted) {

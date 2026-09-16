@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class NordlyKnowledgeCorpusTest {
 
     private static final String EXPECTED_CORPUS_CONTENT_SHA256 =
-            "9ba9e0aeac7d6c090e3a6f6be9779f1734dce56febd032ee50616ec6af72e30a";
+            "6ec834d8aa784e433961a798e32edb96c6ed179ef853a1e557da8021c84f466d";
     private static final RagProperties PROFILE = new RagProperties(
             "gemini-embedding-2",
             768,
@@ -57,7 +57,7 @@ class NordlyKnowledgeCorpusTest {
                 corpus.corpusContentSha256()
         );
         assertEquals(13, corpus.eligibleDocumentCount());
-        assertEquals(27, corpus.eligibleChunkCount());
+        assertEquals(28, corpus.eligibleChunkCount());
         assertTrue(corpus.entries().stream()
                 .allMatch(entry -> corpus.metadata(entry.evidenceId())
                         .status().equals("APPROVED")));
@@ -68,6 +68,15 @@ class NordlyKnowledgeCorpusTest {
                                 "kb-employee-compensation-register"
                         )
         ));
+        NordlyKnowledgeCorpus.EntryMetadata support = corpus.metadata(
+                "nordly-evidence-manual-support-contact"
+        );
+        assertEquals("APPROVED", support.status());
+        assertEquals(
+                "knowledge/kb-order-status-cancellation#manual-support-contact",
+                support.sourceRef()
+        );
+        assertTrue(support.text().contains("synthetic support number 123"));
     }
 
     @Test
@@ -89,13 +98,14 @@ class NordlyKnowledgeCorpusTest {
         RunbookImportReport first = importer.importMissingOrChanged();
         RunbookImportReport second = importer.importMissingOrChanged();
 
-        assertEquals(27, first.importedChunks());
+        assertEquals(28, first.importedChunks());
         assertEquals("developer_api", first.providerTransport());
         assertEquals(0, first.skippedChunks());
         assertEquals(0, second.importedChunks());
-        assertEquals(27, second.skippedChunks());
-        assertEquals(27, embeddings.inputs.size());
-        assertEquals(27, store.upserted.size());
+        assertEquals(28, second.skippedChunks());
+        assertEquals(28, embeddings.inputs.size());
+        assertEquals(28, store.upserted.size());
+        assertEquals(28, store.synchronizedMetadata.size());
         assertFalse(store.upserted.contains("nordly-evidence-legacy-refund-window"));
         assertFalse(store.upserted.contains("nordly-evidence-untrusted-instruction"));
         assertFalse(store.upserted.contains(
@@ -127,6 +137,7 @@ class NordlyKnowledgeCorpusTest {
     private static final class FakeStore implements RunbookVectorStore {
         private final Set<String> current = new HashSet<>();
         private final List<String> upserted = new ArrayList<>();
+        private final List<String> synchronizedMetadata = new ArrayList<>();
 
         @Override
         public boolean containsCurrent(
@@ -135,6 +146,15 @@ class NordlyKnowledgeCorpusTest {
                 RagProperties profile
         ) {
             return current.contains(entry.evidenceId());
+        }
+
+        @Override
+        public void synchronizeMetadata(
+                String corpusVersion,
+                RunbookCorpusEntry entry,
+                RagProperties profile
+        ) {
+            synchronizedMetadata.add(entry.evidenceId());
         }
 
         @Override

@@ -62,11 +62,15 @@ class LiveDailyQuotaApiTest {
     void rejectsAnExhaustedDailyQuotaBeforeCallingGemini() throws Exception {
         Instant resetsAt = Instant.now().plusSeconds(3_600);
         when(dailyQuota.tryConsume(
-                LiveInvestigationService.DAILY_LIVE_RUN_LIMIT
+                LiveInvestigationService.DAILY_LIVE_RUN_LIMIT,
+                LiveAiBudgetProperties.DEFAULT_DAILY_LIMIT_MICRO_USD,
+                LiveAiOperation.LEGACY_INVESTIGATION.allowanceMicroUsd()
         )).thenReturn(new GlobalDailyLiveQuota.Decision(
                 false,
                 LiveInvestigationService.DAILY_LIVE_RUN_LIMIT,
                 LiveInvestigationService.DAILY_LIVE_RUN_LIMIT,
+                LiveAiBudgetProperties.DEFAULT_DAILY_LIMIT_MICRO_USD,
+                LiveAiBudgetProperties.DEFAULT_DAILY_LIMIT_MICRO_USD,
                 resetsAt
         ));
 
@@ -84,7 +88,9 @@ class LiveDailyQuotaApiTest {
         );
         assertTrue(retryAfterSeconds > 0);
         verify(dailyQuota).tryConsume(
-                LiveInvestigationService.DAILY_LIVE_RUN_LIMIT
+                LiveInvestigationService.DAILY_LIVE_RUN_LIMIT,
+                LiveAiBudgetProperties.DEFAULT_DAILY_LIMIT_MICRO_USD,
+                LiveAiOperation.LEGACY_INVESTIGATION.allowanceMicroUsd()
         );
         verifyNoInteractions(model);
     }

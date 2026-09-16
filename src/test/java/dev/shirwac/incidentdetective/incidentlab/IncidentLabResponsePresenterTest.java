@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -145,6 +146,37 @@ class IncidentLabResponsePresenterTest {
         assertNull(sanitized.diagnosis());
         assertNull(sanitized.events().getLast().text());
         assertTrue(sanitized.events().getLast().contentWithheld());
+    }
+
+    @Test
+    void publicProjectionDropsRawToolPayloadButRetainsTypedEvidence() {
+        AdkAgentTurnResponse raw = agentTurn(
+                diagnosed(alarm.evidenceIds().getFirst()),
+                true
+        );
+
+        AdkAgentTurnResponse sanitized =
+                IncidentLabResponsePresenter.sanitizeAgentTurn(
+                        raw,
+                        IncidentLabRunResponse.AnswerState.DIAGNOSED
+                );
+
+        Map<String, Object> publicResponse = sanitized.events().get(1)
+                .functionResponses().getFirst().response();
+        assertEquals(Set.of(
+                "status",
+                "safe_summary",
+                "scenario_id",
+                "evidence_ids",
+                "source_refs",
+                "write_capability",
+                "action_executed"
+        ), publicResponse.keySet());
+        assertFalse(publicResponse.containsKey("operations"));
+        assertFalse(publicResponse.containsKey("diagnostic_probe"));
+        assertEquals(raw.toolEvents(), sanitized.toolEvents());
+        assertEquals(raw.diagnosticProbe(), sanitized.diagnosticProbe());
+        assertFalse(sanitized.toolEvents().getFirst().evidence().isEmpty());
     }
 
     @Test
@@ -500,7 +532,23 @@ class IncidentLabResponsePresenterTest {
                         List.of(new AdkAgentTurnResponse.FunctionResponseEvent(
                                 "call-1",
                                 "inspect_incident_evidence",
-                                Map.of("status", "found")
+                                Map.of(
+                                        "status", "found",
+                                        "safe_summary",
+                                        "Returned bounded synthetic evidence.",
+                                        "scenario_id",
+                                        generated.scenario().scenarioId(),
+                                        "evidence_ids",
+                                        List.of(logs.getFirst().evidenceId()),
+                                        "source_refs",
+                                        List.of(logs.getFirst().sourceRef()),
+                                        "operations",
+                                        List.of(Map.of("raw", "must not survive")),
+                                        "diagnostic_probe",
+                                        Map.of("raw", "must not survive"),
+                                        "write_capability", false,
+                                        "action_executed", false
+                                )
                         )),
                         null,
                         null

@@ -484,7 +484,17 @@ class IncidentLabApiTest {
                                 List.of(new AdkAgentTurnResponse.FunctionResponseEvent(
                                         "call-1",
                                         "inspect_incident_evidence",
-                                        Map.of("status", "found")
+                                        Map.of(
+                                                "status", "found",
+                                                "safe_summary",
+                                                "Returned bounded synthetic evidence.",
+                                                "scenario_id",
+                                                scenario.scenarioId(),
+                                                "evidence_ids", List.of(),
+                                                "source_refs", List.of(),
+                                                "write_capability", false,
+                                                "action_executed", false
+                                        )
                                 )),
                                 null,
                                 null

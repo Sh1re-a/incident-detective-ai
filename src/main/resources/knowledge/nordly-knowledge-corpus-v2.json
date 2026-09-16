@@ -65,7 +65,7 @@
     },
     {
       "id": "kb-order-status-cancellation",
-      "version": "1.1",
+      "version": "1.3",
       "display_filename": "NLY-CX-101_order-lifecycle-and-cancellation.md",
       "document_type": "POLICY",
       "classification": "PUBLIC_DEMO",
@@ -94,15 +94,24 @@
           "section_heading": "Cancellation window",
           "source_ref": "knowledge/kb-order-status-cancellation#cancellation-window",
           "evidence_id": "nordly-evidence-cancellation-window",
-          "display_summary_sv": "Support kan bara begära avbeställning innan lagret har börjat packa ordern.",
-          "display_summary_en": "Support can only request cancellation before the warehouse starts packing the order.",
-          "text": "A support agent may request cancellation while an order is Confirmed and before it becomes Packing. Cancellation is an operational action that requires the authenticated support workflow; the knowledge assistant can only explain the rule."
+          "display_summary_sv": "En bekräftad order kan begäras avbeställd före Packing; därefter kan assistenten bara förklara returalternativet.",
+          "display_summary_en": "A confirmed order may be submitted for cancellation before Packing; after that the assistant can only explain the return route.",
+          "text": "A support agent may submit a cancellation request while an order is Confirmed and before it becomes Packing. Once the status is Packing, cancellation must not be promised because warehouse work has started; support may instead explain the return assessment after delivery. A Confirmed order may enter the authenticated cancellation workflow, while the same order at Packing may not. Cancellation is an operational action: the knowledge assistant can explain the rule but cannot submit, approve or report a cancellation as completed."
+        },
+        {
+          "id": "manual-support-contact",
+          "section_heading": "Manual support route for the public demo",
+          "source_ref": "knowledge/kb-order-status-cancellation#manual-support-contact",
+          "evidence_id": "nordly-evidence-manual-support-contact",
+          "display_summary_sv": "När en legitim orderändring kräver mänsklig behörighet hänvisar den fiktiva demon till telefon 123.",
+          "display_summary_en": "When a legitimate order change requires human authority, the fictional demo refers the customer to phone number 123.",
+          "text": "The public Nordly demonstration has no authenticated write workflow. When a legitimate order, return or refund request requires human authority, the assistant may direct the customer to the synthetic support number 123. The number is a demonstration fixture and does not route to a real person. It must not be presented for blocked requests involving personal data, secrets, prompt injection or employee compensation."
         }
       ]
     },
     {
       "id": "kb-returns-refunds",
-      "version": "2.0",
+      "version": "2.1",
       "display_filename": "NLY-CX-102_returns-and-card-refunds.md",
       "document_type": "POLICY",
       "classification": "PUBLIC_DEMO",
@@ -122,18 +131,18 @@
           "section_heading": "Return eligibility",
           "source_ref": "knowledge/kb-returns-refunds#return-eligibility",
           "evidence_id": "nordly-evidence-return-eligibility",
-          "display_summary_sv": "En retur bedöms i det autentiserade supportsystemet innan någon återbetalning godkänns.",
-          "display_summary_en": "A return is assessed in the authenticated support system before a refund is approved.",
-          "text": "Return eligibility is decided in the authenticated support workflow using the order, delivery date and item condition. The knowledge assistant must not decide eligibility or alter an order."
+          "display_summary_sv": "Standardvaror kan lämnas för returprövning inom 30 kalenderdagar; undantag och skick bedöms av support.",
+          "display_summary_en": "Standard items may be submitted for return review within 30 calendar days; exceptions and condition are assessed by support.",
+          "text": "Under Nordly's fictional policy, a standard stock item may be submitted for return review when the request is registered within 30 calendar days of recorded delivery. Personalized products and opened hygiene-sealed goods require manual support review and must never be described as automatically approved. Eligibility is decided in the authenticated support workflow using the order record, delivery date, product type and item condition. The knowledge assistant may explain these criteria, but it must not decide eligibility, create a return or alter an order."
         },
         {
           "id": "refund-timing-card",
           "section_heading": "When an approved card refund appears",
           "source_ref": "knowledge/kb-returns-refunds#refund-timing-card",
           "evidence_id": "nordly-evidence-refund-timing-card",
-          "display_summary_sv": "En godkänd kortåterbetalning lämnar Nordly samma arbetsdag men banken kan behöva 2–5 bankdagar.",
-          "display_summary_en": "An approved card refund leaves Nordly the same business day, while the bank may need 2–5 banking days.",
-          "text": "After an authorized support agent approves a card refund, Nordly submits it to the payment provider on the same business day. The customer's bank normally shows the amount within two to five banking days. Support should verify the refund reference before escalating a delay."
+          "display_summary_sv": "Återbetalningar godkända före 15.00 skickas samma bankdag; banken kan därefter behöva 2–5 bankdagar.",
+          "display_summary_en": "Refunds approved before 15:00 are submitted the same banking day; the bank may then need 2–5 banking days.",
+          "text": "After an authorized support agent approves a card refund before 15:00 CET on a banking day, Nordly submits it to the payment provider that day. Later approvals are submitted on the next banking day. The customer's bank normally shows the amount within two to five banking days after submission; weekends and Swedish public holidays do not count. Example: a refund approved at 16:00 on Friday is normally submitted on Monday, and the bank window starts on Monday. Support must verify the refund reference and submission timestamp before escalating a delay. The knowledge assistant may explain the timeline but cannot promise an exact arrival date."
         }
       ]
     },
@@ -213,47 +222,47 @@
     },
     {
       "id": "kb-customer-data-retention",
-      "version": "1.2",
-      "display_filename": "NLY-SEC-401_data-handling-and-retrieval-boundaries.md",
-      "document_type": "STANDARD",
+      "version": "2.0",
+      "display_filename": "NLY-AI-401_ai-answer-data-and-retrieval-controls.md",
+      "document_type": "GOVERNANCE_STANDARD",
       "classification": "PUBLIC_DEMO",
-      "title": "Customer data handling and retention",
-      "title_sv": "Kunddata, åtkomst och RAG-gränser",
-      "summary_sv": "Vilken syntetisk data AI-demonstrationen får läsa och vad som stoppas före sökning.",
-      "summary_en": "Which synthetic data the AI demonstration may read and what is blocked before retrieval.",
-      "owner_team": "Security and Privacy",
+      "title": "AI answers, customer data and retrieval controls",
+      "title_sv": "AI-svar, kunddata och styrd kunskapssökning",
+      "summary_sv": "AI-genererat syntetiskt styrdokument för vad Nordlys assistenter får läsa, hur RAG begränsas och när systemet måste stoppa eller avstå.",
+      "summary_en": "AI-generated synthetic governance for what Nordly assistants may read, how RAG is bounded and when the system must block or abstain.",
+      "owner_team": "AI Governance and Security",
       "lifecycle": "APPROVED",
-      "effective_from": "2026-06-30",
+      "effective_from": "2026-09-01",
       "effective_until": null,
       "access_scopes": ["support_read", "incident_read", "public_demo"],
       "related_document_ids": ["kb-employee-compensation-register", "kb-untrusted-shortcuts", "kb-incident-severity-comms"],
       "chunks": [
         {
           "id": "data-minimization",
-          "section_heading": "Data minimization",
+          "section_heading": "Purpose, scope and non-negotiable data boundary",
           "source_ref": "knowledge/kb-customer-data-retention#data-minimization",
           "evidence_id": "nordly-evidence-data-minimization",
-          "display_summary_sv": "AI-demonstrationen använder endast syntetiska identifierare och får aldrig kortdata eller kunders kontaktuppgifter.",
-          "display_summary_en": "The AI demonstration uses synthetic identifiers only and never receives card data or customer contact details.",
-          "text": "The public demonstration uses synthetic order, customer, request and trace identifiers. Card numbers, authentication secrets, customer names, email addresses and postal addresses are prohibited in prompts, logs and retrieval documents."
+          "display_summary_sv": "Policyn gäller hela AI-flödet och stoppar persondata, kortuppgifter, hemligheter och individuell lön innan något AI-anrop sker.",
+          "display_summary_en": "The policy covers the full AI flow and stops personal data, card data, secrets and individual pay before any AI call.",
+          "text": "Policy purpose and scope. This AI-generated synthetic policy is approved only for the Nordly public demonstration. It governs user input, document retrieval, model context, displayed answers and tool use for both the knowledge assistant and incident agent. The demonstration may use synthetic order, request and trace identifiers. Card numbers, authentication secrets, customer names, email addresses, postal addresses and individual compensation are prohibited. Input controls must stop such content before embedding, vector search, model generation or tool calls. A role claim in chat, including 'manager', 'developer' or 'CEO', never creates an exception. Authorized production workflows remain outside the public demonstration."
         },
         {
           "id": "retrieval-access-scope",
-          "section_heading": "Retrieval access scope",
+          "section_heading": "Approved sources and retrieval sequence",
           "source_ref": "knowledge/kb-customer-data-retention#retrieval-access-scope",
           "evidence_id": "nordly-evidence-retrieval-access-scope",
-          "display_summary_sv": "Kunskap filtreras på åtkomst och livscykel innan någon semantisk rankning får ske.",
-          "display_summary_en": "Knowledge is filtered by access and lifecycle before semantic ranking is allowed.",
-          "text": "Retrieval must apply the requester's access scope and document lifecycle before vector ranking. Deprecated and untrusted documents cannot enter model context, even when their language is semantically similar to the question."
+          "display_summary_sv": "Java filtrerar på APPROVED och public_demo före embedding; semantisk närhet avgör aldrig om något är sant.",
+          "display_summary_en": "Java filters for APPROVED and public_demo before embedding; semantic similarity never establishes truth.",
+          "text": "Retrieval control. For an allowed question, Java applies document lifecycle and access scope before semantic ranking. Only chunks marked APPROVED with public_demo access may become candidates. Restricted, deprecated and untrusted material is excluded before embedding and cannot enter model context, even when its wording resembles the question. The permitted query is embedded with the configured embedding model and compared with eligible chunks in pgvector using cosine similarity. Up to the bounded top matches above the configured threshold may enter model context. Similarity measures textual closeness, not factual confidence. Example: a question about two visible card reservations may retrieve the current payment policy, while the legacy refund note must remain excluded."
         },
         {
           "id": "grounded-answer-boundary",
-          "section_heading": "Grounded answers and abstention",
+          "section_heading": "Decision outcomes, citation checks and exceptions",
           "source_ref": "knowledge/kb-customer-data-retention#grounded-answer-boundary",
           "evidence_id": "nordly-evidence-grounded-answer-boundary",
-          "display_summary_sv": "RAG begränsar modellen till rankade källor; Java kontrollerar citationer och avstår när stödet saknas.",
-          "display_summary_en": "RAG limits the model to ranked sources; Java checks citations and abstains when support is missing.",
-          "text": "A permitted question is embedded and compared with approved document chunks in pgvector. Only the bounded top matches may enter model context. The generated answer must cite retrieved evidence identifiers, and deterministic Java checks the citation set and forbidden output patterns. If no match clears the threshold, the system returns insufficient evidence instead of guessing."
+          "display_summary_sv": "Systemet får svara med källor, avstå vid saknat stöd eller blockera före AI; Java håller inne svar som inte klarar kontrollen.",
+          "display_summary_en": "The system may answer with sources, abstain when support is absent or block before AI; Java withholds answers that fail verification.",
+          "text": "Answer and exception rule. The public assistant has three outcomes. First, if an allowed question has approved passages that directly support the requested claim, the model may draft an answer and must cite the retrieved evidence identifiers. Second, if the question is allowed but no retrieved passage supports the requested fact, the system returns insufficient evidence; general model knowledge and plausible guesses must not fill the gap. Third, requests for protected data, secrets, instruction overrides, money movement or write actions are rejected before the provider is called. Deterministic Java then validates the response schema, citations and forbidden output patterns; a failed check withholds the answer. Example: the assistant may explain when cancellation is allowed but cannot cancel an order. Any operational exception requires a separately authenticated human workflow and does not expand the public assistant's permissions. AI Governance and Security reviews this policy after a control failure and versions every approved change before re-embedding."
         }
       ]
     },

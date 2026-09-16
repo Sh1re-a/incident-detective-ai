@@ -273,6 +273,14 @@ class PgvectorRunbookRetrievalStrategyTest {
         }
 
         @Override
+        public void synchronizeMetadata(
+                String corpusVersion,
+                RunbookCorpusEntry entry,
+                RagProperties profile
+        ) {
+        }
+
+        @Override
         public void upsert(
                 String corpusVersion,
                 RunbookCorpusEntry entry,

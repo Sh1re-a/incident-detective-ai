@@ -22,6 +22,8 @@ import jakarta.annotation.PreDestroy;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -38,6 +40,10 @@ import java.util.Map;
 @Component
 @Profile("rag")
 final class GeminiKnowledgeAnswerGateway implements KnowledgeAnswerGateway {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(
+            GeminiKnowledgeAnswerGateway.class
+    );
 
     private static final String PROMPT_RESOURCE =
             "ai/prompts/answer-nordly-knowledge-v1.txt";
@@ -129,6 +135,10 @@ final class GeminiKnowledgeAnswerGateway implements KnowledgeAnswerGateway {
         } catch (ModelProviderException exception) {
             throw exception;
         } catch (GenAiIOException exception) {
+            LOGGER.warn(
+                    "Nordly knowledge generation transport failed: type={}",
+                    exception.getClass().getSimpleName()
+            );
             if (isTimeout(exception)) {
                 throw providerFailure(
                         ModelProviderFailure.TIMEOUT,
@@ -142,6 +152,11 @@ final class GeminiKnowledgeAnswerGateway implements KnowledgeAnswerGateway {
                     exception
             );
         } catch (ApiException exception) {
+            LOGGER.warn(
+                    "Nordly knowledge generation provider rejected the request: status={}, type={}",
+                    exception.code(),
+                    exception.getClass().getSimpleName()
+            );
             ModelProviderFailure failure = exception.code() == 429
                     ? ModelProviderFailure.RATE_LIMITED
                     : ModelProviderFailure.UPSTREAM;

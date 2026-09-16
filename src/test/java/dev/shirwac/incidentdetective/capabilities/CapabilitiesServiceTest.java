@@ -98,7 +98,7 @@ class CapabilitiesServiceTest {
                 response.knowledgeCorpus().corpusContentSha256()
         );
         assertEquals(13, response.knowledgeCorpus().eligibleDocumentCount());
-        assertEquals(27, response.knowledgeCorpus().eligibleChunkCount());
+        assertEquals(28, response.knowledgeCorpus().eligibleChunkCount());
         assertEquals(List.of(
                 new ModeCapability(
                         RunMode.RECORDED_REPLAY,
@@ -416,7 +416,19 @@ class CapabilitiesServiceTest {
     private GlobalDailyLiveQuota quota(GlobalDailyLiveQuota.Scope scope) {
         return new GlobalDailyLiveQuota() {
             @Override
-            public Decision tryConsume(int dailyLimit) {
+            public Decision tryConsume(
+                    int dailyLimit,
+                    long dailyBudgetMicroUsd,
+                    long operationAllowanceMicroUsd
+            ) {
+                throw new UnsupportedOperationException("Not used by capability test");
+            }
+
+            @Override
+            public Snapshot snapshot(
+                    int dailyLimit,
+                    long dailyBudgetMicroUsd
+            ) {
                 throw new UnsupportedOperationException("Not used by capability test");
             }
 
@@ -436,7 +448,7 @@ class CapabilitiesServiceTest {
                         + "0123456789abcdef0123456789abcdef"
         );
         when(corpus.eligibleDocumentCount()).thenReturn(13);
-        when(corpus.eligibleChunkCount()).thenReturn(27);
+        when(corpus.eligibleChunkCount()).thenReturn(28);
         return corpus;
     }
 

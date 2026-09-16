@@ -58,6 +58,9 @@ public record AdkAgentTurnResponse(
     public static final String MODE = "adk_live_ai";
     public static final String TRUTH_LABEL =
             "Generated synthetic incident — real Google ADK investigation.";
+    public static final String BLOCKED_MODE = "blocked_before_ai";
+    public static final String BLOCKED_TRUTH_LABEL =
+            "Deterministic Java safety decision — Google ADK and Gemini were not called.";
 
     public AdkAgentTurnResponse {
         events = events == null ? List.of() : List.copyOf(events);

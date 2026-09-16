@@ -10,6 +10,12 @@ public interface RunbookVectorStore {
             RagProperties profile
     );
 
+    void synchronizeMetadata(
+            String corpusVersion,
+            RunbookCorpusEntry entry,
+            RagProperties profile
+    );
+
     void upsert(
             String corpusVersion,
             RunbookCorpusEntry entry,

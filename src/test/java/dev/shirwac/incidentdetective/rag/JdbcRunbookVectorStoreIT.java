@@ -145,6 +145,59 @@ class JdbcRunbookVectorStoreIT {
     }
 
     @Test
+    void synchronizesMetadataWithoutReplacingTheCurrentEmbedding() {
+        RunbookCorpusEntry original = new RunbookCorpusEntry(
+                "policy-section",
+                "policy-document",
+                "1.1",
+                "section-one",
+                "Policy title",
+                "Old display summary",
+                "knowledge/policy-document#section-one",
+                "The approved policy body is unchanged."
+        );
+        RunbookCorpusEntry current = new RunbookCorpusEntry(
+                "policy-section",
+                "policy-document",
+                "1.2",
+                "section-one",
+                "Policy title",
+                "Current display summary",
+                "knowledge/policy-document#section-one",
+                "The approved policy body is unchanged."
+        );
+        store.upsert(
+                CORPUS_VERSION,
+                original,
+                PROFILE,
+                new EmbeddingResult(unitVector(0), 20, 10, 3.0, 5)
+        );
+
+        assertTrue(store.containsCurrent(CORPUS_VERSION, current, PROFILE));
+        store.synchronizeMetadata(CORPUS_VERSION, current, PROFILE);
+
+        RunbookSearchHit hit = store.search(
+                CORPUS_VERSION,
+                PROFILE,
+                unitVector(0),
+                1,
+                -1
+        ).getFirst();
+        RunbookCorpusEntry stored = hit.entry();
+        assertEquals("1.2", stored.documentVersion());
+        assertEquals("Current display summary", stored.displaySummary());
+        assertEquals(1.0, hit.cosineSimilarity(), 0.000_001);
+        assertEquals(5L, JdbcClient.create(dataSource)
+                .sql("""
+                        SELECT embedding_latency_ms
+                        FROM runbook_embeddings
+                        WHERE evidence_id = 'policy-section'
+                        """)
+                .query(Long.class)
+                .single());
+    }
+
+    @Test
     void neverTreatsDeveloperApiVectorsAsCurrentVertexVectors() {
         RagProperties vertexProfile = new RagProperties(
                 "gemini-embedding-2",
@@ -278,11 +331,11 @@ class JdbcRunbookVectorStoreIT {
 
         assertEquals("nordly-knowledge-corpus-v2", first.corpusVersion());
         assertEquals("developer_api", first.providerTransport());
-        assertEquals(27, first.importedChunks());
+        assertEquals(28, first.importedChunks());
         assertEquals(0, second.importedChunks());
-        assertEquals(27, second.skippedChunks());
+        assertEquals(28, second.skippedChunks());
         assertTrue(status.ready());
-        assertEquals(27, store.count(corpus.version(), PROFILE));
+        assertEquals(28, store.count(corpus.version(), PROFILE));
         assertFalse(store.documentIds(corpus.version(), PROFILE)
                 .contains("kb-legacy-refund-playbook"));
         assertFalse(store.documentIds(corpus.version(), PROFILE)

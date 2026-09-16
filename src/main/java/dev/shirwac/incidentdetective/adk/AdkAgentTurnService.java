@@ -24,6 +24,7 @@ import dev.shirwac.incidentdetective.investigation.GroundTruthInvestigationVerif
 import dev.shirwac.incidentdetective.investigation.tools.InvalidToolArgumentsException;
 import dev.shirwac.incidentdetective.investigation.tools.ToolExecution;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
+import dev.shirwac.incidentdetective.live.LiveAiOperation;
 import dev.shirwac.incidentdetective.live.LiveInvestigationException;
 import dev.shirwac.incidentdetective.live.LiveInvestigationFailure;
 import dev.shirwac.incidentdetective.live.LiveToolEvent;
@@ -146,6 +147,7 @@ public final class AdkAgentTurnService {
         }
         return liveRunGuard.runConfirmed(
                 confirmLiveAi,
+                LiveAiOperation.ADK_TURN,
                 () -> admittedRun.apply(safety)
         );
     }
@@ -396,8 +398,8 @@ public final class AdkAgentTurnService {
                 UUID.randomUUID().toString(),
                 null,
                 UUID.randomUUID().toString(),
-                AdkAgentTurnResponse.MODE,
-                AdkAgentTurnResponse.TRUTH_LABEL,
+                AdkAgentTurnResponse.BLOCKED_MODE,
+                AdkAgentTurnResponse.BLOCKED_TRUTH_LABEL,
                 "blocked_before_ai",
                 null,
                 null,

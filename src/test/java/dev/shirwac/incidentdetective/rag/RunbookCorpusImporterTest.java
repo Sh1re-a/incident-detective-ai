@@ -50,6 +50,7 @@ class RunbookCorpusImporterTest {
         assertEquals(1, report.skippedChunks());
         assertEquals(11, embeddings.inputs.size());
         assertEquals(11, store.upserted.size());
+        assertEquals(1, store.synchronizedMetadata.size());
         assertTrue(report.inputCharacters() > 0);
         assertEquals(110, report.providerBillableCharacters());
         assertEquals(33.0, report.providerInputTokens());
@@ -95,6 +96,7 @@ class RunbookCorpusImporterTest {
 
         private final Set<String> current;
         private final List<String> upserted = new ArrayList<>();
+        private final List<String> synchronizedMetadata = new ArrayList<>();
 
         private FakeStore(Set<String> current) {
             this.current = new HashSet<>(current);
@@ -107,6 +109,15 @@ class RunbookCorpusImporterTest {
                 RagProperties profile
         ) {
             return current.contains(entry.evidenceId());
+        }
+
+        @Override
+        public void synchronizeMetadata(
+                String corpusVersion,
+                RunbookCorpusEntry entry,
+                RagProperties profile
+        ) {
+            synchronizedMetadata.add(entry.evidenceId());
         }
 
         @Override

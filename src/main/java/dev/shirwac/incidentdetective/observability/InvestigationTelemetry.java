@@ -435,6 +435,7 @@ public final class InvestigationTelemetry {
                 case CONFIRMATION_REQUIRED -> "live.confirmation_required";
                 case LIVE_AI_DISABLED -> "live.disabled";
                 case API_KEY_MISSING -> "live.api_key_missing";
+                case COST_PROFILE_MISSING -> "live.cost_profile_missing";
                 case DEADLINE_EXCEEDED -> "live.deadline_exceeded";
             };
         }

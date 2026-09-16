@@ -76,9 +76,8 @@ public final class LiveInvestigationService {
     private final CompletedInvestigationVerifier verifier;
     private final GroundTruthInvestigationVerifier groundTruthVerifier;
     private final GeminiCostEstimator costEstimator;
-    private final LiveInvestigationAdmissionGuard admissionGuard;
+    private final LiveAiRunGuard liveAiRunGuard;
     private final LiveInvestigationMetrics metrics;
-    private final GlobalDailyLiveQuota dailyQuota;
     private final InvestigationTelemetry telemetry;
     private final Clock clock;
 
@@ -90,9 +89,8 @@ public final class LiveInvestigationService {
             CompletedInvestigationVerifier verifier,
             GroundTruthInvestigationVerifier groundTruthVerifier,
             GeminiCostEstimator costEstimator,
-            LiveInvestigationAdmissionGuard admissionGuard,
+            LiveAiRunGuard liveAiRunGuard,
             LiveInvestigationMetrics metrics,
-            GlobalDailyLiveQuota dailyQuota,
             InvestigationTelemetry telemetry,
             Clock clock
     ) {
@@ -103,9 +101,8 @@ public final class LiveInvestigationService {
         this.verifier = verifier;
         this.groundTruthVerifier = groundTruthVerifier;
         this.costEstimator = costEstimator;
-        this.admissionGuard = admissionGuard;
+        this.liveAiRunGuard = liveAiRunGuard;
         this.metrics = metrics;
-        this.dailyQuota = dailyQuota;
         this.telemetry = telemetry;
         this.clock = clock;
     }
@@ -116,16 +113,15 @@ public final class LiveInvestigationService {
     ) {
         long startedAtNanos = System.nanoTime();
         try {
-            requireLiveAccess(request);
             Scenario scenario = scenarios.findById(scenarioId)
                     .orElseThrow(() -> new InvestigationScenarioNotFoundException(
                             scenarioId
                     ));
-            java.util.function.Supplier<LiveInvestigationResult> action = () -> {
-                consumeDailyQuota();
-                return investigateAdmitted(catalogContext(scenarioId, scenario));
-            };
-            LiveInvestigationResult result = admissionGuard.admit(action);
+            LiveInvestigationResult result = liveAiRunGuard.runConfirmed(
+                    request != null && request.confirmLiveAi(),
+                    LiveAiOperation.LEGACY_INVESTIGATION,
+                    () -> investigateAdmitted(catalogContext(scenarioId, scenario))
+            );
             metrics.recordResult(
                     result.status(),
                     elapsedMillis(startedAtNanos),
@@ -146,13 +142,12 @@ public final class LiveInvestigationService {
     ) {
         long startedAtNanos = System.nanoTime();
         try {
-            requireLiveAccess(request);
             requireMatchingGeneratedCase(data, groundTruth);
-            java.util.function.Supplier<LiveInvestigationResult> action = () -> {
-                consumeDailyQuota();
-                return investigateAdmitted(generatedContext(data, groundTruth));
-            };
-            LiveInvestigationResult result = admissionGuard.admit(action);
+            LiveInvestigationResult result = liveAiRunGuard.runConfirmed(
+                    request != null && request.confirmLiveAi(),
+                    LiveAiOperation.LEGACY_INVESTIGATION,
+                    () -> investigateAdmitted(generatedContext(data, groundTruth))
+            );
             metrics.recordResult(
                     result.status(),
                     elapsedMillis(startedAtNanos),
@@ -475,36 +470,6 @@ public final class LiveInvestigationService {
         if (!scenarioId.equals(groundTruth.scenarioId())) {
             throw new IllegalArgumentException(
                     "Generated investigation data and GroundTruth must share scenario_id"
-            );
-        }
-    }
-
-    private void consumeDailyQuota() {
-        GlobalDailyLiveQuota.Decision decision = dailyQuota.tryConsume(
-                DAILY_LIVE_RUN_LIMIT
-        );
-        if (!decision.allowed()) {
-            throw new LiveDailyQuotaExceededException(decision.resetsAt());
-        }
-    }
-
-    private void requireLiveAccess(LiveInvestigationRequest request) {
-        if (request == null || !request.confirmLiveAi()) {
-            throw new LiveInvestigationException(
-                    LiveInvestigationFailure.CONFIRMATION_REQUIRED,
-                    "Live AI request was not explicitly confirmed"
-            );
-        }
-        if (!properties.liveEnabled()) {
-            throw new LiveInvestigationException(
-                    LiveInvestigationFailure.LIVE_AI_DISABLED,
-                    "Live AI is disabled by server configuration"
-            );
-        }
-        if (!properties.hasProviderConfiguration()) {
-            throw new LiveInvestigationException(
-                    LiveInvestigationFailure.API_KEY_MISSING,
-                    "Google Gen AI provider configuration is missing"
             );
         }
     }

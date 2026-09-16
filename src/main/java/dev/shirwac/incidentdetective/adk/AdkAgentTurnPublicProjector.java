@@ -7,6 +7,8 @@ import dev.shirwac.incidentdetective.domain.diagnosis.SafeNextStep;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /** Removes unverified model-authored prose from the public ADK receipt. */
 final class AdkAgentTurnPublicProjector {
@@ -35,7 +37,12 @@ final class AdkAgentTurnPublicProjector {
                 response.safety(),
                 response.runtime(),
                 response.workflow(),
-                safeEvents(response.events()),
+                safeEvents(
+                        response.events(),
+                        response.scenario() == null
+                                ? null
+                                : response.scenario().scenarioId()
+                ),
                 response.toolEvents(),
                 response.diagnosticProbe(),
                 diagnosis,
@@ -94,7 +101,8 @@ final class AdkAgentTurnPublicProjector {
     }
 
     private List<AdkAgentTurnResponse.RuntimeEvent> safeEvents(
-            List<AdkAgentTurnResponse.RuntimeEvent> events
+            List<AdkAgentTurnResponse.RuntimeEvent> events,
+            String scenarioId
     ) {
         return events.stream()
                 .map(event -> new AdkAgentTurnResponse.RuntimeEvent(
@@ -108,11 +116,79 @@ final class AdkAgentTurnPublicProjector {
                         event.contentWithheld() || event.text() != null,
                         null,
                         event.functionCalls(),
-                        event.functionResponses(),
+                        safeFunctionResponses(
+                                event.functionResponses(),
+                                scenarioId
+                        ),
                         event.tokenUsage(),
                         event.providerModelVersion()
                 ))
                 .toList();
+    }
+
+    private List<AdkAgentTurnResponse.FunctionResponseEvent>
+    safeFunctionResponses(
+            List<AdkAgentTurnResponse.FunctionResponseEvent> responses,
+            String scenarioId
+    ) {
+        if (responses == null || responses.isEmpty()) {
+            return List.of();
+        }
+        return responses.stream()
+                .filter(Objects::nonNull)
+                .map(response -> new AdkAgentTurnResponse.FunctionResponseEvent(
+                        response.id(),
+                        response.name(),
+                        publicFunctionResponse(response.response(), scenarioId)
+                ))
+                .toList();
+    }
+
+    private Map<String, Object> publicFunctionResponse(
+            Map<String, Object> response,
+            String scenarioId
+    ) {
+        Objects.requireNonNull(response, "function response must not be null");
+        String publicScenarioId = scenarioId == null
+                ? requiredString(response, "scenario_id")
+                : scenarioId;
+        return Map.of(
+                "status", requiredString(response, "status"),
+                "safe_summary", requiredString(response, "safe_summary"),
+                "scenario_id", publicScenarioId,
+                "evidence_ids", requiredStringList(response, "evidence_ids"),
+                "source_refs", requiredStringList(response, "source_refs"),
+                "write_capability", false,
+                "action_executed", false
+        );
+    }
+
+    private String requiredString(
+            Map<String, Object> response,
+            String field
+    ) {
+        Object value = response.get(field);
+        if (!(value instanceof String text) || text.isBlank()) {
+            throw new IllegalStateException(
+                    "Public function response requires " + field
+            );
+        }
+        return text;
+    }
+
+    private List<String> requiredStringList(
+            Map<String, Object> response,
+            String field
+    ) {
+        Object value = response.get(field);
+        if (!(value instanceof List<?> values)
+                || values.stream().anyMatch(item -> !(item instanceof String))) {
+            throw new IllegalStateException(
+                    "Public function response requires a string list for "
+                            + field
+            );
+        }
+        return values.stream().map(String.class::cast).toList();
     }
 
     private List<String> limitations(List<String> source) {

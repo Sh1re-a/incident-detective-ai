@@ -190,7 +190,7 @@
   "corpus": {
     "version": "nordly-knowledge-corpus-v2",
     "document_count": 16,
-    "chunk_count": 30,
+    "chunk_count": 31,
     "approved_documents": 14,
     "deprecated_documents": 1,
     "untrusted_documents": 1

@@ -1,0 +1,8 @@
+{
+  "context_version": "nordly-demo-customer-v1",
+  "context_id": "public-demo-customer",
+  "current_order_id": "NORD-2051",
+  "source_ref": "demo/nordly-demo-customer-v1#current-order",
+  "evidence_id": "nordly-demo-customer-current-order-context",
+  "synthetic_only": true
+}

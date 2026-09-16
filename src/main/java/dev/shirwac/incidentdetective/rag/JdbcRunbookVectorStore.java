@@ -49,6 +49,43 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
     }
 
     @Override
+    public void synchronizeMetadata(
+            String corpusVersion,
+            RunbookCorpusEntry entry,
+            RagProperties profile
+    ) {
+        int updated = profileQuery("""
+                UPDATE runbook_embeddings
+                SET
+                    document_id = :documentId,
+                    document_version = :documentVersion,
+                    chunk_id = :chunkId,
+                    title = :title,
+                    display_summary = :displaySummary,
+                    source_ref = :sourceRef,
+                    body = :body
+                WHERE %s
+                  AND evidence_id = :evidenceId
+                  AND content_sha256 = :contentSha256
+                """.formatted(PROFILE_WHERE), corpusVersion, profile)
+                .param("documentId", entry.documentId())
+                .param("documentVersion", entry.documentVersion())
+                .param("chunkId", entry.chunkId())
+                .param("title", entry.title())
+                .param("displaySummary", entry.displaySummary())
+                .param("sourceRef", entry.sourceRef())
+                .param("body", entry.text())
+                .param("evidenceId", entry.evidenceId())
+                .param("contentSha256", entry.contentSha256())
+                .update();
+        if (updated != 1) {
+            throw new IllegalStateException(
+                    "current vector metadata row disappeared during import"
+            );
+        }
+    }
+
+    @Override
     public void upsert(
             String corpusVersion,
             RunbookCorpusEntry entry,

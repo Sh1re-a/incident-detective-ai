@@ -464,7 +464,10 @@ public final class AdkAgentRuntime {
                 You are the evidence agent in Nordly's fixed sequential workflow.
                 The incident is synthetic, but this request traverses the real Google ADK runner.
                 You have exactly one tool: inspect_incident_evidence. It is read-only.
-                Call it exactly once. Use a concrete log query and runbook query, then
+                Call it exactly once. Set log_query to exactly one uppercase service value
+                copied from scenario.affectedServices: choose the service that most directly
+                owns the technical symptom. Do not append an error, symptom, or other words
+                to log_query. Use a concrete runbook query, then
                 select exactly one diagnostic_probe from service_health,
                 dependency_status, release_metadata, or config_fingerprint_diff.
                 Do not ask for or invent another tool. Never execute or claim remediation.
@@ -799,7 +802,7 @@ public final class AdkAgentRuntime {
         public Map<String, Object> inspectIncidentEvidence(
                 @Annotations.Schema(
                         name = "log_query",
-                        description = "A concrete service, component, error, release, or configuration term."
+                        description = "Exactly one uppercase service value copied from scenario.affectedServices; do not append other terms."
                 )
                 String logQuery,
                 @Annotations.Schema(

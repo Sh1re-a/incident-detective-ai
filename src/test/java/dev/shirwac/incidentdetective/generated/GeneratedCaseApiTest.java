@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -82,8 +83,10 @@ class GeneratedCaseApiTest {
     @BeforeEach
     void configureRequestLocalInvestigation() {
         reset(model, dailyQuota);
-        when(dailyQuota.tryConsume(anyInt())).thenReturn(
-                new GlobalDailyLiveQuota.Decision(true, 1, 20, QUOTA_RESET)
+        when(dailyQuota.tryConsume(anyInt(), anyLong(), anyLong())).thenReturn(
+                new GlobalDailyLiveQuota.Decision(
+                        true, 1, 20, 25_000, 200_000, QUOTA_RESET
+                )
         );
         stubCollectionRounds();
         when(model.synthesize(any(), anyList(), any())).thenAnswer(invocation -> {
@@ -107,7 +110,9 @@ class GeneratedCaseApiTest {
                         .value("LIVE_AI_CONFIRMATION_REQUIRED"));
 
         verifyNoInteractions(model);
-        verify(dailyQuota, never()).tryConsume(anyInt());
+        verify(dailyQuota, never()).tryConsume(
+                anyInt(), anyLong(), anyLong()
+        );
     }
 
     @Test
@@ -154,7 +159,9 @@ class GeneratedCaseApiTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST_BODY"));
 
         verifyNoInteractions(model);
-        verify(dailyQuota, never()).tryConsume(anyInt());
+        verify(dailyQuota, never()).tryConsume(
+                anyInt(), anyLong(), anyLong()
+        );
     }
 
     @Test

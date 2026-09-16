@@ -203,6 +203,8 @@ class OpenApiDocumentationTest {
                         "LIVE_AI_CONFIRMATION_REQUIRED",
                         "LIVE_AI_DISABLED",
                         "LIVE_AI_NOT_CONFIGURED",
+                        "LIVE_AI_COST_PROFILE_UNAVAILABLE",
+                        "LIVE_AI_BUDGET_UNAVAILABLE",
                         "LIVE_INVESTIGATION_TIMEOUT",
                         "MODEL_PROVIDER_TIMEOUT",
                         "MODEL_PROVIDER_RATE_LIMITED",
@@ -216,7 +218,9 @@ class OpenApiDocumentationTest {
                         "RAG_EMBEDDING_RESPONSE_INVALID",
                         "RAG_DATABASE_UNAVAILABLE",
                         "SCENARIO_NOT_FOUND",
-                        "KNOWLEDGE_QUESTION_NOT_FOUND"
+                        "KNOWLEDGE_QUESTION_NOT_FOUND",
+                        "INCIDENT_LAB_REPLAY_NOT_AVAILABLE",
+                        "DEMO_ORDER_NOT_FOUND"
                 )))
                 .andExpect(jsonPath(
                         "$.components.schemas.ApiProblemResponse.properties.status.example"
@@ -227,7 +231,7 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.ApiProblemResponse.properties.code.example"
                 ).doesNotExist())
-                .andExpect(jsonPath("$.paths.length()").value(10))
+                .andExpect(jsonPath("$.paths.length()").value(15))
                 .andExpect(jsonPath(
                         "$.paths['" + DEMO_WORLD_PATH + "'].get.summary"
                 ).value("Get the fictional Nordly demo world"))

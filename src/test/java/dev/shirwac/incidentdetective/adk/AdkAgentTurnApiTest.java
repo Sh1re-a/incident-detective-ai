@@ -48,6 +48,7 @@ import java.util.Map;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
@@ -118,6 +119,10 @@ class AdkAgentTurnApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.contract_version")
                         .value("nordly-adk-turn-v4"))
+                .andExpect(jsonPath("$.mode")
+                        .value(AdkAgentTurnResponse.BLOCKED_MODE))
+                .andExpect(jsonPath("$.truth_label")
+                        .value(AdkAgentTurnResponse.BLOCKED_TRUTH_LABEL))
                 .andExpect(jsonPath("$.outcome").value("blocked_before_ai"))
                 .andExpect(jsonPath("$.safety.decision").value("blocked"))
                 .andExpect(jsonPath("$.safety.reason_code")
@@ -138,13 +143,16 @@ class AdkAgentTurnApiTest {
                 .andExpect(jsonPath("$.receipt.action_executed").value(false));
 
         verifyNoInteractions(runtime, models);
-        verify(quota, never()).tryConsume(anyInt());
+        verify(quota, never()).tryConsume(anyInt(), anyLong(), anyLong());
     }
 
     @Test
     void completedTurnPublishesTheObservedSequentialWorkflowReceipt()
             throws Exception {
         stubAdmittedRun(validTrajectory(), 2, true);
+        when(runtime.projectEvents(any(), eq(false))).thenReturn(List.of(
+                eventWithRawFunctionResponse()
+        ));
         String sentinel = "MODEL_PROSE_MUST_NOT_ESCAPE_9F2C";
         when(diagnosisDecoder.decode("{}")).thenReturn(new Diagnosis(
                 DiagnosisStatus.DIAGNOSED,
@@ -170,6 +178,10 @@ class AdkAgentTurnApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.contract_version")
                         .value("nordly-adk-turn-v4"))
+                .andExpect(jsonPath("$.mode")
+                        .value(AdkAgentTurnResponse.MODE))
+                .andExpect(jsonPath("$.truth_label")
+                        .value(AdkAgentTurnResponse.TRUTH_LABEL))
                 .andExpect(jsonPath("$.outcome").value("completed"))
                 .andExpect(jsonPath("$.provider_route.transport")
                         .value("developer_api"))
@@ -220,6 +232,33 @@ class AdkAgentTurnApiTest {
                         .value(false))
                 .andExpect(jsonPath("$.diagnostic_probe.duration_ms")
                         .value(7))
+                .andExpect(jsonPath(
+                        "$.events[0].function_responses[0].response.status"
+                ).value("found"))
+                .andExpect(jsonPath(
+                        "$.events[0].function_responses[0].response.safe_summary"
+                ).value("Returned bounded synthetic evidence."))
+                .andExpect(jsonPath(
+                        "$.events[0].function_responses[0].response.evidence_ids[0]"
+                ).value("catalog-log-1"))
+                .andExpect(jsonPath(
+                        "$.events[0].function_responses[0].response.source_refs[0]"
+                ).value("synthetic/catalog-log-1"))
+                .andExpect(jsonPath(
+                        "$.events[0].function_responses[0].response.write_capability"
+                ).value(false))
+                .andExpect(jsonPath(
+                        "$.events[0].function_responses[0].response.action_executed"
+                ).value(false))
+                .andExpect(jsonPath(
+                        "$.events[0].function_responses[0].response.operations"
+                ).doesNotExist())
+                .andExpect(jsonPath(
+                        "$.events[0].function_responses[0].response.diagnostic_probe"
+                ).doesNotExist())
+                .andExpect(jsonPath(
+                        "$.events[0].function_responses[0].response.private_marker"
+                ).doesNotExist())
                 .andExpect(jsonPath("$.receipt.model_calls").value(2))
                 .andExpect(jsonPath("$.receipt.adk_tool_calls").value(1))
                 .andExpect(jsonPath("$.receipt.read_operations").value(2))
@@ -251,6 +290,7 @@ class AdkAgentTurnApiTest {
         assertFalse(response.contains(sentinel));
         assertFalse(response.contains("expected_root_cause_code"));
         assertFalse(response.contains("expected_affected_service"));
+        assertFalse(response.contains("RAW_FUNCTION_RESPONSE_MUST_NOT_ESCAPE"));
     }
 
     @Test
@@ -364,7 +404,7 @@ class AdkAgentTurnApiTest {
                         .value("LIVE_AI_CONFIRMATION_REQUIRED"));
 
         verifyNoInteractions(runtime, models);
-        verify(quota, never()).tryConsume(anyInt());
+        verify(quota, never()).tryConsume(anyInt(), anyLong(), anyLong());
     }
 
     @Test
@@ -386,7 +426,7 @@ class AdkAgentTurnApiTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST_BODY"));
 
         verifyNoInteractions(runtime, models);
-        verify(quota, never()).tryConsume(anyInt());
+        verify(quota, never()).tryConsume(anyInt(), anyLong(), anyLong());
     }
 
     @Test
@@ -496,11 +536,13 @@ class AdkAgentTurnApiTest {
         BaseLlm model = mock(BaseLlm.class);
         when(lease.model()).thenReturn(model);
         when(models.create()).thenReturn(lease);
-        when(quota.tryConsume(anyInt())).thenReturn(
+        when(quota.tryConsume(anyInt(), anyLong(), anyLong())).thenReturn(
                 new GlobalDailyLiveQuota.Decision(
                         true,
                         1,
                         20,
+                        20_000,
+                        200_000,
                         Instant.parse("2026-09-11T00:00:00Z")
                 )
         );
@@ -577,6 +619,44 @@ class AdkAgentTurnApiTest {
                 7,
                 true,
                 false
+        );
+    }
+
+    private AdkAgentTurnResponse.RuntimeEvent eventWithRawFunctionResponse() {
+        return new AdkAgentTurnResponse.RuntimeEvent(
+                2,
+                "event-tool-response",
+                "invocation-42",
+                AdkAgentRuntime.EVIDENCE_AGENT_NAME,
+                "function_response",
+                Instant.parse("2026-09-11T10:00:00Z"),
+                false,
+                true,
+                null,
+                List.of(),
+                List.of(new AdkAgentTurnResponse.FunctionResponseEvent(
+                        "inspect-call-1",
+                        AdkAgentRuntime.TOOL_NAME,
+                        Map.of(
+                                "status", "found",
+                                "safe_summary", "Returned bounded synthetic evidence.",
+                                "scenario_id", "raw-scenario-must-not-escape",
+                                "evidence_ids", List.of("catalog-log-1"),
+                                "source_refs", List.of("synthetic/catalog-log-1"),
+                                "operations", List.of(Map.of(
+                                        "private_marker",
+                                        "RAW_FUNCTION_RESPONSE_MUST_NOT_ESCAPE"
+                                )),
+                                "diagnostic_probe", Map.of(
+                                        "private_marker",
+                                        "RAW_FUNCTION_RESPONSE_MUST_NOT_ESCAPE"
+                                ),
+                                "private_marker",
+                                "RAW_FUNCTION_RESPONSE_MUST_NOT_ESCAPE"
+                        )
+                )),
+                null,
+                "gemini-test-version"
         );
     }
 

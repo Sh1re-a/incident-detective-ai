@@ -41,6 +41,18 @@ public final class LiveInvestigationExceptionHandler {
                 .body(problem);
     }
 
+    @ExceptionHandler(LiveAiBudgetStoreUnavailableException.class)
+    ProblemDetail handleBudgetStoreUnavailable(
+            LiveAiBudgetStoreUnavailableException exception
+    ) {
+        return ApiProblemFactory.create(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Live AI budget guard unavailable",
+                "The shared live AI budget could not be verified, so no provider call was started.",
+                LIVE_AI_BUDGET_UNAVAILABLE
+        );
+    }
+
     @ExceptionHandler(LiveAdmissionRejectedException.class)
     ResponseEntity<ProblemDetail> handleAdmissionRejection(
             LiveAdmissionRejectedException exception
@@ -83,6 +95,12 @@ public final class LiveInvestigationExceptionHandler {
                     "Live AI unavailable",
                     "The model provider is not configured on the server.",
                     LIVE_AI_NOT_CONFIGURED
+            );
+            case COST_PROFILE_MISSING -> ApiProblemFactory.create(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Live AI cost profile unavailable",
+                    "The configured model does not have an approved daily-cost profile.",
+                    LIVE_AI_COST_PROFILE_UNAVAILABLE
             );
             case DEADLINE_EXCEEDED -> ApiProblemFactory.create(
                     HttpStatus.GATEWAY_TIMEOUT,
