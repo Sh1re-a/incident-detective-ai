@@ -67,8 +67,22 @@ public final class AdkAgentTurnController {
                     ))
             ),
             @ApiResponse(
+                    responseCode = "502",
+                    description = "Provider, embedding, or model tool output failed validation",
+                    content = @Content(schema = @Schema(
+                            implementation = ApiProblemResponse.class
+                    ))
+            ),
+            @ApiResponse(
                     responseCode = "503",
                     description = "ADK, live AI, credentials, or retrieval is unavailable",
+                    content = @Content(schema = @Schema(
+                            implementation = ApiProblemResponse.class
+                    ))
+            ),
+            @ApiResponse(
+                    responseCode = "504",
+                    description = "The bounded ADK turn or model provider timed out",
                     content = @Content(schema = @Schema(
                             implementation = ApiProblemResponse.class
                     ))
