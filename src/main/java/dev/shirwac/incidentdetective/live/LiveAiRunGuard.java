@@ -69,6 +69,21 @@ public final class LiveAiRunGuard {
         });
     }
 
+    /**
+     * Establishes confirmation precedence before a caller checks its own
+     * feature availability. This does not admit a run or consume quota;
+     * {@link #runConfirmed(boolean, LiveAiOperation, Supplier)} remains the
+     * only live-execution boundary.
+     */
+    public void requireExplicitConfirmation(boolean confirmed) {
+        if (!confirmed) {
+            throw new LiveInvestigationException(
+                    LiveInvestigationFailure.CONFIRMATION_REQUIRED,
+                    "Live AI request was not explicitly confirmed"
+            );
+        }
+    }
+
     GlobalDailyLiveQuota.Snapshot budgetSnapshot() {
         try {
             return dailyQuota.snapshot(
@@ -102,12 +117,7 @@ public final class LiveAiRunGuard {
             boolean confirmed,
             LiveAiOperation operation
     ) {
-        if (!confirmed) {
-            throw new LiveInvestigationException(
-                    LiveInvestigationFailure.CONFIRMATION_REQUIRED,
-                    "Live AI request was not explicitly confirmed"
-            );
-        }
+        requireExplicitConfirmation(confirmed);
         if (!properties.liveEnabled()) {
             throw new LiveInvestigationException(
                     LiveInvestigationFailure.LIVE_AI_DISABLED,

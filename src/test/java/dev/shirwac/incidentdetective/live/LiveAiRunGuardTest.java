@@ -48,6 +48,32 @@ class LiveAiRunGuardTest {
     }
 
     @Test
+    void missingConfirmationStopsBeforeBudgetOrAction() {
+        InMemoryGlobalDailyLiveQuota quota = new InMemoryGlobalDailyLiveQuota(CLOCK);
+        LiveAiRunGuard guard = guard("gemini-3.1-flash-lite", quota, 25_000);
+        AtomicBoolean called = new AtomicBoolean();
+
+        LiveInvestigationException exception = assertThrows(
+                LiveInvestigationException.class,
+                () -> guard.runConfirmed(
+                        false,
+                        LiveAiOperation.INCIDENT_PLAN,
+                        () -> {
+                            called.set(true);
+                            return "must not run";
+                        }
+                )
+        );
+
+        assertEquals(
+                LiveInvestigationFailure.CONFIRMATION_REQUIRED,
+                exception.failure()
+        );
+        assertFalse(called.get());
+        assertEquals(0, quota.snapshot(20, 25_000).consumed());
+    }
+
+    @Test
     void exhaustedAllowanceStopsBeforeTheSuppliedAction() {
         InMemoryGlobalDailyLiveQuota quota = new InMemoryGlobalDailyLiveQuota(CLOCK);
         LiveAiRunGuard guard = guard("gemini-3.1-flash-lite", quota, 25_000);

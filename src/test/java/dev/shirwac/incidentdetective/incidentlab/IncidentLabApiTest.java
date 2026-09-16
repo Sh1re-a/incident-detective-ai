@@ -23,6 +23,8 @@ import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
 import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
 import dev.shirwac.incidentdetective.generated.NordlyIncidentGeneratedCaseGenerator;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
+import dev.shirwac.incidentdetective.live.LiveInvestigationException;
+import dev.shirwac.incidentdetective.live.LiveInvestigationFailure;
 import dev.shirwac.incidentdetective.live.LiveToolEvent;
 import dev.shirwac.incidentdetective.planning.IncidentBlastRadius;
 import dev.shirwac.incidentdetective.planning.IncidentPlan;
@@ -129,6 +131,28 @@ class IncidentLabApiTest {
                         .value("APPROVED"))
                 .andExpect(jsonPath("$.provider_receipt.transport")
                         .value("developer_api"));
+    }
+
+    @Test
+    void planEndpointReturnsStableConfirmationProblem() throws Exception {
+        when(service.createPlan(any())).thenThrow(
+                new LiveInvestigationException(
+                        LiveInvestigationFailure.CONFIRMATION_REQUIRED,
+                        "Live AI request was not explicitly confirmed"
+                )
+        );
+
+        mockMvc.perform(post(PLANS)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "instruction": "Simulera betalningstimeout i den syntetiska Nordly-miljön.",
+                                  "confirm_live_ai": false
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code")
+                        .value("LIVE_AI_CONFIRMATION_REQUIRED"));
     }
 
     @Test

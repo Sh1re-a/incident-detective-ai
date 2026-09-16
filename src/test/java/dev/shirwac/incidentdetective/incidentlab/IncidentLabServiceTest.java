@@ -23,6 +23,8 @@ import dev.shirwac.incidentdetective.investigation.InvestigationData;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
 import dev.shirwac.incidentdetective.live.LiveAiOperation;
+import dev.shirwac.incidentdetective.live.LiveInvestigationException;
+import dev.shirwac.incidentdetective.live.LiveInvestigationFailure;
 import dev.shirwac.incidentdetective.live.LiveToolEvent;
 import dev.shirwac.incidentdetective.nordly.KnowledgeRagSafetyGate;
 import dev.shirwac.incidentdetective.planning.IncidentBlastRadius;
@@ -178,6 +180,38 @@ class IncidentLabServiceTest {
                 eq(true), eq(LiveAiOperation.INCIDENT_PLAN), any()
         );
         order.verify(planner).propose(any());
+    }
+
+    @Test
+    void allowedPlanningWithoutConfirmationStopsBeforeProvider() {
+        KnowledgeRagSafetyGate.Decision allowed = decision(true,
+                KnowledgeRagSafetyGate.ReasonCode.NONE);
+        LiveInvestigationException expected = new LiveInvestigationException(
+                LiveInvestigationFailure.CONFIRMATION_REQUIRED,
+                "Live AI request was not explicitly confirmed"
+        );
+        when(safetyGate.evaluate(any())).thenReturn(allowed);
+        when(liveAiRunGuard.runConfirmed(
+                eq(false),
+                eq(LiveAiOperation.INCIDENT_PLAN),
+                any()
+        )).thenThrow(expected);
+
+        LiveInvestigationException thrown = assertThrows(
+                LiveInvestigationException.class,
+                () -> service.createPlan(new IncidentLabPlanRequest(
+                        "Simulera betalningstimeout",
+                        false
+                ))
+        );
+
+        assertSame(expected, thrown);
+        verify(liveAiRunGuard).runConfirmed(
+                eq(false),
+                eq(LiveAiOperation.INCIDENT_PLAN),
+                any()
+        );
+        verifyNoInteractions(planner);
     }
 
     @Test

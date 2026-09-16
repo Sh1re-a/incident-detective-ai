@@ -139,6 +139,7 @@ public final class AdkAgentTurnService {
         if (!safety.allowed()) {
             return blocked(safety);
         }
+        liveRunGuard.requireExplicitConfirmation(confirmLiveAi);
         if (!adk.enabled()) {
             throw new LiveInvestigationException(
                     LiveInvestigationFailure.LIVE_AI_DISABLED,
