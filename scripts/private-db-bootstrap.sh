@@ -375,6 +375,44 @@ SQL
     'RUNTIME_SCHEMA_CREATE=false'
 }
 
+verify_daily_quota() {
+  local quota_record
+  local quota_day
+  local quota_starts
+  local quota_micro_usd
+
+  quota_record="$(scalar runtime_psql --command="
+    SELECT concat(
+      requested.quota_day,
+      '|',
+      COALESCE(quota.consumed_starts, 0),
+      '|',
+      COALESCE(quota.consumed_micro_usd, 0)
+    )
+    FROM (
+      SELECT timezone('UTC', CURRENT_TIMESTAMP)::date AS quota_day
+    ) AS requested
+    LEFT JOIN incident_detective.global_live_daily_quota AS quota
+      ON quota.quota_day = requested.quota_day
+  ")"
+  IFS='|' read -r quota_day quota_starts quota_micro_usd \
+    <<<"${quota_record}"
+
+  if [[ -n "${EXPECTED_QUOTA_STARTS:-}" ]]; then
+    assert_equal "quota_starts" "${EXPECTED_QUOTA_STARTS}" "${quota_starts}"
+  fi
+  if [[ -n "${EXPECTED_QUOTA_MICRO_USD:-}" ]]; then
+    assert_equal \
+      "quota_micro_usd" \
+      "${EXPECTED_QUOTA_MICRO_USD}" \
+      "${quota_micro_usd}"
+  fi
+
+  printf 'QUOTA_DAY=%s\n' "${quota_day}"
+  printf 'QUOTA_CONSUMED_STARTS=%s\n' "${quota_starts}"
+  printf 'QUOTA_CONSUMED_MICRO_USD=%s\n' "${quota_micro_usd}"
+}
+
 case "${BOOTSTRAP_STAGE}" in
   prepare)
     prepare_database
@@ -384,6 +422,9 @@ case "${BOOTSTRAP_STAGE}" in
     ;;
   verify)
     verify_runtime
+    ;;
+  quota)
+    verify_daily_quota
     ;;
   *)
     printf 'BOOTSTRAP_ERROR=unknown_stage\n' >&2
