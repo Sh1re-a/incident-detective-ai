@@ -36,7 +36,7 @@ public class RagDatabaseConfiguration {
                     "cloudSqlInstance",
                     properties.cloudSqlInstance()
             );
-            config.addDataSourceProperty("ipTypes", "PRIVATE");
+            config.addDataSourceProperty("ipTypes", properties.cloudSqlIpType());
             config.addDataSourceProperty("cloudSqlRefreshStrategy", "lazy");
         }
         return config;
