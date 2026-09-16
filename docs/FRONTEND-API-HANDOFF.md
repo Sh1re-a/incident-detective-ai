@@ -43,7 +43,7 @@ Gör detta som ett lokalt/build-time-steg, inte genom att hämta OpenAPI från e
 separat browser-origin i den färdiga appen. Den valfria CORS-allowlisten gäller
 avsiktligt bara `/api/v1/**`, inte Swagger eller `/v3/api-docs`.
 
-## De tretton produkt- och proof-endpointsen
+## De femton produkt- och proof-endpointsen
 
 | Metod | Path | Användning |
 |---|---|---|
@@ -54,6 +54,8 @@ avsiktligt bara `/api/v1/**`, inte Swagger eller `/v3/api-docs`.
 | `POST` | `/api/v1/knowledge/questions/{questionId}/runs/recorded-replay` | Backenddriven kunskapsreplay med rankade källor, svar, verifiering, kvitto och uttryckliga runtime-begränsningar. |
 | `POST` | `/api/v1/incident-lab/plans` | Säkerhetsgrindad Gemini-plan som Java kanoniserar till ett avgränsat syntetiskt incidentförslag. Endast under profilen `rag`. |
 | `POST` | `/api/v1/incident-lab/runs` | Genererar backendtelemetri, utvärderar ett deterministiskt larm och anropar ADK endast när larmet har löst ut. Endast under profilen `rag`. |
+| `GET` | `/api/v1/incident-lab/recorded-replay` | Tillgänglighet och orsakskod för den verifierade historiska Driftlabb-körningen. |
+| `POST` | `/api/v1/incident-lab/runs/recorded-replay` | Checksummeverifierad historisk plan→ADK→RAG-körning med noll aktuell provider-, embedding-, databas- eller quotaexekvering. |
 | `POST` | `/api/v1/agent/turns` | Explicit bekräftat `SequentialAgent`-flöde med två avgränsade ADK-agenter, post-run-events, workflow-kvitto och separat Java release gate. |
 | `GET` | `/api/v1/scenarios` | Säkra scenariosammanfattningar utan evidensinventarium eller facit. |
 | `POST` | `/api/v1/scenarios/{scenarioId}/runs/recorded-replay` | Gratis, deterministisk körning utan modellrequest. |
@@ -234,6 +236,43 @@ fälten och får inte anta att ett larm alltid finns, att agenten alltid hittar 
 orsak eller att en föreslagen åtgärd utfördes. `action_receipt` ska alltid visa
 `write_tools_available = false`, `action_executed = false` och
 `human_approval_required = true`.
+
+### Incident Lab recorded replay
+
+```http
+GET /api/v1/incident-lab/recorded-replay
+POST /api/v1/incident-lab/runs/recorded-replay
+```
+
+`GET` avgör om replayen är `ready`. `POST` returnerar den första publicerade
+historiska Driftlabb-körningen med kontraktet `incident-lab-replay-v1`.
+Frontend ska visa den som **historisk inspelning**, aldrig som en ny AI-körning.
+
+Den publicerade inspelningen är ett verkligt syntetiskt plan→larm→ADK→RAG-
+flöde där Java undanhöll diagnosen efter misslyckad direkt evidenskontroll.
+Det är ett avsiktligt säkerhetsbevis: UI:t ska visa `answer_state = withheld`
+och förklara att systemet hellre avstår än publicerar en otillräckligt stödd
+slutsats.
+
+Historiska fält under `recorded_plan` och `recorded_run` beskriver vad som
+hände vid inspelningen. Endast `playback_receipt` beskriver det aktuella
+anropet och ska visa:
+
+- `provider_calls = 0` och `model_calls = 0`;
+- `embedding_calls = 0` och `vector_search_executed = false`;
+- `live_quota_consumed = false`;
+- inga write tools och ingen utförd action.
+
+`provenance.resource_sha256_verified_at_startup = true` betyder att backend
+har verifierat resursens checksumma innan den började svara. Capture- och
+saneringskvittot finns i
+`docs/INCIDENT-LAB-GOLDEN-REPLAY-CAPTURE-2026-09-16.md`.
+
+`provenance.source_content_git_sha` identifierar exakt källinnehåll i den
+historiska körningen. För den första inspelningen är
+`runtime_build_identity_verified = false` och `runtime_build_git_sha = null`,
+eftersom körningen inte fick en build-SHA injicerad. UI:t får därför inte kalla
+värdet en deployad eller runtime-observerad build.
 
 ## Kontrollerat ADK-flöde
 

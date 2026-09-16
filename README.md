@@ -69,6 +69,8 @@ Backendens publika demo-API omfattar:
 | `POST` | `/api/v1/knowledge/questions/{questionId}/runs/recorded-replay` | Providerfri kunskapsreplay. |
 | `POST` | `/api/v1/incident-lab/plans` | Säkerhetsgrindad AI-plan som Java avgränsar till ett syntetiskt incidentförslag. |
 | `POST` | `/api/v1/incident-lab/runs` | Genererar syntetisk telemetri, avgör larm och kör det kontrollerade ADK-flödet när larmet löser ut. |
+| `GET` | `/api/v1/incident-lab/recorded-replay` | Visar om den checksummeverifierade historiska Driftlabb-körningen är tillgänglig. |
+| `POST` | `/api/v1/incident-lab/runs/recorded-replay` | Spelar upp en verklig historisk plan→ADK→RAG-körning utan nya provider-, embedding- eller databas-anrop. |
 | `POST` | `/api/v1/agent/turns` | Lägre teknisk bevisyta för det kontrollerade tvåagentsflödet med Google ADK och post-run-kvitto. |
 | `GET` | `/api/v1/scenarios` | Säkra scenariosammanfattningar utan facit eller evidensinventarium. |
 | `POST` | `/api/v1/scenarios/{scenarioId}/runs/recorded-replay` | Stabil providerfri referenskörning. |

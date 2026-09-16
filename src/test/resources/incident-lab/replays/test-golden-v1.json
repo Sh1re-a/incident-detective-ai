@@ -3,7 +3,9 @@
   "replay_id": "test-contract-fixture-v1",
   "recording_source": "test_contract_fixture",
   "recorded_at": "2026-09-15T08:00:00Z",
-  "source_build_git_sha": "test-fixture",
+  "source_content_git_sha": "test-fixture",
+  "runtime_build_git_sha": null,
+  "runtime_build_identity_verified": false,
   "recorded_instruction": "Testa den publika replay-strukturen utan att kontakta AI eller databas.",
   "recorded_instruction_locale": "sv",
   "recorded_plan": {

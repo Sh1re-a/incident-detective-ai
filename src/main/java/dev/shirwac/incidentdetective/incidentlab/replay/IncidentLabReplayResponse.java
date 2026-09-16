@@ -41,7 +41,10 @@ public record IncidentLabReplayResponse(
             String fixtureVersion,
             String recordingSource,
             Instant recordedAt,
-            String sourceBuildGitSha,
+            String sourceContentGitSha,
+            @Schema(nullable = true)
+            String runtimeBuildGitSha,
+            boolean runtimeBuildIdentityVerified,
             String resourceSha256,
             boolean resourceSha256VerifiedAtStartup,
             String originalPlanContractVersion,

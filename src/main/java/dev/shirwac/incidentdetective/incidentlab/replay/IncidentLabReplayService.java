@@ -127,7 +127,9 @@ public final class IncidentLabReplayService {
                         fixture.fixtureVersion(),
                         fixture.recordingSource(),
                         fixture.recordedAt(),
-                        fixture.sourceBuildGitSha(),
+                        fixture.sourceContentGitSha(),
+                        fixture.runtimeBuildGitSha(),
+                        fixture.runtimeBuildIdentityVerified(),
                         loaded.resourceSha256(),
                         true,
                         fixture.recordedPlan().contractVersion(),
@@ -226,7 +228,8 @@ public final class IncidentLabReplayService {
             );
         }
         Objects.requireNonNull(fixture.recordedAt(), "recordedAt must not be null");
-        requireText(fixture.sourceBuildGitSha(), "source build git SHA");
+        requireText(fixture.sourceContentGitSha(), "source content git SHA");
+        validateRuntimeBuildIdentity(fixture);
         requireText(fixture.recordedInstruction(), "recorded instruction");
         if (!Set.of("sv", "en").contains(fixture.recordedInstructionLocale())) {
             throw invalid("recorded instruction locale must be sv or en");
@@ -273,8 +276,10 @@ public final class IncidentLabReplayService {
             IncidentLabPlanResponse plan,
             IncidentLabRunResponse run
     ) {
-        if (!fixture.sourceBuildGitSha().matches("[0-9a-f]{40}")) {
-            throw invalid("captured replay requires a full lowercase build SHA");
+        if (!fixture.sourceContentGitSha().matches("[0-9a-f]{40}")) {
+            throw invalid(
+                    "captured replay requires a full lowercase source content SHA"
+            );
         }
         requireEqual(
                 IncidentLabPlanResponse.DELIVERY,
@@ -363,6 +368,25 @@ public final class IncidentLabReplayService {
             );
         }
         validateCapturedPublicToolPayloads(agent);
+    }
+
+    private static void validateRuntimeBuildIdentity(
+            IncidentLabReplayFixture fixture
+    ) {
+        String runtimeSha = fixture.runtimeBuildGitSha();
+        if (fixture.runtimeBuildIdentityVerified()) {
+            if (runtimeSha == null || !runtimeSha.matches("[0-9a-f]{40}")) {
+                throw invalid(
+                        "verified runtime build identity requires a full lowercase SHA"
+                );
+            }
+            return;
+        }
+        if (runtimeSha != null) {
+            throw invalid(
+                    "unverified runtime build identity must not publish a build SHA"
+            );
+        }
     }
 
     private static void requireRecordedProviderRoute(

@@ -33,7 +33,7 @@ public final class IncidentLabReplayController {
     )
     @Operation(
             summary = "Read recorded Incident Lab availability",
-            description = "Always provider-, database-, and quota-free. Availability remains false until a verified capture resource is explicitly configured."
+            description = "Always provider-, database-, and quota-free. The packaged capture is available by default and can be disabled by clearing its resource configuration."
     )
     public IncidentLabReplayAvailabilityResponse availability() {
         return service.availability();

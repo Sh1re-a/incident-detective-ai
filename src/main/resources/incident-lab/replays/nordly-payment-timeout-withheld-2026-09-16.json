@@ -1,0 +1,969 @@
+{
+  "fixture_version": "incident-lab-replay-fixture-v1",
+  "replay_id": "nordly-payment-timeout-withheld-2026-09-16",
+  "recording_source": "captured_public_api",
+  "recorded_at": "2026-09-16T07:49:47.367407Z",
+  "source_content_git_sha": "f890fbfe4afd50bb91d87dce3956e9d22696a494",
+  "runtime_build_git_sha": null,
+  "runtime_build_identity_verified": false,
+  "recorded_instruction": "Efter en syntetisk release börjar betalningsanrop ge återkommande 500-fel. Skapa ett säkert lokalt fall som agenten kan utreda med read-only verktyg.",
+  "recorded_instruction_locale": "sv",
+  "recorded_plan": {
+    "contract_version": "incident-lab-plan-v1",
+    "outcome": "plan_ready",
+    "delivery": "synchronous_post_run",
+    "truth_label": "Real Gemini proposal — deterministic Java validation for a synthetic incident only.",
+    "safety": {
+      "decision": "allowed",
+      "reason_code": "none",
+      "summary_sv": "Instruktionen får gå till planeringsmodellen; Java avgör om förslaget blir körbart.",
+      "summary_en": "The instruction may reach the planning model; Java decides whether the proposal is runnable."
+    },
+    "proposal": {
+      "status": "candidate",
+      "summary": "Simulering av betalningsfel efter release för att möjliggöra undersökning av betalningsadapter och checkout-tjänster.",
+      "incident_family": "payment_timeout",
+      "requested_severity": "medium",
+      "affected_services": [
+        "storefront",
+        "checkout_api",
+        "payment_adapter"
+      ],
+      "requested_blast_radius": "service_chain"
+    },
+    "java_validation": {
+      "decision": "NARROWED",
+      "plan": {
+        "contract_version": "incident-plan-v1",
+        "incident_family": "payment_timeout",
+        "severity": "high",
+        "affected_services": [
+          "payment_adapter"
+        ],
+        "summary": "Synthetic PAYMENT_ADAPTER timeout with three HTTP 504 responses.",
+        "synthetic_only": true,
+        "write_actions_allowed": false,
+        "human_approval_required": true
+      },
+      "adjustments": [
+        "SERVICES_NARROWED_TO_RUNNABLE_CORE",
+        "SEVERITY_CANONICALIZED_TO_HIGH"
+      ],
+      "rejection": null
+    },
+    "provider_receipt": {
+      "transport": "developer_api",
+      "model": "gemini-3.1-flash-lite",
+      "provider_response_id": "A0qqauWaBp61kdUPjvqGgQI",
+      "token_usage": {
+        "input_tokens": 609,
+        "cached_input_tokens": null,
+        "uncached_input_tokens": null,
+        "candidate_output_tokens": 114,
+        "thinking_output_tokens": null,
+        "output_tokens": 114,
+        "tool_use_prompt_tokens": null,
+        "total_tokens": 723
+      },
+      "latency_ms": 4507
+    },
+    "limitations": [
+      "The model proposes a plan; deterministic Java owns approval.",
+      "Java narrows every runnable family to one bounded synthetic core service.",
+      "This endpoint does not execute an incident or call an agent.",
+      "The handoff is stateless; the run endpoint revalidates every canonical plan field."
+    ]
+  },
+  "recorded_run": {
+    "contract_version": "incident-lab-run-v3",
+    "outcome": "alarm_detected_investigation_withheld",
+    "delivery": "synchronous_post_run",
+    "truth_label": "Backend-generated synthetic telemetry — deterministic Java alarm; Google ADK runs only when triggered.",
+    "answer_state": "withheld",
+    "business_response": {
+      "headline": "Svar undanhållet efter kontroll",
+      "what_happened": "Larmet löste ut när antalet HTTP 5xx-svar uppmättes till 3 händelser under 30 sekunder; gränsen är minst 3 händelser.",
+      "impact": "I det syntetiska fallet misslyckades betalningar i kassan.",
+      "what_is_known": [
+        "Larmet löste ut när antalet HTTP 5xx-svar uppmättes till 3 händelser under 30 sekunder; gränsen är minst 3 händelser.",
+        "Java har inte frisläppt någon diagnos."
+      ],
+      "what_remains_unknown": [
+        "Rotorsak och berörd tjänst är inte fastställda."
+      ],
+      "safe_next_step": "Granska verifieringskvittot och de befintliga läskvittona; kör ingen ändring från detta svar.",
+      "certainty": "Ingen frisläppt slutsats",
+      "human_approval_required": true
+    },
+    "developer_response": {
+      "summary": "Agentsvaret frisläpptes inte. Underkända eller saknade kontroller: agent_outcome_not_completed, direct_evidence_support, factual_match, answer_not_released. Kvittot visar 3 verktygshändelser och probe SERVICE_HEALTH med utfallet OBSERVED.",
+      "root_cause_code": null,
+      "affected_service": null,
+      "verified_claims": [],
+      "highlighted_log_evidence_ids": [
+        "generated-payment-timeout-1022ff0864c2d41b-payment-http-004",
+        "generated-payment-timeout-1022ff0864c2d41b-payment-http-005",
+        "generated-payment-timeout-1022ff0864c2d41b-log-timeout-error",
+        "generated-payment-timeout-1022ff0864c2d41b-payment-http-006"
+      ],
+      "missing_evidence_codes": [],
+      "failed_verification_checks": [
+        "agent_outcome_not_completed",
+        "direct_evidence_support",
+        "factual_match",
+        "answer_not_released"
+      ],
+      "next_read": "Granska verifieringskvittot och de befintliga läskvittona; kör ingen ändring från detta svar."
+    },
+    "action_receipt": {
+      "status": "not_proposed",
+      "read_operations": 4,
+      "write_tools_available": false,
+      "action_executed": false,
+      "human_approval_required": true,
+      "proposed_next_step": null,
+      "summary": "Endast 4 läsoperationer utfördes. Ingen åtgärd kördes och varje ändring kräver mänskligt godkännande."
+    },
+    "localized_presentations": {
+      "sv": {
+        "business_response": {
+          "headline": "Svar undanhållet efter kontroll",
+          "what_happened": "Larmet löste ut när antalet HTTP 5xx-svar uppmättes till 3 händelser under 30 sekunder; gränsen är minst 3 händelser.",
+          "impact": "I det syntetiska fallet misslyckades betalningar i kassan.",
+          "what_is_known": [
+            "Larmet löste ut när antalet HTTP 5xx-svar uppmättes till 3 händelser under 30 sekunder; gränsen är minst 3 händelser.",
+            "Java har inte frisläppt någon diagnos."
+          ],
+          "what_remains_unknown": [
+            "Rotorsak och berörd tjänst är inte fastställda."
+          ],
+          "safe_next_step": "Granska verifieringskvittot och de befintliga läskvittona; kör ingen ändring från detta svar.",
+          "certainty": "Ingen frisläppt slutsats",
+          "human_approval_required": true
+        },
+        "developer_response": {
+          "summary": "Agentsvaret frisläpptes inte. Underkända eller saknade kontroller: agent_outcome_not_completed, direct_evidence_support, factual_match, answer_not_released. Kvittot visar 3 verktygshändelser och probe SERVICE_HEALTH med utfallet OBSERVED.",
+          "root_cause_code": null,
+          "affected_service": null,
+          "verified_claims": [],
+          "highlighted_log_evidence_ids": [
+            "generated-payment-timeout-1022ff0864c2d41b-payment-http-004",
+            "generated-payment-timeout-1022ff0864c2d41b-payment-http-005",
+            "generated-payment-timeout-1022ff0864c2d41b-log-timeout-error",
+            "generated-payment-timeout-1022ff0864c2d41b-payment-http-006"
+          ],
+          "missing_evidence_codes": [],
+          "failed_verification_checks": [
+            "agent_outcome_not_completed",
+            "direct_evidence_support",
+            "factual_match",
+            "answer_not_released"
+          ],
+          "next_read": "Granska verifieringskvittot och de befintliga läskvittona; kör ingen ändring från detta svar."
+        },
+        "action_receipt": {
+          "status": "not_proposed",
+          "read_operations": 4,
+          "write_tools_available": false,
+          "action_executed": false,
+          "human_approval_required": true,
+          "proposed_next_step": null,
+          "summary": "Endast 4 läsoperationer utfördes. Ingen åtgärd kördes och varje ändring kräver mänskligt godkännande."
+        }
+      },
+      "en": {
+        "business_response": {
+          "headline": "Answer withheld after verification",
+          "what_happened": "The alarm triggered when the number of HTTP 5xx responses reached 3 events over 30 seconds; the threshold is at least 3 events.",
+          "impact": "Payments failed at checkout in the synthetic case.",
+          "what_is_known": [
+            "The alarm triggered when the number of HTTP 5xx responses reached 3 events over 30 seconds; the threshold is at least 3 events.",
+            "Java has not released a diagnosis."
+          ],
+          "what_remains_unknown": [
+            "The root cause and affected service have not been established."
+          ],
+          "safe_next_step": "Review the verification receipt and the existing read receipts; do not make a change based on this answer.",
+          "certainty": "No conclusion was released",
+          "human_approval_required": true
+        },
+        "developer_response": {
+          "summary": "The agent answer was not released. Failed or missing checks: agent_outcome_not_completed, direct_evidence_support, factual_match, answer_not_released. The receipt records 3 tool events and probe SERVICE_HEALTH with outcome OBSERVED.",
+          "root_cause_code": null,
+          "affected_service": null,
+          "verified_claims": [],
+          "highlighted_log_evidence_ids": [
+            "generated-payment-timeout-1022ff0864c2d41b-payment-http-004",
+            "generated-payment-timeout-1022ff0864c2d41b-payment-http-005",
+            "generated-payment-timeout-1022ff0864c2d41b-log-timeout-error",
+            "generated-payment-timeout-1022ff0864c2d41b-payment-http-006"
+          ],
+          "missing_evidence_codes": [],
+          "failed_verification_checks": [
+            "agent_outcome_not_completed",
+            "direct_evidence_support",
+            "factual_match",
+            "answer_not_released"
+          ],
+          "next_read": "Review the verification receipt and the existing read receipts; do not make a change based on this answer."
+        },
+        "action_receipt": {
+          "status": "not_proposed",
+          "read_operations": 4,
+          "write_tools_available": false,
+          "action_executed": false,
+          "human_approval_required": true,
+          "proposed_next_step": null,
+          "summary": "Only 4 read operations were performed. No action was executed, and every change requires human approval."
+        }
+      }
+    },
+    "plan": {
+      "contract_version": "incident-plan-v1",
+      "incident_family": "payment_timeout",
+      "severity": "high",
+      "affected_services": [
+        "payment_adapter"
+      ],
+      "summary": "Synthetic PAYMENT_ADAPTER timeout with three HTTP 504 responses.",
+      "synthetic_only": true,
+      "write_actions_allowed": false,
+      "human_approval_required": true
+    },
+    "generation_receipt": {
+      "generator_version": "nordly-incident-generator-v2",
+      "seed": 2899321180519870117,
+      "seed_origin": "server_generated",
+      "incident_family": "payment_timeout",
+      "evidence_mode": "diagnostic",
+      "noise_level": "low",
+      "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+      "variant": {
+        "variant_id": "payment-timeout-631762cca9628e39",
+        "fingerprint": "631762cca9628e39a6f3f02582f5eb054a173336184a40bcc2862cd2d6c8c8d4"
+      }
+    },
+    "scenario": {
+      "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+      "title": "Generated checkout payment timeout",
+      "description": "A request-local synthetic checkout incident generated from one bounded template.",
+      "incident_started_at": "2026-09-04T13:49:00Z",
+      "time_window": {
+        "start": "2026-09-04T13:42:00Z",
+        "end": "2026-09-04T14:02:00Z"
+      },
+      "affected_services": [
+        "STOREFRONT",
+        "CHECKOUT_API",
+        "PAYMENT_ADAPTER"
+      ],
+      "business_impact_summary": "Generated estimate: 135 of 647 synthetic checkout attempts failed.",
+      "initial_symptoms": [
+        {
+          "symptom_code": "CHECKOUT_ERROR_RATE_HIGH",
+          "summary": "Checkout failures are above the generated baseline.",
+          "observed_at": "2026-09-04T13:51:00Z"
+        },
+        {
+          "symptom_code": "PAYMENT_STEP_SLOW",
+          "summary": "The payment step is slower than the generated baseline.",
+          "observed_at": "2026-09-04T13:52:00Z"
+        }
+      ],
+      "version": 1
+    },
+    "backend_logs": [
+      {
+        "evidence_type": "log",
+        "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-log-release",
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "observed_at": "2026-09-04T13:47:12Z",
+        "display_summary": "The generated payment adapter release completed before failures began.",
+        "source_ref": "generated/generated-payment-timeout-1022ff0864c2d41b/logs/payment-adapter/release",
+        "content": {
+          "service": "PAYMENT_ADAPTER",
+          "level": "INFO",
+          "message": "Generated release payment-adapter-generated-1022ff08 completed.",
+          "attributes": {
+            "result": "success",
+            "release": "payment-adapter-generated-1022ff08"
+          }
+        }
+      },
+      {
+        "evidence_type": "log",
+        "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-log-timeout-config",
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "observed_at": "2026-09-04T13:47:14Z",
+        "display_summary": "The generated release reduced the payment provider read timeout.",
+        "source_ref": "generated/generated-payment-timeout-1022ff0864c2d41b/logs/payment-adapter/config-audit",
+        "content": {
+          "service": "PAYMENT_ADAPTER",
+          "level": "INFO",
+          "message": "Configuration changed for PAYMENT_PROVIDER_READ_TIMEOUT_MS.",
+          "attributes": {
+            "previous_value": "5000",
+            "new_value": "1900",
+            "release": "payment-adapter-generated-1022ff08"
+          }
+        }
+      },
+      {
+        "evidence_type": "log",
+        "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-log-inventory-noise",
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "observed_at": "2026-09-04T13:50:20Z",
+        "display_summary": "A generated inventory cache warning was brief and unrelated.",
+        "source_ref": "generated/generated-payment-timeout-1022ff0864c2d41b/logs/inventory-service/cache-refresh",
+        "content": {
+          "service": "INVENTORY_SERVICE",
+          "level": "WARN",
+          "message": "Generated inventory cache refresh exceeded its warning threshold.",
+          "attributes": {
+            "result": "completed",
+            "duration_ms": "120"
+          }
+        }
+      },
+      {
+        "evidence_type": "log",
+        "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-payment-http-001",
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "observed_at": "2026-09-04T13:50:23Z",
+        "display_summary": "Synthetic payment authorization completed with HTTP 200.",
+        "source_ref": "synthetic/generated-payment-timeout-1022ff0864c2d41b/logs/payment/001",
+        "content": {
+          "service": "PAYMENT_ADAPTER",
+          "level": "INFO",
+          "message": "Synthetic payment authorization completed.",
+          "attributes": {
+            "request_id": "synthetic-payment-001",
+            "path": "/payments/authorize",
+            "method": "POST",
+            "http_status": "200",
+            "event_kind": "HTTP_RESPONSE",
+            "incident_family": "PAYMENT_TIMEOUT",
+            "synthetic": "true"
+          }
+        }
+      },
+      {
+        "evidence_type": "log",
+        "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-payment-http-002",
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "observed_at": "2026-09-04T13:50:28Z",
+        "display_summary": "Synthetic payment authorization completed with HTTP 200.",
+        "source_ref": "synthetic/generated-payment-timeout-1022ff0864c2d41b/logs/payment/002",
+        "content": {
+          "service": "PAYMENT_ADAPTER",
+          "level": "INFO",
+          "message": "Synthetic payment authorization completed.",
+          "attributes": {
+            "request_id": "synthetic-payment-002",
+            "path": "/payments/authorize",
+            "method": "POST",
+            "http_status": "200",
+            "event_kind": "HTTP_RESPONSE",
+            "incident_family": "PAYMENT_TIMEOUT",
+            "synthetic": "true"
+          }
+        }
+      },
+      {
+        "evidence_type": "log",
+        "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-payment-http-003",
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "observed_at": "2026-09-04T13:50:33Z",
+        "display_summary": "Synthetic payment authorization completed with HTTP 200.",
+        "source_ref": "synthetic/generated-payment-timeout-1022ff0864c2d41b/logs/payment/003",
+        "content": {
+          "service": "PAYMENT_ADAPTER",
+          "level": "INFO",
+          "message": "Synthetic payment authorization completed.",
+          "attributes": {
+            "request_id": "synthetic-payment-003",
+            "path": "/payments/authorize",
+            "method": "POST",
+            "http_status": "200",
+            "event_kind": "HTTP_RESPONSE",
+            "incident_family": "PAYMENT_TIMEOUT",
+            "synthetic": "true"
+          }
+        }
+      },
+      {
+        "evidence_type": "log",
+        "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-payment-http-004",
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "observed_at": "2026-09-04T13:50:43Z",
+        "display_summary": "Synthetic payment authorization timed out with HTTP 504.",
+        "source_ref": "synthetic/generated-payment-timeout-1022ff0864c2d41b/logs/payment/004",
+        "content": {
+          "service": "PAYMENT_ADAPTER",
+          "level": "ERROR",
+          "message": "Synthetic payment provider exceeded the configured timeout.",
+          "attributes": {
+            "request_id": "synthetic-payment-004",
+            "path": "/payments/authorize",
+            "method": "POST",
+            "http_status": "504",
+            "event_kind": "HTTP_RESPONSE",
+            "incident_family": "PAYMENT_TIMEOUT",
+            "synthetic": "true"
+          }
+        }
+      },
+      {
+        "evidence_type": "log",
+        "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-payment-http-005",
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "observed_at": "2026-09-04T13:50:55Z",
+        "display_summary": "Synthetic payment authorization timed out with HTTP 504.",
+        "source_ref": "synthetic/generated-payment-timeout-1022ff0864c2d41b/logs/payment/005",
+        "content": {
+          "service": "PAYMENT_ADAPTER",
+          "level": "ERROR",
+          "message": "Synthetic payment provider exceeded the configured timeout.",
+          "attributes": {
+            "request_id": "synthetic-payment-005",
+            "path": "/payments/authorize",
+            "method": "POST",
+            "http_status": "504",
+            "event_kind": "HTTP_RESPONSE",
+            "incident_family": "PAYMENT_TIMEOUT",
+            "synthetic": "true"
+          }
+        }
+      },
+      {
+        "evidence_type": "log",
+        "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-log-timeout-error",
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "observed_at": "2026-09-04T13:51:08Z",
+        "display_summary": "Generated payment authorization stopped at the configured timeout.",
+        "source_ref": "generated/generated-payment-timeout-1022ff0864c2d41b/logs/payment-adapter/request-timeout",
+        "content": {
+          "service": "PAYMENT_ADAPTER",
+          "level": "ERROR",
+          "message": "SocketTimeoutException while awaiting synthetic payment provider.",
+          "attributes": {
+            "configured_timeout_ms": "1900",
+            "trace_id": "generated-trace-537655899eef5326",
+            "provider": "SYNTHETIC_PAY",
+            "elapsed_ms": "1952"
+          }
+        }
+      },
+      {
+        "evidence_type": "log",
+        "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-payment-http-006",
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "observed_at": "2026-09-04T13:51:08Z",
+        "display_summary": "Synthetic payment authorization timed out with HTTP 504.",
+        "source_ref": "synthetic/generated-payment-timeout-1022ff0864c2d41b/logs/payment/006",
+        "content": {
+          "service": "PAYMENT_ADAPTER",
+          "level": "ERROR",
+          "message": "Synthetic payment provider exceeded the configured timeout.",
+          "attributes": {
+            "request_id": "synthetic-payment-006",
+            "path": "/payments/authorize",
+            "method": "POST",
+            "http_status": "504",
+            "event_kind": "HTTP_RESPONSE",
+            "incident_family": "PAYMENT_TIMEOUT",
+            "synthetic": "true"
+          }
+        }
+      }
+    ],
+    "alarm_receipt": {
+      "alarm_id": "generated-payment-timeout-1022ff0864c2d41b-http-5xx-burst-1788529868000",
+      "rule_id": "HTTP_5XX_BURST_V1",
+      "incident_family": "payment_timeout",
+      "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+      "service": "PAYMENT_ADAPTER",
+      "triggered_at": "2026-09-04T13:51:08Z",
+      "signal": {
+        "name": "http_5xx_response_count",
+        "comparison": "at_least",
+        "threshold_value": 3.0,
+        "observed_value": 3.0,
+        "unit": "count",
+        "lookback_seconds": 30
+      },
+      "evidence_ids": [
+        "generated-payment-timeout-1022ff0864c2d41b-payment-http-004",
+        "generated-payment-timeout-1022ff0864c2d41b-payment-http-005",
+        "generated-payment-timeout-1022ff0864c2d41b-payment-http-006"
+      ]
+    },
+    "agent_turn": {
+      "contract_version": "nordly-adk-turn-v4",
+      "run_id": "a03307c4-3605-4614-8dd8-b1befcdc294d",
+      "session_id": "53369f33-0cc5-448c-b080-56eb6f43916b",
+      "turn_id": "2aa7d667-a2b8-4a08-9815-891f3b72fb26",
+      "mode": "adk_live_ai",
+      "truth_label": "Generated synthetic incident — real Google ADK investigation.",
+      "outcome": "verification_failed",
+      "provider_route": {
+        "transport": "developer_api",
+        "authentication_mode": "api_key",
+        "location": null
+      },
+      "scenario": {
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "title": "Generated checkout payment timeout",
+        "description": "A request-local synthetic checkout incident generated from one bounded template.",
+        "incident_started_at": "2026-09-04T13:49:00Z",
+        "time_window": {
+          "start": "2026-09-04T13:42:00Z",
+          "end": "2026-09-04T14:02:00Z"
+        },
+        "affected_services": [
+          "STOREFRONT",
+          "CHECKOUT_API",
+          "PAYMENT_ADAPTER"
+        ],
+        "business_impact_summary": "Generated estimate: 135 of 647 synthetic checkout attempts failed.",
+        "initial_symptoms": [
+          {
+            "symptom_code": "CHECKOUT_ERROR_RATE_HIGH",
+            "summary": "Checkout failures are above the generated baseline.",
+            "observed_at": "2026-09-04T13:51:00Z"
+          },
+          {
+            "symptom_code": "PAYMENT_STEP_SLOW",
+            "summary": "The payment step is slower than the generated baseline.",
+            "observed_at": "2026-09-04T13:52:00Z"
+          }
+        ],
+        "version": 1
+      },
+      "safety": {
+        "decision": "allowed",
+        "reason_code": "none",
+        "summary_sv": "Frågan passerade säkerhetskontrollen och får gå vidare inom den begränsade assistenten.",
+        "summary_en": "The question passed the safety check and may continue within the bounded assistant."
+      },
+      "runtime": {
+        "framework": "google_adk",
+        "framework_version": "1.7.0",
+        "agent_name": "nordly_incident_agent",
+        "model_id": "gemini-3.1-flash-lite",
+        "prompt_version": "nordly-adk-sequential-v3",
+        "session_service": "request_scoped_in_memory",
+        "delivery": "synchronous_post_run",
+        "event_source": "google_adk_runner",
+        "runner_invoked": true,
+        "streamed": false
+      },
+      "workflow": {
+        "type": "sequential_agent",
+        "expected_agent_order": [
+          "nordly_evidence_agent",
+          "nordly_diagnosis_agent"
+        ],
+        "observed_agent_order": [
+          "nordly_evidence_agent",
+          "nordly_diagnosis_agent"
+        ],
+        "evidence_handoff": "adk_function_response",
+        "final_response_author": "nordly_diagnosis_agent",
+        "completed_in_order": true
+      },
+      "events": [
+        {
+          "sequence": 1,
+          "event_id": "85c8bb01-557a-4330-b677-4b65f6492bed",
+          "invocation_id": "e-b8d9ea82-30f2-43ca-abac-a9ff4e833bf5",
+          "author": "nordly_evidence_agent",
+          "type": "tool_call",
+          "observed_at": "2026-09-16T07:49:40.356Z",
+          "final_response": false,
+          "content_withheld": false,
+          "text": null,
+          "function_calls": [
+            {
+              "id": "call_170071",
+              "name": "inspect_incident_evidence",
+              "arguments": {
+                "log_query": "PAYMENT_ADAPTER timeout checkout failure",
+                "diagnostic_probe": "service_health",
+                "runbook_query": "payment gateway timeout troubleshooting"
+              }
+            }
+          ],
+          "function_responses": [],
+          "token_usage": {
+            "input_tokens": 725,
+            "cached_input_tokens": null,
+            "uncached_input_tokens": null,
+            "candidate_output_tokens": 49,
+            "thinking_output_tokens": null,
+            "output_tokens": 49,
+            "tool_use_prompt_tokens": null,
+            "total_tokens": 774
+          },
+          "provider_model_version": "gemini-3.1-flash-lite"
+        },
+        {
+          "sequence": 2,
+          "event_id": "3727cb0d-35e4-45bc-a56f-a3777b5d9efb",
+          "invocation_id": "e-b8d9ea82-30f2-43ca-abac-a9ff4e833bf5",
+          "author": "nordly_evidence_agent",
+          "type": "tool_result",
+          "observed_at": "2026-09-16T07:49:40.758Z",
+          "final_response": false,
+          "content_withheld": false,
+          "text": null,
+          "function_calls": [],
+          "function_responses": [
+            {
+              "id": "call_170071",
+              "name": "inspect_incident_evidence",
+              "response": {
+                "status": "found",
+                "action_executed": false,
+                "write_capability": false,
+                "safe_summary": "Returned 5 bounded evidence item(s) from synthetic sources.",
+                "evidence_ids": [
+                  "generated-payment-timeout-1022ff0864c2d41b-metric-payment-p95",
+                  "generated-payment-timeout-1022ff0864c2d41b-metric-checkout-failure-ratio",
+                  "generated-payment-timeout-1022ff0864c2d41b-metric-failed-checkouts",
+                  "runbook-payment-provider-degradation",
+                  "runbook-payment-timeout-precedence"
+                ],
+                "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+                "source_refs": [
+                  "generated/generated-payment-timeout-1022ff0864c2d41b/metrics/payment-adapter/authorization-p95",
+                  "generated/generated-payment-timeout-1022ff0864c2d41b/metrics/checkout/failure-ratio",
+                  "generated/generated-payment-timeout-1022ff0864c2d41b/metrics/checkout/failed-attempts",
+                  "runbooks/rb-payment-provider-timeouts#provider-degradation-check",
+                  "runbooks/rb-payment-provider-timeouts#timeout-precedence"
+                ]
+              }
+            }
+          ],
+          "token_usage": null,
+          "provider_model_version": null
+        },
+        {
+          "sequence": 3,
+          "event_id": "9b19427f-00b6-4c6e-bb92-b0198e63998c",
+          "invocation_id": "e-b8d9ea82-30f2-43ca-abac-a9ff4e833bf5",
+          "author": "nordly_diagnosis_agent",
+          "type": "final_response",
+          "observed_at": "2026-09-16T07:49:47.318Z",
+          "final_response": true,
+          "content_withheld": true,
+          "text": null,
+          "function_calls": [],
+          "function_responses": [],
+          "token_usage": {
+            "input_tokens": 5489,
+            "cached_input_tokens": null,
+            "uncached_input_tokens": null,
+            "candidate_output_tokens": 399,
+            "thinking_output_tokens": null,
+            "output_tokens": 399,
+            "tool_use_prompt_tokens": null,
+            "total_tokens": 5888
+          },
+          "provider_model_version": "gemini-3.1-flash-lite"
+        }
+      ],
+      "tool_events": [
+        {
+          "event_id": "4b75e6ec-a6d3-448d-bba1-aa237ad23f94-metrics",
+          "collection_round": 1,
+          "tool_name": "get_metrics",
+          "arguments": {
+            "end": "2026-09-04T14:02:00Z",
+            "start": "2026-09-04T13:42:00Z",
+            "metric_names": [
+              "checkout_failure_ratio",
+              "failed_checkout_attempts",
+              "payment_authorization_duration_p95"
+            ]
+          },
+          "safe_summary": "Returned 3 bounded metric evidence item(s).",
+          "evidence": [
+            {
+              "evidence_type": "metric",
+              "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-metric-payment-p95",
+              "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+              "observed_at": "2026-09-04T13:52:00Z",
+              "display_summary": "Generated payment authorization p95 reached 1.98 seconds.",
+              "source_ref": "generated/generated-payment-timeout-1022ff0864c2d41b/metrics/payment-adapter/authorization-p95",
+              "content": {
+                "metric_name": "payment_authorization_duration_p95",
+                "value": 1.977,
+                "unit": "seconds",
+                "labels": {
+                  "service": "PAYMENT_ADAPTER",
+                  "release": "payment-adapter-generated-1022ff08"
+                }
+              }
+            },
+            {
+              "evidence_type": "metric",
+              "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-metric-checkout-failure-ratio",
+              "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+              "observed_at": "2026-09-04T13:59:00Z",
+              "display_summary": "Generated checkout failure ratio reached 20.9 percent.",
+              "source_ref": "generated/generated-payment-timeout-1022ff0864c2d41b/metrics/checkout/failure-ratio",
+              "content": {
+                "metric_name": "checkout_failure_ratio",
+                "value": 0.209,
+                "unit": "ratio",
+                "labels": {
+                  "attempts": "647",
+                  "service": "CHECKOUT_API"
+                }
+              }
+            },
+            {
+              "evidence_type": "metric",
+              "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-metric-failed-checkouts",
+              "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+              "observed_at": "2026-09-04T13:59:00Z",
+              "display_summary": "135 generated checkout attempts failed.",
+              "source_ref": "generated/generated-payment-timeout-1022ff0864c2d41b/metrics/checkout/failed-attempts",
+              "content": {
+                "metric_name": "failed_checkout_attempts",
+                "value": 135.0,
+                "unit": "count",
+                "labels": {
+                  "service": "CHECKOUT_API"
+                }
+              }
+            }
+          ],
+          "runbook_retrieval": null
+        },
+        {
+          "event_id": "4b75e6ec-a6d3-448d-bba1-aa237ad23f94-logs",
+          "collection_round": 1,
+          "tool_name": "search_logs",
+          "arguments": {
+            "start": "2026-09-04T13:42:00Z",
+            "query": "PAYMENT_ADAPTER timeout checkout failure",
+            "levels": [],
+            "end": "2026-09-04T14:02:00Z",
+            "services": []
+          },
+          "safe_summary": "Returned 0 bounded log evidence item(s).",
+          "evidence": [],
+          "runbook_retrieval": null
+        },
+        {
+          "event_id": "4b75e6ec-a6d3-448d-bba1-aa237ad23f94-runbooks",
+          "collection_round": 1,
+          "tool_name": "retrieve_runbooks",
+          "arguments": {
+            "query": "payment gateway timeout troubleshooting",
+            "max_results": 2
+          },
+          "safe_summary": "Returned 2 bounded runbook chunk(s) using Gemini embeddings with exact pgvector cosine retrieval.",
+          "evidence": [
+            {
+              "evidence_type": "runbook",
+              "evidence_id": "runbook-payment-provider-degradation",
+              "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+              "display_summary": "Distinguish an internal timeout regression from external provider degradation.",
+              "source_ref": "runbooks/rb-payment-provider-timeouts#provider-degradation-check",
+              "content": {
+                "document_id": "rb-payment-provider-timeouts",
+                "chunk_id": "provider-degradation-check",
+                "document_version": "1.2",
+                "text": "Compare multiple provider operations and regions before declaring an external outage. If only one client release changed and upstream duration is stable, inspect local timeout configuration first."
+              }
+            },
+            {
+              "evidence_type": "runbook",
+              "evidence_id": "runbook-payment-timeout-precedence",
+              "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+              "display_summary": "Compare client timeout settings with measured upstream latency before proposing a rollback.",
+              "source_ref": "runbooks/rb-payment-provider-timeouts#timeout-precedence",
+              "content": {
+                "document_id": "rb-payment-provider-timeouts",
+                "chunk_id": "timeout-precedence",
+                "document_version": "1.2",
+                "text": "Compare recent client timeout changes with observed upstream duration. A release event alone is not proof. Recommend rollback only after a human reviews the config change, error timing, and request trace."
+              }
+            }
+          ],
+          "runbook_retrieval": {
+            "backend": "pgvector_exact_cosine",
+            "corpus_version": "runbook-corpus-v1",
+            "embedding_profile": {
+              "model_id": "gemini-embedding-2",
+              "dimensions": 768,
+              "format_version": "search-result-v1",
+              "minimum_similarity": 0.6620781500197453
+            },
+            "query_embedding": {
+              "local_input_characters": 68,
+              "provider_billable_characters": null,
+              "provider_input_tokens": null,
+              "latency_ms": 320
+            },
+            "matches": [
+              {
+                "rank": 1,
+                "evidence_id": "runbook-payment-provider-degradation",
+                "cosine_similarity": 0.7823175037777628,
+                "content_sha256": "545903665a4480b38f68372ad7cd634f8f6599a5a07b66dc360fbe1e2dbc7e44"
+              },
+              {
+                "rank": 2,
+                "evidence_id": "runbook-payment-timeout-precedence",
+                "cosine_similarity": 0.7658616355268938,
+                "content_sha256": "4ab593fed99519615d70d254c57ab8617e5860a922b7890a3838fda80c2ca036"
+              }
+            ]
+          }
+        }
+      ],
+      "diagnostic_probe": {
+        "scenario_id": "generated-payment-timeout-1022ff0864c2d41b",
+        "probe_id": "service_health",
+        "outcome": "observed",
+        "safe_summary": "Inspected request-local failure signals for 3 affected service(s).",
+        "findings": [
+          {
+            "code": "service_health",
+            "subject": "STOREFRONT",
+            "status": "degraded",
+            "detail": "0 error log(s), 0 warning log(s), and 1 non-success trace span(s).",
+            "evidence_ids": [
+              "generated-payment-timeout-1022ff0864c2d41b-trace-failed-checkout"
+            ]
+          },
+          {
+            "code": "service_health",
+            "subject": "CHECKOUT_API",
+            "status": "degraded",
+            "detail": "0 error log(s), 0 warning log(s), and 1 non-success trace span(s).",
+            "evidence_ids": [
+              "generated-payment-timeout-1022ff0864c2d41b-trace-failed-checkout"
+            ]
+          },
+          {
+            "code": "service_health",
+            "subject": "PAYMENT_ADAPTER",
+            "status": "degraded",
+            "detail": "4 error log(s), 0 warning log(s), and 1 non-success trace span(s).",
+            "evidence_ids": [
+              "generated-payment-timeout-1022ff0864c2d41b-payment-http-004",
+              "generated-payment-timeout-1022ff0864c2d41b-payment-http-005",
+              "generated-payment-timeout-1022ff0864c2d41b-payment-http-006",
+              "generated-payment-timeout-1022ff0864c2d41b-log-timeout-error"
+            ]
+          }
+        ],
+        "truncated": true,
+        "duration_ms": 2,
+        "read_only": true,
+        "action_executed": false
+      },
+      "diagnosis": null,
+      "verification": {
+        "diagnosis_schema_pass": true,
+        "ground_truth_schema_pass": true,
+        "citation_validity": {
+          "valid": true,
+          "unknown_evidence_ids": []
+        },
+        "evidence_precision": {
+          "applicable": true,
+          "supported_triples": 1,
+          "total_triples": 2,
+          "score": 0.5,
+          "citation_support": [
+            {
+              "claim_code": "missing_evidence",
+              "claim_value_code": "PAYMENT_TIMEOUT_CONFIG_AUDIT",
+              "evidence_id": "runbook-payment-timeout-precedence",
+              "supported": false
+            },
+            {
+              "claim_code": "observed_symptom",
+              "claim_value_code": "PAYMENT_LATENCY_SPIKE",
+              "evidence_id": "generated-payment-timeout-1022ff0864c2d41b-metric-payment-p95",
+              "supported": true
+            }
+          ]
+        },
+        "claim_coverage": {
+          "applicable": true,
+          "matched_claim_count": 1,
+          "reference_claim_count": 5,
+          "score": 0.2
+        },
+        "diagnosis_correctness": {
+          "evaluated": true,
+          "diagnosis_applicable": true,
+          "root_cause_correct": false,
+          "affected_service_correct": false,
+          "abstention_correct": false
+        },
+        "hard_errors": []
+      },
+      "comparison": null,
+      "verification_event": {
+        "source": "deterministic_java_verifier",
+        "executed_at": "2026-09-16T07:49:47.367407Z",
+        "schema_valid": true,
+        "citations_valid": true,
+        "direct_evidence_support_valid": false,
+        "factual_result_matches_ground_truth": false,
+        "agent_sequence_valid": true,
+        "evidence_handoff_valid": true,
+        "tool_boundary_valid": true,
+        "final_author_valid": true,
+        "answer_released": false,
+        "summary": "Java withheld the diagnosis: direct evidence support failed for 1 of 2 claim-to-evidence links."
+      },
+      "receipt": {
+        "model_calls": 2,
+        "adk_tool_calls": 1,
+        "read_operations": 4,
+        "embedding_calls": 1,
+        "write_tools_available": false,
+        "action_executed": false,
+        "human_approval_required": true,
+        "registered_tools": [
+          "inspect_incident_evidence"
+        ],
+        "token_usage": {
+          "input_tokens": 6214,
+          "cached_input_tokens": null,
+          "uncached_input_tokens": null,
+          "candidate_output_tokens": 448,
+          "thinking_output_tokens": null,
+          "output_tokens": 448,
+          "tool_use_prompt_tokens": null,
+          "total_tokens": 6662
+        },
+        "estimated_cost_usd": 0.00222550,
+        "estimated_cost_basis": "Gemini paid Standard list prices checked 2026-08-31; model generation only. This is not a provider invoice, and the API does not report the actual charged amount or whether the run was free-tier billed. Provider cache usage was not reported, so every input token was conservatively priced at the normal input rate.",
+        "total_latency_ms": 11665
+      },
+      "limitations": [
+        "All incident data is synthetic and request-local.",
+        "The Google ADK session is in-memory and discarded after this request.",
+        "Events are returned after the synchronous run; this endpoint does not stream hidden reasoning.",
+        "Only the evidence agent has read-only evidence access; neither agent can execute remediation.",
+        "Correctness is checked against this generated case only; it is not a general model-accuracy claim."
+      ]
+    },
+    "limitations": [
+      "All telemetry and business impact are synthetic and request-local.",
+      "Events are returned after the synchronous run; this API does not stream live logs or hidden reasoning.",
+      "The ADK agents are invoked only when the deterministic Java alarm fires.",
+      "No write tool or automated remediation is available; a human owns the next action."
+    ]
+  }
+}

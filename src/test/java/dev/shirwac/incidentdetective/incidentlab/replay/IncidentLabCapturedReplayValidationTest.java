@@ -37,6 +37,33 @@ class IncidentLabCapturedReplayValidationTest {
     }
 
     @Test
+    void rejectsAnUnverifiedRuntimeBuildThatPublishesASha()
+            throws Exception {
+        IncidentLabReplayFixture fixture = capturedFixture(root -> root.put(
+                "runtime_build_git_sha",
+                "b".repeat(40)
+        ));
+
+        assertInvalid(
+                fixture,
+                "unverified runtime build identity must not publish a build SHA"
+        );
+    }
+
+    @Test
+    void rejectsAVerifiedRuntimeBuildWithoutASha() throws Exception {
+        IncidentLabReplayFixture fixture = capturedFixture(root -> root.put(
+                "runtime_build_identity_verified",
+                true
+        ));
+
+        assertInvalid(
+                fixture,
+                "verified runtime build identity requires a full lowercase SHA"
+        );
+    }
+
+    @Test
     void rejectsACapturedFixtureWithATestTruthLabel() throws Exception {
         IncidentLabReplayFixture fixture = capturedFixture(root -> plan(root)
                 .put("truth_label", "Test-only fixture"));
@@ -257,7 +284,9 @@ class IncidentLabCapturedReplayValidationTest {
                 "recording_source",
                 IncidentLabReplayFixture.CAPTURED_PUBLIC_API
         );
-        root.put("source_build_git_sha", "a".repeat(40));
+        root.put("source_content_git_sha", "a".repeat(40));
+        root.putNull("runtime_build_git_sha");
+        root.put("runtime_build_identity_verified", false);
 
         ObjectNode plan = plan(root);
         plan.put("delivery", IncidentLabPlanResponse.DELIVERY);
