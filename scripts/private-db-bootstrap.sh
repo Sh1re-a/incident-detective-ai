@@ -356,7 +356,7 @@ SQL
     'DELETE FROM incident_detective.global_live_daily_quota WHERE false'
 
   local forbidden_table
-  forbidden_table="$(scalar admin_psql --command="
+  forbidden_table="$(scalar migrator_psql --command="
     SELECT to_regclass(
       'incident_detective.runtime_must_not_create'
     ) IS NOT NULL
