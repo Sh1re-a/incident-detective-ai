@@ -1,9 +1,15 @@
 # Google Cloud path for Nordly
 
-Status: next-phase implementation plan, 10 September 2026. The current Phase
-3A working revision was not deployed in this task. An older public Cloud Run
-revision may exist, but its URL is not evidence that the current code, ADK
-workflow or data configuration is live.
+Status: private-IP deployment plan, updated 16 September 2026. A controlled
+Vertex AI + Cloud SQL Java Connector smoke has now verified the current backend,
+ADK workflow, pgvector retrieval and safety receipts. The disposable live
+environment was deleted after the test. The final Direct VPC/private-IP path is
+still blocked by Google Service Usage error `160008` for Compute Engine API.
+
+The authoritative current-run evidence is recorded in
+[`VERTEX-CLOUD-SQL-CONNECTOR-SMOKE-2026-09-16.md`](VERTEX-CLOUD-SQL-CONNECTOR-SMOKE-2026-09-16.md).
+That temporary public-IP Connector smoke must not be described as the final
+private network architecture.
 
 ## Personal cloud boundary
 
@@ -13,11 +19,11 @@ cloud operation must use a dedicated personal Google Cloud project, a separate
 customer-work projects, configurations, service accounts, registries and
 deployed services must never be reused or updated for this application.
 
-Before the first Vertex or deployment command, verify the selected account,
-project, configuration and ADC identity together. If any value still belongs
-to a customer-work environment, stop. Use `PERSONAL_GCP_PROJECT_ID` as a
-placeholder in documentation until the exact personal project ID and billing
-scope have been explicitly chosen.
+Before every Vertex or deployment command, verify the selected account,
+project, configuration and ADC identity together. If any value belongs to a
+customer-work environment, stop. The verified personal project is
+`shirwac-incident-detective` and the dedicated configuration is
+`incident-detective-personal`.
 
 ## Current local baseline
 
@@ -36,13 +42,12 @@ scope have been explicitly chosen.
   Boot backend as one non-root image; that combined artifact has been verified
   locally.
 
-The current working revision is locally Vertex-ready at the client boundary,
-but its default route remains the Gemini Developer API and its database remains
-local PostgreSQL/pgvector. No Vertex request has been made, ADC reachability has
-not been proved, the corpus has not been re-embedded through Vertex, and the
-revision has not been matched to a currently running Cloud Run revision. It
-therefore does not establish Vertex AI, Cloud SQL or managed Vector Search
-readiness.
+The current backend has now completed a real, private-IAM Vertex AI and Cloud
+SQL Connector smoke. ADC, generation, embeddings, explicit corpus import,
+pgvector exact cosine retrieval, ADK orchestration and deterministic Java
+verification were observed in one bounded run. The environment was then torn
+down. This proves application/runtime compatibility, but it does not yet prove
+Direct VPC or Cloud SQL private-IP readiness.
 
 ## Target with the smallest architecture change
 
@@ -63,8 +68,8 @@ Vertex AI Agent Engine migration is part of this phase.
 
 ## Gate 1: provider seam in Java
 
-Local implementation status: implemented and provider-free tested. Cloud and
-provider execution remain pending explicit approval.
+Implementation status: provider-free tests and one bounded Vertex execution are
+verified. The final private-network rerun remains pending Compute Engine API.
 
 Add one server-side provider setting:
 
@@ -136,13 +141,17 @@ write; the earlier local result does not verify a later revision automatically.
 
 ## Gate 3: identity and secrets
 
-Use a dedicated Cloud Run service account. Vertex AI access uses the service
-identity and ADC, not a downloaded service-account key. Its exact runtime roles
-are:
+Use separate service identities for runtime and migration/import work. Vertex
+AI access uses ADC, not downloaded service-account keys. The runtime identity's
+exact permissions are:
 
 - `roles/aiplatform.user`;
 - `roles/cloudsql.client`;
 - `roles/secretmanager.secretAccessor`, scoped to the exact database secret.
+
+The migration/import identity receives Cloud SQL Client, Vertex AI User and
+access only to the separate migrator secret. The runtime identity must never be
+able to read that secret.
 
 Build and deployment identities stay separate from this runtime identity.
 
@@ -158,8 +167,19 @@ attributes.
 Use Cloud SQL for PostgreSQL 17 in the same region as Cloud Run and enable the
 `vector` extension. Keep the existing Flyway schema and exact cosine query for
 the first corpus. Create the extension once with the administrative
-`cloudsqlsuperuser`; normal migrations and application queries then use a
-less-privileged application user.
+`cloudsqlsuperuser`, then use two custom non-login roles and two built-in login
+users:
+
+- a non-superuser migrator that owns the application schema and runs Flyway and
+  the explicit corpus imports;
+- a non-superuser runtime that can read Flyway history and embeddings and can
+  insert/update only the database-global quota table.
+
+Neither login may belong to `cloudsqlsuperuser`. Runtime receives no schema
+`CREATE`, extension, sequence or corpus-import rights. The same datasource may
+still call Flyway on startup because an already-current V7 schema requires only
+read access to the history table; a missing migration then fails closed until
+the migrator job runs.
 
 For V1, use the Cloud SQL Java Connector with Hikari,
 `cloudSqlRefreshStrategy=lazy`, a pool size of 4 and the password from Secret
@@ -258,17 +278,19 @@ The following remain separate operator decisions for the next revision:
 2. Rebuild and verify the combined frontend/backend container from the exact
    reviewed SHA.
 3. Create the dedicated runtime identity with least-privilege IAM.
-4. Create Cloud SQL in the chosen region and create `vector` with the admin user.
+4. Create Cloud SQL in the chosen region, create `vector` with the admin user,
+   and bootstrap separate non-superuser migrator/runtime roles.
 5. Build the image into Artifact Registry.
-6. Deploy a private, replay-only Cloud Run revision with `rag`, live AI disabled
+6. Run Flyway and both explicit corpus imports with the migrator identity.
+7. Verify V1–V7, both current indexes and the runtime user's negative DDL test.
+8. Deploy a private, replay-only Cloud Run revision with `rag`, live AI disabled
    and zero public traffic.
-7. Run migrations and the explicit corpus import.
-8. Verify health, capabilities, index hash/chunk readiness and global quota
+9. Verify health, capabilities, index hash/chunk readiness and global quota
    scope.
-9. Run one explicitly approved Vertex generation-and-embedding smoke.
-10. Freeze its sanitised result as replay evidence.
-11. Expose the replay journey only after a separate public traffic decision.
-12. Keep live AI private until its anti-abuse boundary is verified.
+10. Run one explicitly approved Vertex generation-and-embedding smoke.
+11. Freeze its sanitised result as replay evidence.
+12. Expose the replay journey only after a separate public traffic decision.
+13. Keep live AI private until its anti-abuse boundary is verified.
 
 ## Primary references
 
