@@ -810,6 +810,81 @@ const customerBlockedResponse: DemoCustomerChatTurnResponse = {
   receipt: { ...customerOrderResponse.receipt, read_operations: 0 },
 };
 
+const customerDownstreamResponse: DemoCustomerChatTurnResponse = {
+  ...customerOrderResponse,
+  turn_id: "customer-turn-downstream",
+  outcome: "unavailable",
+  submitted_message: {
+    text: "Hur arbetar Nordlys kundservice?",
+    locale: "sv",
+    redacted: false,
+  },
+  intent: {
+    name: "company_knowledge",
+    classifier: "gemini_function_router",
+    action_requested: false,
+  },
+  assistant_message: {
+    text_sv:
+      "Jag förstod frågan, men kunde inte starta den skyddade informationshämtningen just nu. Jag vill inte gissa. Ingen ändring gjordes.",
+    text_en:
+      "I understood the question, but could not start the protected information retrieval right now. I will not guess. No change was made.",
+  },
+  order: null,
+  tool_events: [
+    customerOrderResponse.tool_events[0],
+    {
+      sequence: 2,
+      type: "model_routing",
+      initiated_by: "gemini_customer_router",
+      model_selected: true,
+      name: "search_approved_company_knowledge",
+      status: "completed",
+      executed: true,
+      summary_sv: "AI:n valde en avgränsad kunskapssökning.",
+      summary_en: "AI selected a bounded knowledge search.",
+      source_ref: null,
+      evidence_ids: [],
+      latency_ms: 22,
+    },
+    {
+      sequence: 3,
+      type: "backend_step",
+      initiated_by: "spring_orchestrator",
+      model_selected: false,
+      name: "run_selected_customer_capability",
+      status: "failed",
+      executed: false,
+      summary_sv: "Nästa skyddade steg kunde inte starta.",
+      summary_en: "The next protected step could not start.",
+      source_ref: null,
+      evidence_ids: [],
+      latency_ms: null,
+    },
+  ],
+  sources: [],
+  verified_claims: [],
+  verification: {
+    ...customerOrderResponse.verification,
+    evaluation_status: "not_run",
+    order_source_verified: false,
+    citations_within_returned_sources: false,
+    overall_outcome: "not_released_downstream_live_boundary",
+  },
+  receipt: {
+    ...customerOrderResponse.receipt,
+    read_operations: 0,
+    provider_calls: 1,
+    generation_calls: 1,
+    model_id: "gemini-3.1-flash-lite-preview",
+  },
+  error: {
+    code: "CUSTOMER_CHAT_DOWNSTREAM_LIVE_BUSY",
+    summary_sv: "Frågan tolkades, men det valda live-steget stoppades av systemets skyddsgräns.",
+    summary_en: "The question was routed, but the selected live step was stopped by the system boundary.",
+  },
+};
+
 const customerConfirmationResponse: DemoCustomerChatTurnResponse = {
   ...customerOrderResponse,
   turn_id: "customer-turn-confirmation",
@@ -1005,6 +1080,9 @@ describe("Nordly PASS A and B", () => {
     expect(screen.getByRole("link", { name: "Shirwac Abib, Applied AI" })).toBeVisible();
     expect(screen.getAllByText("PERSONLIGT APPLIED AI-ARBETSPROV")[0]).toBeVisible();
     expect(screen.getByText("Nordly Kundhjälp")).toBeVisible();
+    expect(screen.getByText("Endast läsning")).toBeVisible();
+    expect(screen.getByText(/Kända högriskfrågor stoppas före AI/i)).toBeVisible();
+    expect(screen.getByText(/skrivverktyg saknas/i)).toBeVisible();
     expect(screen.getByText(/Jag kan läsa information, men aldrig ändra en order/i)).toBeVisible();
     expect(screen.getByText(/Fiktiv miljö · endast syntetisk data/i)).toBeVisible();
     expect(await screen.findByRole("button", { name: "Var är min order?" })).toBeVisible();
@@ -1056,6 +1134,32 @@ describe("Nordly PASS A and B", () => {
     const receipt = screen.getByLabelText("Körningskvitto");
     expect(within(within(receipt).getByText("Backendläsningar").parentElement as HTMLElement).getByText("1")).toBeVisible();
     expect(within(within(receipt).getByText("Ändringar").parentElement as HTMLElement).getByText("0")).toBeVisible();
+  });
+
+  it("explains a downstream stop without claiming that no AI ran", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/api/v1/demo-customer/chat/turns")) {
+        return jsonResponse(customerDownstreamResponse);
+      }
+      return readOnlyBackendResponse(input);
+    }));
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(
+      screen.getByRole("textbox", { name: "Skriv en fråga till Nordly…" }),
+      "Hur arbetar Nordlys kundservice?",
+    );
+    await user.click(screen.getByRole("button", { name: "Skicka" }));
+    await screen.findByText(/kunde inte starta den skyddade informationshämtningen/i);
+
+    await user.click(screen.getByRole("button", { name: "Så gick det till" }));
+    expect(screen.getByText(/AI:n tolkade frågan/i)).toBeVisible();
+    expect(screen.getByText(/innan något verktyg hann läsa data/i)).toBeVisible();
+    expect(screen.queryByText(/Inga verktyg eller AI behövdes/i)).not.toBeInTheDocument();
+    const receipt = screen.getByLabelText("Körningskvitto");
+    expect(within(within(receipt).getByText("AI-anrop").parentElement as HTMLElement).getByText("1")).toBeVisible();
   });
 
   it("keeps a real transcript and safely answers a cancellation follow-up", async () => {

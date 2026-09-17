@@ -52,11 +52,11 @@ const copy = {
     eyebrow: "PERSONLIGT APPLIED AI-ARBETSPROV",
     title: "AI som visar vad den vet – och när den måste stanna.",
     lead:
-      "Jag byggde Nordly Commerce som en fiktiv företagsmiljö för att visa hur RAG hittar rätt kunskap, svarar med källor och stoppar känsliga frågor innan AI:n anropas.",
+      "Jag byggde Nordly Commerce som en fiktiv företagsmiljö där RAG hittar rätt kunskap och visar sina källor. Kända högriskfrågor stoppas före AI, och affärsändringar är tekniskt omöjliga eftersom skrivverktyg saknas.",
     stack: "Java · Spring Boot · Gemini embeddings · semantic search · PostgreSQL + pgvector",
     assistantLabel: "Nordly Kundhjälp",
     sceneTitle: "Fråga Nordly.",
-    readOnly: "Kan läsa · kan inte ändra",
+    readOnly: "Endast läsning",
     hello:
       "Hej! Jag kan kontrollera din order och förklara Nordlys regler för leverans, retur och återbetalning. Jag kan läsa information, men aldrig ändra en order.",
     orderExample: "Var är min order?",
@@ -225,6 +225,8 @@ const copy = {
       "Frågan stoppades innan kunddata, dokument eller AI användes.",
     customerNoTools:
       "Inga verktyg eller AI behövdes för att avgränsa svaret.",
+    customerDownstreamStopped:
+      "AI:n tolkade frågan. Därefter stoppade systemet den valda informationshämtningen innan något verktyg hann läsa data.",
     semanticDone: "semantisk sökning utförd",
     aiAnswer: "AI-svar",
     noActions: "0 åtgärder",
@@ -293,11 +295,11 @@ const copy = {
     eyebrow: "PERSONAL APPLIED AI CASE STUDY",
     title: "AI that shows what it knows – and when it must stop.",
     lead:
-      "I built Nordly Commerce as a fictional company environment to show how RAG finds the right knowledge, answers with sources and stops sensitive requests before AI is called.",
+      "I built Nordly Commerce as a fictional company environment where RAG finds the right knowledge and shows its sources. Known high-risk requests stop before AI, and business changes are technically impossible because no write tools exist.",
     stack: "Java · Spring Boot · Gemini embeddings · semantic search · PostgreSQL + pgvector",
     assistantLabel: "Nordly Customer Care",
     sceneTitle: "Ask Nordly.",
-    readOnly: "Can read · cannot change",
+    readOnly: "Read only",
     hello:
       "Hi! I can check your order and explain Nordly's delivery, return and refund rules. I can read information, but I can never change an order.",
     orderExample: "Where is my order?",
@@ -466,6 +468,8 @@ const copy = {
       "The question was stopped before customer data, documents or AI were used.",
     customerNoTools:
       "No tools or AI were needed to scope this answer.",
+    customerDownstreamStopped:
+      "AI interpreted the question. The system then stopped the selected information retrieval before any tool could read data.",
     semanticDone: "semantic search completed",
     aiAnswer: "AI answer",
     noActions: "0 actions",
@@ -1378,15 +1382,19 @@ function CustomerChatBackstage({
 }) {
   const labels = copy[locale];
   const isAuthorityStop = response.outcome === "outside_authority";
-  const ragSummary = response.rag.current_vector_search
-    ? labels.customerRagUsed
-    : response.outcome === "confirmation_required"
-      ? labels.customerRagPending
-      : response.outcome === "refused"
-        ? labels.customerStoppedBeforeData
-        : response.receipt.read_operations > 0
-          ? labels.customerNoRag
-          : labels.customerNoTools;
+  const isDownstreamStop = response.outcome === "unavailable"
+    && response.error?.code.startsWith("CUSTOMER_CHAT_DOWNSTREAM_");
+  const ragSummary = isDownstreamStop
+    ? labels.customerDownstreamStopped
+    : response.rag.current_vector_search
+      ? labels.customerRagUsed
+      : response.outcome === "confirmation_required"
+        ? labels.customerRagPending
+        : response.outcome === "refused"
+          ? labels.customerStoppedBeforeData
+          : response.receipt.read_operations > 0
+            ? labels.customerNoRag
+            : labels.customerNoTools;
 
   return (
     <section className="customer-backstage" id={panelId} aria-labelledby={`${panelId}-title`}>
@@ -1635,9 +1643,10 @@ function App() {
 
   useEffect(() => {
     if (!expandedTurnId) return;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     document
       .getElementById(`${expandedTurnId}-backstage`)
-      ?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+      ?.scrollIntoView?.({ behavior: reducedMotion ? "auto" : "smooth", block: "nearest" });
   }, [expandedTurnId]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -1965,9 +1974,8 @@ function App() {
                   </div>
                 ) : (
                   <div
-                    className="knowledge-run customer-chat-thread"
+                    className={`knowledge-run customer-chat-thread${expandedTurnId ? " is-backstage-open" : ""}`}
                     aria-label={labels.customerTranscript}
-                    aria-live="polite"
                     aria-busy={isSubmitting}
                     ref={chatThreadRef}
                   >
@@ -2001,7 +2009,12 @@ function App() {
                           ) : null}
 
                           {response && !isPending ? (
-                            <div className="message-row message-row--assistant">
+                            <div
+                              className="message-row message-row--assistant"
+                              role="status"
+                              aria-live="polite"
+                              aria-atomic="true"
+                            >
                               <span className="message-avatar" aria-hidden="true">N</span>
                               <article
                                 className="message-bubble message-bubble--assistant knowledge-chat-answer customer-chat-answer"
@@ -2060,7 +2073,12 @@ function App() {
                           ) : null}
 
                           {turn.errorCode && !isPending ? (
-                            <div className="message-row message-row--assistant">
+                            <div
+                              className="message-row message-row--assistant"
+                              role="status"
+                              aria-live="polite"
+                              aria-atomic="true"
+                            >
                               <span className="message-avatar" aria-hidden="true">N</span>
                               <article
                                 className="message-bubble message-bubble--assistant knowledge-chat-answer"
