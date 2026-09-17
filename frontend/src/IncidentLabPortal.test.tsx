@@ -2,6 +2,14 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import IncidentLabPortal from "./IncidentLabPortal";
+import type {
+  CapabilitiesResponse,
+  IncidentLabPlanResponse,
+  IncidentLabReplayAvailabilityResponse,
+  IncidentLabRunResponse,
+  IncidentPlan,
+  LiveAiStatusResponse,
+} from "./api/generated";
 
 const approvedPlan = {
   contract_version: "incident-plan-v1",
@@ -12,7 +20,7 @@ const approvedPlan = {
   synthetic_only: true,
   write_actions_allowed: false,
   human_approval_required: true,
-};
+} satisfies IncidentPlan;
 
 const readyPlan = {
   contract_version: "incident-lab-plan-v1",
@@ -47,10 +55,11 @@ const readyPlan = {
     latency_ms: 240,
   },
   limitations: [],
-};
+} satisfies IncidentLabPlanResponse;
 
 const noAlarmRun = {
   contract_version: "incident-lab-run-v3",
+  run_reference: "ilr_12345678901234567890123456789012",
   outcome: "no_alarm",
   delivery: "synchronous_post_run",
   truth_label: "Backend-generated synthetic telemetry.",
@@ -174,7 +183,7 @@ const noAlarmRun = {
   alarm_receipt: null,
   agent_turn: null,
   limitations: [],
-};
+} satisfies IncidentLabRunResponse;
 
 const liveStatus = {
   contract_version: "live-ai-status-v1",
@@ -185,7 +194,7 @@ const liveStatus = {
   replay_available: false,
   daily_cost_guard_active: true,
   quota_scope: "database_global",
-};
+} satisfies LiveAiStatusResponse;
 
 const replayUnavailable = {
   contract_version: "incident-lab-replay-availability-v1",
@@ -194,7 +203,158 @@ const replayUnavailable = {
   truth_label: "Ingen replay.",
   truth_label_en: "No replay.",
   reason_code: "golden_recording_not_captured",
-};
+} satisfies IncidentLabReplayAvailabilityResponse;
+
+const capabilities = {
+  contract_version: "capabilities-v5",
+  synthetic_only: true,
+  remediation_enabled: false,
+  provider: {
+    transport: "developer_api",
+    authentication_mode: "api_key",
+    location: null,
+    routing_configuration_complete: true,
+    credential_status: "configured",
+  },
+  deployment: {
+    platform: "local",
+    revision: null,
+    build_git_sha: null,
+  },
+  knowledge_corpus: {
+    manifest_version: "nordly-knowledge-corpus-v2",
+    corpus_version: "nordly-knowledge-v2",
+    corpus_content_sha256: "abc123",
+    eligible_document_count: 13,
+    eligible_chunk_count: 27,
+  },
+  modes: [{
+    mode: "live_ai",
+    truth_label: "Live AI",
+    model_backed: true,
+    explicit_confirmation_required: true,
+  }],
+  tools: [
+    { name: "get_metrics", read_only: true },
+    { name: "search_logs", read_only: true },
+    { name: "get_trace", read_only: true },
+    { name: "retrieve_runbooks", read_only: true },
+  ],
+  diagnostic_probe: {
+    function_name: "run_diagnostic_probe",
+    allowed_probe_ids: [
+      "service_health",
+      "dependency_status",
+      "release_metadata",
+      "config_fingerprint_diff",
+    ],
+    case_bound: true,
+    read_only: true,
+    action_executed: false,
+  },
+  incident_lab: {
+    enabled: true,
+    availability_reason: "enabled_by_configuration_not_health_checked",
+    required_profiles: ["rag"],
+    plan_contract_version: "incident-lab-plan-v1",
+    run_contract_version: "incident-lab-run-v3",
+    orchestration: "sequential_agent",
+    expected_agent_order: ["nordly_evidence_agent", "nordly_diagnosis_agent"],
+    delivery: "synchronous_post_run",
+    streaming: false,
+    alarm_required: true,
+    answer_states: ["diagnosed", "insufficient_evidence", "withheld", "not_started"],
+    explicit_confirmation_required: true,
+    synthetic_only: true,
+    write_tools_available: false,
+    action_executed: false,
+    human_approval_required: true,
+    registered_tool: {
+      function_name: "inspect_incident_evidence",
+      read_only: true,
+      case_bound: true,
+      read_operations: ["get_metrics", "search_logs", "get_trace", "retrieve_runbooks"],
+      diagnostic_probe_reference: "diagnostic_probe",
+      allowed_diagnostic_probe_ids: [
+        "service_health",
+        "dependency_status",
+        "release_metadata",
+        "config_fingerprint_diff",
+      ],
+    },
+    supported_locales: ["sv", "en"],
+    incident_families: [{
+      id: "catalog_cache_invalidation",
+      label: { sv: "Gamla priser efter deploy", en: "Stale prices after deploy" },
+      description: { sv: "Syntetiskt katalogfel.", en: "Synthetic catalogue fault." },
+      customer_impact: { sv: "Äldre produktdata.", en: "Stale product data." },
+      service: "catalog_service",
+      alarm_signal: "catalog_version_divergence_count",
+      alarm_signal_concept: { sv: "Versionsskillnad", en: "Version divergence" },
+    }],
+  },
+  live_ai: {
+    enabled_by_configuration: true,
+    request_routing_configured: true,
+    explicit_confirmation_required: true,
+    model_id: "gemini-3.1-flash-lite",
+    thinking_level: "LOW",
+    prompt_version: "nordly-adk-sequential-v3",
+    budget: {
+      max_collection_rounds: 1,
+      max_tool_calls_total: 4,
+      max_tool_calls_per_round: 4,
+      max_calls_by_tool: [
+        { tool: "get_metrics", max_calls_per_investigation: 1 },
+        { tool: "search_logs", max_calls_per_investigation: 1 },
+        { tool: "get_trace", max_calls_per_investigation: 1 },
+        { tool: "retrieve_runbooks", max_calls_per_investigation: 1 },
+      ],
+      hard_deadline_ms: 30_000,
+      provider_call_cap_ms: 15_000,
+      daily_live_run_limit: 20,
+      daily_quota_scope: "database_global",
+    },
+  },
+  generated_cases: {
+    enabled: true,
+    contract_version: "generated-live-run-v1",
+    generator_version: "nordly-incident-generator-v2",
+    truth_label: "Generated synthetic incident — real AI investigation.",
+    user_supplied_data_accepted: false,
+    request_local_only: true,
+    incident_families: ["catalog_cache_invalidation"],
+    evidence_modes: ["diagnostic", "insufficient_evidence"],
+    noise_levels: ["none", "low"],
+    allowed_tools: ["get_metrics", "search_logs", "get_trace", "retrieve_runbooks"],
+  },
+  retrieval: {
+    backend: "pgvector_exact_cosine",
+    active_profiles: ["rag"],
+    mode_description: "PostgreSQL pgvector exact cosine search.",
+    limitation: "Current runtime configuration, not a provider health check.",
+    vector_database_backend_active: true,
+    active_embedding_profile: {
+      provider_transport: "developer_api",
+      model_id: "gemini-embedding-2",
+      dimensions: 768,
+      format_version: "search-result-v1",
+      minimum_similarity: 0.66,
+    },
+    index_status: {
+      ready: true,
+      corpus_version: "nordly-knowledge-v2",
+      indexed_chunks: 27,
+      current_chunks: 27,
+      expected_chunks: 27,
+    },
+  },
+  prompt_cache: {
+    strategy: "provider_implicit",
+    explicit_caching_enabled: false,
+    cache_hit_claims_require_provider_metadata: true,
+  },
+} satisfies CapabilitiesResponse;
 
 function response(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), {
@@ -217,6 +377,7 @@ describe("Incident Lab recruiter portal", () => {
       const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
       requests.push({ path, body });
       if (path.endsWith("/api/v1/live-ai/status")) return response(liveStatus);
+      if (path.endsWith("/api/v1/capabilities")) return response(capabilities);
       if (path.endsWith("/api/v1/incident-lab/recorded-replay")) return response(replayUnavailable);
       if (path.endsWith("/api/v1/incident-lab/plans")) return response(readyPlan);
       if (path.endsWith("/api/v1/incident-lab/runs")) return response(noAlarmRun);
@@ -225,25 +386,65 @@ describe("Incident Lab recruiter portal", () => {
 
     const user = userEvent.setup();
     render(<IncidentLabPortal locale="sv" active />);
-    await screen.findByText("Live AI tillgänglig");
-    await user.click(screen.getByRole("button", { name: /Låt AI:n föreslå testfallet/ }));
+    await screen.findByText("Live AI redo");
+    expect(screen.getByLabelText("Vad ska hända i testbutiken?")).toHaveAttribute("maxlength", "500");
+    await user.click(screen.getByRole("button", { name: /Skapa ett säkert testfall/ }));
 
-    expect(await screen.findByRole("heading", { name: "AI:n föreslog. Java bestämde gränserna." })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Testfallet är avgränsat och redo." })).toBeVisible();
     expect(requests.filter(({ path }) => path.endsWith("/api/v1/incident-lab/runs"))).toHaveLength(0);
 
-    await user.click(screen.getByRole("button", { name: /Iscensätt larmet/ }));
-    expect(await screen.findByRole("heading", { name: "Inget larm behövde utredas" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Starta larmet" }));
+    expect(await screen.findByRole("heading", { name: "Följ vad som hände – i rätt ordning." })).toBeVisible();
 
     const runRequest = requests.find(({ path }) => path.endsWith("/api/v1/incident-lab/runs"));
     expect(runRequest?.body).toEqual({ plan: approvedPlan, confirm_live_ai: true });
     expect(runRequest?.body).not.toHaveProperty("seed");
     expect(runRequest?.body).not.toHaveProperty("evidence_mode");
+
+    await user.click(screen.getByRole("button", { name: /Svar$/ }));
+    expect(await screen.findByRole("heading", { name: "Fråga Driftagenten om den här körningen." })).toBeVisible();
+    const followUpInput = screen.getByLabelText("Din fråga om utredningen");
+    expect(followUpInput).toBeEnabled();
+    await user.type(followUpInput, "Hur vet du det?");
+    await user.click(screen.getByRole("button", { name: "Visa avgörande loggar" }));
+    await user.click(screen.getByRole("button", { name: /Svar$/ }));
+    expect(screen.getByLabelText("Din fråga om utredningen")).toHaveValue("Hur vet du det?");
+    expect(screen.queryByText("Fortsätt observera testmiljön.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Öppna tekniskt kvitto" }));
+    expect(await screen.findByText("Fortsätt observera testmiljön.")).toBeVisible();
+  });
+
+  it("keeps the verified report read-only when the backend returns no valid follow-up reference", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path.endsWith("/api/v1/live-ai/status")) return response(liveStatus);
+      if (path.endsWith("/api/v1/capabilities")) return response(capabilities);
+      if (path.endsWith("/api/v1/incident-lab/recorded-replay")) return response(replayUnavailable);
+      if (path.endsWith("/api/v1/incident-lab/plans")) return response(readyPlan);
+      if (path.endsWith("/api/v1/incident-lab/runs")) {
+        return response({ ...noAlarmRun, run_reference: "malformed-ref" });
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    }));
+
+    const user = userEvent.setup();
+    render(<IncidentLabPortal locale="sv" active />);
+    await screen.findByText("Live AI redo");
+    await user.click(screen.getByRole("button", { name: /Skapa ett säkert testfall/ }));
+    await user.click(await screen.findByRole("button", { name: "Starta larmet" }));
+    await user.click(await screen.findByRole("button", { name: /Svar$/ }));
+
+    expect(await screen.findByText(
+      "Körningen saknar ett giltigt följdfrågekvitto. Rapporten är läsbar, men chatten öppnas inte.",
+    )).toBeVisible();
+    expect(screen.queryByLabelText("Din fråga om utredningen")).not.toBeInTheDocument();
   });
 
   it("keeps a blocked planning result visible and never starts the run", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
       if (path.endsWith("/api/v1/live-ai/status")) return response(liveStatus);
+      if (path.endsWith("/api/v1/capabilities")) return response(capabilities);
       if (path.endsWith("/api/v1/incident-lab/recorded-replay")) return response(replayUnavailable);
       if (path.endsWith("/api/v1/incident-lab/plans")) {
         return response({
@@ -266,12 +467,37 @@ describe("Incident Lab recruiter portal", () => {
 
     const user = userEvent.setup();
     render(<IncidentLabPortal locale="sv" active />);
-    await screen.findByText("Live AI tillgänglig");
-    await user.click(screen.getByRole("button", { name: /Låt AI:n föreslå testfallet/ }));
+    await screen.findByText("Live AI redo");
+    await user.click(screen.getByRole("button", { name: /Skapa ett säkert testfall/ }));
 
     expect(await screen.findByRole("heading", { name: "Bra. Säkerhetsgränsen stoppade begäran." })).toBeVisible();
     expect(screen.getByText("Begäran stoppades före AI.")).toBeVisible();
     expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/api/v1/incident-lab/runs"))).toBe(false);
+  });
+
+  it("keeps live planning disabled when the Incident Lab capability is unavailable", async () => {
+    const unavailableCapabilities = {
+      ...capabilities,
+      incident_lab: {
+        ...capabilities.incident_lab,
+        enabled: false,
+        availability_reason: "adk_disabled",
+      },
+    } satisfies CapabilitiesResponse;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path.endsWith("/api/v1/live-ai/status")) return response(liveStatus);
+      if (path.endsWith("/api/v1/capabilities")) return response(unavailableCapabilities);
+      if (path.endsWith("/api/v1/incident-lab/recorded-replay")) return response(replayUnavailable);
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<IncidentLabPortal locale="sv" active />);
+
+    expect(await screen.findByText("Live AI är inte redo")).toBeVisible();
+    expect(screen.getByLabelText("Vad ska hända i testbutiken?")).toBeDisabled();
+    expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/api/v1/incident-lab/plans"))).toBe(false);
   });
 
   it("fails closed after a refreshed live-status check fails", async () => {
@@ -283,20 +509,21 @@ describe("Incident Lab recruiter portal", () => {
         if (statusCalls === 1) return response(liveStatus);
         throw new Error("status unavailable");
       }
+      if (path.endsWith("/api/v1/capabilities")) return response(capabilities);
       if (path.endsWith("/api/v1/incident-lab/recorded-replay")) return response(replayUnavailable);
       throw new Error(`Unexpected request: ${path}`);
     });
     vi.stubGlobal("fetch", fetchMock);
 
     const { rerender } = render(<IncidentLabPortal locale="sv" active />);
-    await screen.findByText("Live AI tillgänglig");
-    expect(screen.getByLabelText("Beskriv ett syntetiskt driftproblem")).toBeEnabled();
+    await screen.findByText("Live AI redo");
+    expect(screen.getByLabelText("Vad ska hända i testbutiken?")).toBeEnabled();
 
     rerender(<IncidentLabPortal locale="sv" active={false} />);
     rerender(<IncidentLabPortal locale="sv" active />);
 
     expect(await screen.findByText("Live-status kunde inte bekräftas")).toBeVisible();
-    expect(screen.getByLabelText("Beskriv ett syntetiskt driftproblem")).toBeDisabled();
+    expect(screen.getByLabelText("Vad ska hända i testbutiken?")).toBeDisabled();
     expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/api/v1/incident-lab/plans"))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/api/v1/incident-lab/runs/recorded-replay"))).toBe(false);
   });
@@ -305,6 +532,7 @@ describe("Incident Lab recruiter portal", () => {
     const replayAvailability = { ...replayUnavailable, available: true, reason_code: "ready" };
     const replayResult = {
       contract_version: "incident-lab-replay-v1",
+      run_reference: "ilr_replay12345678901234567890123456",
       replay_id: "golden-1",
       playback_id: "playback-1",
       mode: "recorded_replay",
@@ -348,6 +576,7 @@ describe("Incident Lab recruiter portal", () => {
       if (path.endsWith("/api/v1/live-ai/status")) {
         return response({ ...liveStatus, live_state: "daily_budget_exhausted", replay_available: true });
       }
+      if (path.endsWith("/api/v1/capabilities")) return response(capabilities);
       if (path.endsWith("/api/v1/incident-lab/recorded-replay")) return response(replayAvailability);
       if (path.endsWith("/api/v1/incident-lab/runs/recorded-replay")) return response(replayResult);
       throw new Error(`Unexpected request: ${path}`);
@@ -360,12 +589,11 @@ describe("Incident Lab recruiter portal", () => {
     expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/api/v1/incident-lab/runs/recorded-replay"))).toBe(false);
     await user.click(screen.getByRole("button", { name: "Se verifierad förinspelad körning" }));
 
-    expect((await screen.findAllByRole("heading", { name: "Inget larm behövde utredas" }))[0]).toBeVisible();
-    expect(screen.getByText("Förinspelad körning.")).toBeVisible();
-    expect(screen.queryByText("FÖRINSPELAD KÖRNING · INGEN AI KÖRS NU")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Visa tekniska bevis" }));
-    expect(screen.getAllByText("Förinspelad körning.")).toHaveLength(2);
-    expect(screen.queryByText("FÖRINSPELAD KÖRNING · INGEN AI KÖRS NU")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Följ vad som hände – i rätt ordning." })).toBeVisible();
+    expect(screen.getByText("Verifierad repris · ingen AI körs nu")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /Svar$/ }));
+    expect(await screen.findByRole("heading", { name: "Inget larm behövde utredas" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Öppna tekniskt kvitto" }));
     expect(screen.getByText(/0 provideranrop · 0 modellanrop · 0 embeddings/)).toBeVisible();
     expect(screen.getByText(/Källinnehåll abcdef123456… · runtime-build ej verifierad · checksumma verifierad vid start/)).toBeVisible();
   });

@@ -1,5 +1,7 @@
 // Typed from the local Incident Detective OpenAPI contract at /v3/api-docs.
 
+export const INCIDENT_LAB_PLAN_INSTRUCTION_MAX_LENGTH = 500 as const;
+
 export type InvestigationMode = "recorded_replay" | "live_ai";
 export type ToolName =
   | "get_metrics"
@@ -590,6 +592,28 @@ export interface AdkWorkflowReceipt {
   completed_in_order: boolean;
 }
 
+export type DiagnosticProbeOutcome = "observed" | "not_available";
+
+export interface DiagnosticProbeFinding {
+  code: string;
+  subject: string;
+  status: string;
+  detail: string;
+  evidence_ids: string[];
+}
+
+export interface DiagnosticProbeReceipt {
+  scenario_id: string;
+  probe_id: DiagnosticProbeId;
+  outcome: DiagnosticProbeOutcome;
+  safe_summary: string;
+  findings: DiagnosticProbeFinding[];
+  truncated: boolean;
+  duration_ms: number;
+  read_only: boolean;
+  action_executed: boolean;
+}
+
 export interface AdkFunctionCallEvent {
   id: string | null;
   name: string;
@@ -660,7 +684,7 @@ export interface AdkAgentTurnResponse {
   run_id: string;
   session_id: string | null;
   turn_id: string;
-  mode: "adk_live_ai";
+  mode: "adk_live_ai" | "blocked_before_ai";
   truth_label: string;
   outcome: AdkAgentOutcome;
   provider_route: GoogleGenAiProviderRoute | null;
@@ -670,6 +694,7 @@ export interface AdkAgentTurnResponse {
   workflow: AdkWorkflowReceipt | null;
   events: AdkRuntimeEvent[];
   tool_events: LiveToolEvent[];
+  diagnostic_probe: DiagnosticProbeReceipt | null;
   diagnosis: Diagnosis | null;
   verification: VerificationReport | null;
   comparison: ReplayComparison | null;
@@ -826,7 +851,7 @@ export interface IncidentLabAlarmReceipt {
 export interface IncidentLabGenerationReceipt {
   generator_version: string;
   seed: number;
-  seed_origin: "server_generated" | "user_supplied";
+  seed_origin: "explicit" | "server_generated";
   incident_family: GeneratedIncidentFamily;
   evidence_mode: GeneratedEvidenceMode;
   noise_level: GeneratedNoiseLevel;
@@ -842,6 +867,7 @@ export type IncidentLabAnswerState =
 
 export interface IncidentLabRunResponse {
   contract_version: "incident-lab-run-v3";
+  run_reference: string | null;
   outcome: string;
   delivery: "synchronous_post_run";
   truth_label: string;
@@ -870,6 +896,7 @@ export interface IncidentLabReplayAvailabilityResponse {
 
 export interface IncidentLabReplayResponse {
   contract_version: "incident-lab-replay-v1";
+  run_reference: string | null;
   replay_id: string;
   playback_id: string;
   mode: "recorded_replay";
@@ -906,6 +933,115 @@ export interface IncidentLabReplayResponse {
     estimated_cost_usd: null;
     cost_status: "not_incurred";
   };
+  limitations: string[];
+}
+
+export type IncidentLabFollowUpMode = "live_ai" | "recorded_replay";
+
+export type IncidentLabFollowUpSuggestionId =
+  | "how_conclusion"
+  | "show_sources"
+  | "what_unknown"
+  | "customer_impact"
+  | "agent_boundary";
+
+export interface IncidentLabFollowUpRequest {
+  run_reference: string;
+  client_turn_id: string;
+  question: string;
+  suggestion_id?: string;
+  locale: KnowledgeRagLocale;
+  confirm_live_ai: boolean;
+}
+
+export type IncidentLabFollowUpClaimSection =
+  | "problem_location"
+  | "cause"
+  | "customer_impact"
+  | "known"
+  | "unknown"
+  | "boundary";
+
+export interface IncidentLabFollowUpClaim {
+  section: IncidentLabFollowUpClaimSection;
+  text: string;
+  citation_ids: string[];
+}
+
+export interface IncidentLabFollowUpCitation {
+  evidence_id: string;
+  source_ref: string;
+  source_type: string;
+  label: string;
+  target_scene: "logs" | "agent_rag" | "java";
+  target_id: string;
+}
+
+export interface IncidentLabFollowUpAnswer {
+  text: string;
+  problem_location: {
+    service: string | null;
+    summary: string;
+    certainty: string;
+  };
+  cause: {
+    summary: string;
+    certainty: string;
+  };
+  customer_impact: string;
+  known: string[];
+  unknown: string[];
+  boundary: string;
+}
+
+export interface IncidentLabFollowUpVerification {
+  status: "verified_from_frozen_receipt";
+  snapshot_sha256: string;
+  citations_valid: boolean;
+  source_scope_valid: boolean;
+  answer_state_preserved: boolean;
+  write_tools_available: false;
+  action_executed: false;
+}
+
+export interface IncidentLabFollowUpStep {
+  sequence: number;
+  code: string;
+  status: string;
+  summary: string;
+  evidence_ids: string[];
+}
+
+export interface IncidentLabFollowUpReceipt {
+  provider_calls: number;
+  model_calls: number;
+  tool_calls: number;
+  read_operations: number;
+  live_quota_consumed: boolean;
+  write_tools_available: false;
+  action_executed: false;
+}
+
+export interface IncidentLabFollowUpSuggestedQuestion {
+  id: IncidentLabFollowUpSuggestionId;
+  label: string;
+}
+
+export interface IncidentLabFollowUpResponse {
+  contract_version: "incident-lab-follow-up-v1";
+  run_reference: string;
+  client_turn_id: string;
+  mode: IncidentLabFollowUpMode;
+  delivery: string;
+  answer_state: "answered" | "outside_scope" | "replay_question_not_supported";
+  answer: IncidentLabFollowUpAnswer;
+  claims: IncidentLabFollowUpClaim[];
+  citations: IncidentLabFollowUpCitation[];
+  steps: IncidentLabFollowUpStep[];
+  verification: IncidentLabFollowUpVerification;
+  receipt: IncidentLabFollowUpReceipt;
+  provider: Record<string, unknown> | null;
+  suggested_questions: IncidentLabFollowUpSuggestedQuestion[];
   limitations: string[];
 }
 

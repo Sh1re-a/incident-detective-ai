@@ -12,6 +12,8 @@ import type {
   DemoWorldResponse,
   IncidentLabPlanRequest,
   IncidentLabPlanResponse,
+  IncidentLabFollowUpRequest,
+  IncidentLabFollowUpResponse,
   IncidentLabReplayAvailabilityResponse,
   IncidentLabReplayResponse,
   IncidentLabRunRequest,
@@ -106,6 +108,18 @@ export function runIncidentLab(
   signal?: AbortSignal,
 ) {
   return getJson<IncidentLabRunResponse>("/api/v1/incident-lab/runs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+    signal,
+  });
+}
+
+export function runIncidentLabFollowUp(
+  request: IncidentLabFollowUpRequest,
+  signal?: AbortSignal,
+) {
+  return getJson<IncidentLabFollowUpResponse>("/api/v1/incident-lab/follow-ups", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
