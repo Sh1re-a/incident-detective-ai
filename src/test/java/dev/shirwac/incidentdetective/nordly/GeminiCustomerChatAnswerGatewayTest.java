@@ -18,9 +18,11 @@ import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.live.LiveAiOperation;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -52,6 +54,20 @@ class GeminiCustomerChatAnswerGatewayTest {
     private final JsonMapper jsonMapper = JsonMapper.builder()
             .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
             .build();
+
+    @Test
+    void promptMakesProtectedBoundaryRepliesNaturalAndNonDisclosing()
+            throws Exception {
+        String prompt = new ClassPathResource(
+                GeminiCustomerChatAnswerGateway.PROMPT_RESOURCE
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertTrue(prompt.contains("routed_intent is \"protected_boundary\""));
+        assertTrue(prompt.contains("Return no claims"));
+        assertTrue(prompt.contains("Jag har inte tillgång till"));
+        assertTrue(prompt.contains("I don't have access to"));
+        assertTrue(prompt.contains("do not invent or suggest a contact route"));
+    }
 
     @Test
     void usesTheSharedConfirmedAnswerBudgetBoundary() {
