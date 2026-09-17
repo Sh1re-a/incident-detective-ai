@@ -186,8 +186,10 @@ For V1, use the Cloud SQL Java Connector with Hikari,
 Manager. Add the connector dependency in `pom.xml` and its configuration in
 `RagDatabaseConfiguration.java`.
 
-The Cloud Run revision must set `SPRING_PROFILES_ACTIVE=rag`; otherwise the
-current default remains replay-only and database-free. Its first smoke also sets
+The Cloud Run revision must set `SPRING_PROFILES_ACTIVE=rag,cloud`; `rag`
+enables the database-backed runtime and `cloud` enables single-line structured
+console JSON for Cloud Logging. Without `rag`, the current default remains
+replay-only and database-free. Its first smoke also sets
 `INCIDENT_DETECTIVE_LIVE_AI_ENABLED=false`.
 
 The corpus import remains an explicit operator command or one-off job. Normal
@@ -195,11 +197,20 @@ application startup must not call the embedding provider or rebuild the index.
 
 ## Gate 5: observability
 
-Start with the request logs and stdout/stderr that Cloud Run captures. The
-current application does not yet prove structured JSON logging, authenticated
-Cloud Trace delivery or trace/log correlation. Keep custom trace export disabled
-for V1. Do not export raw prompts, user questions, retrieved passages, evidence
-bodies, GroundTruth or provider responses.
+Start with the request logs and stdout/stderr that Cloud Run captures. With the
+`cloud` profile, Spring Boot writes one Logstash JSON object per console line;
+Cloud Run can ingest those entries into Cloud Logging as `jsonPayload` without
+an application-side Logging client or `entries.write` calls. Incident Lab emits
+bounded lifecycle events for plan decisions, synthetic run start, deterministic
+alarm evaluation, ADK start/completion, Java verification and final outcome.
+The event schema contains correlation IDs, server-controlled identifiers,
+booleans, counts, latency, provider token usage and estimated model cost when
+available. It intentionally has no field for prompts, user questions, retrieved
+passages, evidence bodies, GroundTruth, provider responses or customer data.
+
+This is stdout integration, not proof of authenticated Cloud Trace delivery or
+trace/log correlation. Keep custom trace export disabled for V1. See
+`docs/CLOUD-LOGGING.md` for the exact event contract and current boundary.
 
 Before enabling OTLP export:
 

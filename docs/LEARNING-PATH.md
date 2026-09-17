@@ -114,11 +114,12 @@ Läs:
 1. [Cloud Run: Logging](https://docs.cloud.google.com/run/docs/logging)
 2. [OpenTelemetry: Spring Boot starter](https://opentelemetry.io/docs/zero-code/java/spring-boot-starter/)
 
-Byggresultat hittills: Actuator/Micrometer använder lågkardinalitetstaggar och
-API-resultatet sparar sanerad körmetadata, latency, calls och nullable usage.
-Nästa del är strukturerade körhändelser och
-OpenTelemetry-spans för API, tools och verifiering utan hemligheter eller privat
-tankedja.
+Byggresultat hittills: Actuator/Micrometer använder lågkardinalitetstaggar,
+OpenTelemetry-spans har en explicit allowlist och Incident Lab skriver
+strukturerade, korrelerade livscykelhändelser när `cloud`-profilen är aktiv.
+Händelserna innehåller endast serverkontrollerade ID:n, utfall, räknare,
+latency, tokenmängd och kostnadsestimat när det finns — aldrig prompt,
+kunddata, evidensinnehåll eller privat tankekedja. Se `CLOUD-LOGGING.md`.
 
 ### Pass 7 – container och Cloud Run
 
