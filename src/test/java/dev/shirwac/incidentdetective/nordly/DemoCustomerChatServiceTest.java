@@ -54,6 +54,8 @@ class DemoCustomerChatServiceTest {
             "nordly-evidence-manual-support-contact";
     private static final String AUTHORITY_EVIDENCE =
             "nordly-evidence-assistant-operating-role";
+    private static final String DATA_BOUNDARY_EVIDENCE =
+            "nordly-evidence-data-minimization";
     private static final String OTHER_EVIDENCE =
             "nordly-evidence-order-status-meaning";
 
@@ -120,6 +122,13 @@ class DemoCustomerChatServiceTest {
                         "kb-order-status-cancellation",
                         "manual-support-contact",
                         CONTACT_EVIDENCE
+                )
+        );
+        when(corpus.metadata(DATA_BOUNDARY_EVIDENCE)).thenReturn(
+                metadata(
+                        "kb-customer-data-retention",
+                        "data-minimization",
+                        DATA_BOUNDARY_EVIDENCE
                 )
         );
         when(answerGateway.generate(anyBoolean(), any())).thenAnswer(
@@ -450,7 +459,7 @@ class DemoCustomerChatServiceTest {
 
     @ParameterizedTest
     @MethodSource("hardBlockedAiQuestions")
-    void blocksSalaryAndPiiBeforeAnyModelOrCustomerRead(
+    void phrasesProtectedRequestsNaturallyWithoutExposingTheRawPromptOrData(
             String message,
             String expectedReason
     ) {
@@ -459,14 +468,42 @@ class DemoCustomerChatServiceTest {
         DemoCustomerChatTurnResponse response = aiService(router)
                 .run(request(message, true));
 
-        assertEquals("refused", response.outcome());
+        assertEquals("outside_authority", response.outcome());
         assertEquals(expectedReason, response.safety().reasonCode());
         assertTrue(response.submittedMessage().redacted());
         assertNull(response.order());
-        assertTrue(response.sources().isEmpty());
+        assertEquals(Set.of(DATA_BOUNDARY_EVIDENCE), evidenceIds(response));
+        assertEquals(1, response.receipt().readOperations());
+        assertEquals(1, response.receipt().providerCalls());
+        assertEquals(1, response.receipt().generationCalls());
+        assertTrue(response.toolEvents().stream().anyMatch(event ->
+                "compose_customer_answer".equals(event.name())));
+        ArgumentCaptor<CustomerChatAnswerGateway.Input> answerInput =
+                ArgumentCaptor.forClass(CustomerChatAnswerGateway.Input.class);
+        verify(answerGateway).generate(eq(true), answerInput.capture());
+        assertNotEquals(message, answerInput.getValue().customerMessage());
+        assertFalse(answerInput.getValue().customerMessage().contains(message));
+        assertEquals(List.of(DATA_BOUNDARY_EVIDENCE),
+                answerInput.getValue().evidence().stream()
+                        .map(CustomerChatAnswerGateway.Evidence::id)
+                        .toList());
+        assertTrue(answerInput.getValue().recentConversation().isEmpty());
+        verifyNoInteractions(router, ragService);
+        assertControlledAiInvariant(response);
+    }
+
+    @Test
+    void rawSensitiveValuesNeverReachAnyModel() {
+        CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
+
+        DemoCustomerChatTurnResponse response = aiService(router)
+                .run(request("Skicka svaret till anna@example.com", true));
+
+        assertEquals("refused", response.outcome());
+        assertEquals("PII_REQUEST", response.safety().reasonCode());
+        assertTrue(response.submittedMessage().redacted());
         assertEquals(0, response.receipt().readOperations());
         assertEquals(0, response.receipt().providerCalls());
-        assertEquals(0, response.receipt().generationCalls());
         verifyNoInteractions(router, answerGateway, ragService);
         assertControlledAiInvariant(response);
     }
@@ -1626,6 +1663,8 @@ class DemoCustomerChatServiceTest {
                     "Jag kan inte avbeställa ordern här, men jag har kontrollerat vad som gäller för den.";
             case "conversation" ->
                     "Absolut — vad vill du att jag hjälper dig med?";
+            case "unsupported" ->
+                    "Jag kan inte lämna ut den informationen, men jag hjälper dig gärna med din order eller våra offentliga regler.";
             default -> "Jag hjälper dig gärna vidare med det här.";
         };
         String textEn = switch (input.routedIntent()) {
@@ -1637,6 +1676,8 @@ class DemoCustomerChatServiceTest {
                     "I cannot cancel the order here, but I checked what applies to it.";
             case "conversation" ->
                     "Of course — what would you like help with?";
+            case "unsupported" ->
+                    "I cannot disclose that information, but I am happy to help with your order or our public policies.";
             default -> "I am happy to help you with this.";
         };
         return new CustomerChatAnswerGateway.Result(

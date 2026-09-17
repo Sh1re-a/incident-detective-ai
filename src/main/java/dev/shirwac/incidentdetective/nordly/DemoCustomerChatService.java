@@ -33,6 +33,8 @@ public final class DemoCustomerChatService {
             "nordly-evidence-manual-support-contact";
     private static final String AUTHORITY_EVIDENCE =
             "nordly-evidence-assistant-operating-role";
+    private static final String DATA_BOUNDARY_EVIDENCE =
+            "nordly-evidence-data-minimization";
     private static final String REDACTED_SV =
             "[STOPPAD OCH MASKERAD AV SÄKERHETSGRINDEN]";
     private static final String REDACTED_EN =
@@ -73,6 +75,7 @@ public final class DemoCustomerChatService {
     private final NordlyKnowledgeCorpus.EntryMetadata refundTimingPolicy;
     private final NordlyKnowledgeCorpus.EntryMetadata authorityPolicy;
     private final NordlyKnowledgeCorpus.EntryMetadata contactPolicy;
+    private final NordlyKnowledgeCorpus.EntryMetadata dataBoundaryPolicy;
 
     public DemoCustomerChatService(
             DemoCustomerContextCatalog contextCatalog,
@@ -132,6 +135,10 @@ public final class DemoCustomerChatService {
                 corpus.metadata(CONTACT_EVIDENCE),
                 CONTACT_EVIDENCE
         );
+        dataBoundaryPolicy = approved(
+                corpus.metadata(DATA_BOUNDARY_EVIDENCE),
+                DATA_BOUNDARY_EVIDENCE
+        );
     }
 
     public DemoCustomerChatTurnResponse run(
@@ -142,19 +149,44 @@ public final class DemoCustomerChatService {
         KnowledgeRagSafetyGate.Decision safety = safetyGate.evaluate(
                 request.message()
         );
+        List<DemoCustomerChatTurnRequest.ConversationTurn> recentConversation =
+                safeRecentConversation(request.recentConversation());
         if (isHardSafetyStop(safety)) {
             DemoCustomerIntentClassifier.Decision safeFallback =
                     classifier.classify(request.message());
-            return refused(
+            if (!request.confirmLiveAi()
+                    || answerGateway == null
+                    || safetyGate.containsRawSensitiveValue(
+                    request.message()
+            )) {
+                return refused(
+                        turnId,
+                        started,
+                        request,
+                        safeFallback,
+                        safety
+                );
+            }
+            DemoCustomerChatTurnResponse response = boundedSafetyResponse(
                     turnId,
                     started,
                     request,
-                    safeFallback,
                     safety
             );
+            try {
+                return composeCustomerAnswer(
+                        response,
+                        request,
+                        List.of(),
+                        safeBoundaryPrompt(safety, request.locale())
+                );
+            } catch (RuntimeException exception) {
+                if (!recoverableRoutingFailure(exception)) {
+                    throw exception;
+                }
+                return compositionUnavailable(response, exception);
+            }
         }
-        List<DemoCustomerChatTurnRequest.ConversationTurn> recentConversation =
-                safeRecentConversation(request.recentConversation());
 
         if (!request.confirmLiveAi() || modelRouter == null) {
             DemoCustomerIntentClassifier.Decision deterministic =
@@ -232,7 +264,8 @@ public final class DemoCustomerChatService {
                 response = composeCustomerAnswer(
                         response,
                         request,
-                        recentConversation
+                        recentConversation,
+                        request.message()
                 );
             } catch (RuntimeException exception) {
                 if (!recoverableRoutingFailure(exception)) {
@@ -468,7 +501,8 @@ public final class DemoCustomerChatService {
     private DemoCustomerChatTurnResponse composeCustomerAnswer(
             DemoCustomerChatTurnResponse response,
             DemoCustomerChatTurnRequest request,
-            List<DemoCustomerChatTurnRequest.ConversationTurn> recentConversation
+            List<DemoCustomerChatTurnRequest.ConversationTurn> recentConversation,
+            String modelMessage
     ) {
         if (answerGateway == null) {
             throw new LiveInvestigationException(
@@ -485,7 +519,7 @@ public final class DemoCustomerChatService {
         CustomerChatAnswerGateway.Result generated = answerGateway.generate(
                 request.confirmLiveAi(),
                 new CustomerChatAnswerGateway.Input(
-                        request.message(),
+                        modelMessage,
                         request.locale(),
                         response.intent().name(),
                         response.outcome(),
@@ -557,6 +591,112 @@ public final class DemoCustomerChatService {
                 receipt,
                 response.error()
         );
+    }
+
+    private DemoCustomerChatTurnResponse boundedSafetyResponse(
+            String turnId,
+            long started,
+            DemoCustomerChatTurnRequest request,
+            KnowledgeRagSafetyGate.Decision safety
+    ) {
+        DemoCustomerIntentClassifier.Decision intent =
+                new DemoCustomerIntentClassifier.Decision(
+                        DemoCustomerIntentClassifier.Intent.UNSUPPORTED,
+                        "java_safety_boundary_v1",
+                        false
+                );
+        List<DemoCustomerChatTurnResponse.ToolEvent> events = List.of(
+                event(
+                        1,
+                        "safety",
+                        "classify_protected_request",
+                        "bounded",
+                        true,
+                        "Skyddsgränsen stoppade dataåtkomst och verktyg. Endast en maskerad riskklass fick gå vidare.",
+                        "The safety boundary stopped data access and tools. Only a masked risk class could continue.",
+                        null,
+                        List.of(),
+                        null
+                ),
+                event(
+                        2,
+                        "backend_read",
+                        "read_public_data_boundary_policy",
+                        "completed",
+                        true,
+                        "Läste endast den godkända offentliga policyn för ett naturligt gränssvar.",
+                        "Read only the approved public policy for a natural boundary reply.",
+                        dataBoundaryPolicy.sourceRef(),
+                        List.of(dataBoundaryPolicy.evidenceId()),
+                        null
+                ),
+                event(
+                        3,
+                        "verification",
+                        "verify_no_protected_context_or_write_tools",
+                        "completed",
+                        true,
+                        "Verifierade att inga privata källor, kundposter eller skrivverktyg var tillgängliga.",
+                        "Verified that no private sources, customer records, or write tools were available.",
+                        dataBoundaryPolicy.sourceRef(),
+                        List.of(dataBoundaryPolicy.evidenceId()),
+                        null
+                )
+        );
+        List<DemoCustomerChatTurnResponse.VerifiedClaim> claims = List.of(
+                new DemoCustomerChatTurnResponse.VerifiedClaim(
+                        dataBoundaryPolicy.displaySummarySv(),
+                        dataBoundaryPolicy.displaySummaryEn(),
+                        List.of(dataBoundaryPolicy.evidenceId())
+                )
+        );
+        return response(
+                turnId,
+                request,
+                intent,
+                safety,
+                "outside_authority",
+                refusalMessage(safety),
+                null,
+                events,
+                List.of(policySource(dataBoundaryPolicy, null)),
+                claims,
+                noRag(),
+                new DemoCustomerChatTurnResponse.Verification(
+                        "completed",
+                        true,
+                        false,
+                        true,
+                        true,
+                        false,
+                        true,
+                        false,
+                        "released_bounded_policy_projection"
+                ),
+                receipt(1, 0, 0, 0, 0, started, null),
+                null
+        );
+    }
+
+    private String safeBoundaryPrompt(
+            KnowledgeRagSafetyGate.Decision safety,
+            String locale
+    ) {
+        String reason = switch (safety.reasonCode()) {
+            case PII_REQUEST -> "protected_personal_information_request";
+            case EMPLOYEE_COMPENSATION_REQUEST ->
+                    "employee_compensation_request";
+            case SECRET_REQUEST -> "secret_or_credential_request";
+            case PROMPT_INJECTION -> "instruction_override_request";
+            default -> "protected_request";
+        };
+        return "sv".equals(locale)
+                ? "Svara vänligt och naturligt på en begäran med den säkra riskklassen "
+                + reason
+                + ". Förklara bara gränsen och erbjud hjälp inom vanlig kundservice."
+                : "Reply naturally and politely to a request with the safe risk class "
+                + reason
+                + ". Explain only the boundary and offer help within ordinary customer service.";
     }
 
     private CustomerChatAnswerGateway.Evidence answerEvidence(

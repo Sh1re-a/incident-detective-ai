@@ -277,6 +277,21 @@ public final class KnowledgeRagSafetyGate {
         return Decision.allow();
     }
 
+    /**
+     * Returns true when the submitted text itself contains a protected value.
+     *
+     * <p>Conceptual boundary questions can be reduced to a safe reason code
+     * before a model call. Raw personal, payment or credential values must
+     * never cross that provider boundary.</p>
+     */
+    public boolean containsRawSensitiveValue(String question) {
+        return contains(EMAIL, question)
+                || contains(SWEDISH_PERSONAL_NUMBER, question)
+                || contains(CARD_LIKE_NUMBER, question)
+                || contains(PHONE_LIKE_NUMBER, question)
+                || contains(SECRET_VALUE, question);
+    }
+
     private static boolean contains(Pattern pattern, String value) {
         return value != null && pattern.matcher(value).find();
     }

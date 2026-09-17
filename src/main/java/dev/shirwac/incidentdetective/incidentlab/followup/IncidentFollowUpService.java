@@ -22,6 +22,12 @@ import java.util.Set;
 public final class IncidentFollowUpService {
 
     private static final String DELIVERY = "synchronous_frozen_snapshot";
+    private static final String SAFE_BOUNDARY_QUESTION_SV =
+            "Förklara agentens verifierade befogenhet och säkerhetsgräns "
+                    + "för en skyddad begäran om den här incidenten.";
+    private static final String SAFE_BOUNDARY_QUESTION_EN =
+            "Explain the agent's verified authority and safety boundary "
+                    + "for a protected request about this incident.";
     private static final Map<String, List<IncidentFollowUpRouter.Section>>
             REPLAY_SELECTIONS = Map.of(
             "how_conclusion", List.of(
@@ -161,7 +167,8 @@ public final class IncidentFollowUpService {
         KnowledgeRagSafetyGate.Decision safety = safetyGate.evaluate(
                 request.question()
         );
-        if (!safety.allowed()) {
+        if (!safety.allowed()
+                && safetyGate.containsRawSensitiveValue(request.question())) {
             return response(
                     stored,
                     request,
@@ -171,11 +178,14 @@ public final class IncidentFollowUpService {
                     false
             );
         }
+        String routingQuestion = safety.allowed()
+                ? request.question()
+                : safeBoundaryQuestion(request.locale());
         IncidentFollowUpRouter.Result routed = liveAiRunGuard.runConfirmed(
                 request.confirmLiveAi(),
                 LiveAiOperation.INCIDENT_FOLLOW_UP,
                 () -> router.route(new IncidentFollowUpRouter.Input(
-                        request.question(),
+                        routingQuestion,
                         request.locale(),
                         snapshot.originalAnswerState().name()
                 ))
@@ -192,6 +202,12 @@ public final class IncidentFollowUpService {
                 routed.provider(),
                 true
         );
+    }
+
+    private String safeBoundaryQuestion(String locale) {
+        return "en".equals(locale)
+                ? SAFE_BOUNDARY_QUESTION_EN
+                : SAFE_BOUNDARY_QUESTION_SV;
     }
 
     private List<IncidentFollowUpRouter.Section> replaySections(

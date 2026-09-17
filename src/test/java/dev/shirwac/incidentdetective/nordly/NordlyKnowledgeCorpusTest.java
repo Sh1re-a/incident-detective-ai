@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class NordlyKnowledgeCorpusTest {
 
     private static final String EXPECTED_CORPUS_CONTENT_SHA256 =
-            "f5c92e8f7996ae45d253ba35d9afe6ec20426a7c0a1f95e264defdef24e27386";
+            "2b9205b5b528759a3c7f6c234f885059145da3bafc3a38992a0a1dbfb3549d27";
     private static final RagProperties PROFILE = new RagProperties(
             "gemini-embedding-2",
             768,
