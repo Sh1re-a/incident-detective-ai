@@ -1,7 +1,6 @@
 package dev.shirwac.incidentdetective.nordly;
 
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
-import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.live.LiveAiBudgetStoreUnavailableException;
@@ -14,7 +13,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -63,7 +61,7 @@ public final class DemoCustomerChatService {
             "Every turn resolves the same fixed synthetic customer and one backend-owned current order.",
             "The assistant can read and explain but has no create, cancel, refund, contact or update tool.",
             "Zero business writes covers customer, order and refund state; live quota accounting and observability may write technical records.",
-            "Natural model wording is checked for schema, returned source IDs and prohibited action claims; canonical verified_claims remain the factual projection.",
+            "Gemini may route free text, but order facts and authority boundaries are released only from Java's canonical evidence projection.",
             "Refund eligibility is never decided because the demo order has no product-condition or authenticated return data.",
             "Semantic similarity ranks approved text; it is not factual confidence or complete semantic verification."
     );
@@ -74,8 +72,6 @@ public final class DemoCustomerChatService {
     private final KnowledgeRagService knowledgeRagService;
     private final NordlyKnowledgeCorpus corpus;
     private final CustomerChatModelRouter modelRouter;
-    private final CustomerChatAnswerGateway answerGateway;
-    private final GeminiCostEstimator costEstimator;
     private final GeminiAiProperties aiProperties;
     private final NordlyKnowledgeCorpus.EntryMetadata cancellationPolicy;
     private final NordlyKnowledgeCorpus.EntryMetadata returnPolicy;
@@ -97,8 +93,6 @@ public final class DemoCustomerChatService {
                 knowledgeRagService,
                 corpus,
                 null,
-                null,
-                null,
                 null
         );
     }
@@ -111,8 +105,6 @@ public final class DemoCustomerChatService {
             KnowledgeRagService knowledgeRagService,
             NordlyKnowledgeCorpus corpus,
             CustomerChatModelRouter modelRouter,
-            CustomerChatAnswerGateway answerGateway,
-            GeminiCostEstimator costEstimator,
             GeminiAiProperties aiProperties
     ) {
         this.contextCatalog = contextCatalog;
@@ -121,8 +113,6 @@ public final class DemoCustomerChatService {
         this.knowledgeRagService = knowledgeRagService;
         this.corpus = corpus;
         this.modelRouter = modelRouter;
-        this.answerGateway = answerGateway;
-        this.costEstimator = costEstimator;
         this.aiProperties = aiProperties;
         cancellationPolicy = approved(
                 corpus.metadata(CANCELLATION_EVIDENCE),
@@ -241,11 +231,10 @@ public final class DemoCustomerChatService {
             );
             return attachRoute(response, route);
         }
-        response = attachRoute(response, route);
-        if (shouldGenerateNaturalAnswer(response)) {
-            response = generateNaturalAnswer(response, request);
-        }
-        return response;
+        // The model may interpret free text, but it does not get a second,
+        // unguarded opportunity to rewrite factual order or authority claims.
+        // RAG answers have their own evidence-bound release path.
+        return attachRoute(response, route);
     }
 
     private DemoCustomerChatTurnResponse dispatch(
@@ -404,15 +393,6 @@ public final class DemoCustomerChatService {
         };
     }
 
-    private boolean shouldGenerateNaturalAnswer(
-            DemoCustomerChatTurnResponse response
-    ) {
-        return answerGateway != null
-                && !response.rag().requested()
-                && !Set.of("refused", "unavailable")
-                .contains(response.outcome());
-    }
-
     private DemoCustomerChatTurnResponse attachRoute(
             DemoCustomerChatTurnResponse response,
             CustomerChatModelRouter.RoutingResult route
@@ -451,110 +431,6 @@ public final class DemoCustomerChatService {
                 receipt,
                 response.error()
         );
-    }
-
-    private DemoCustomerChatTurnResponse generateNaturalAnswer(
-            DemoCustomerChatTurnResponse response,
-            DemoCustomerChatTurnRequest request
-    ) {
-        try {
-            CustomerChatAnswerGateway.Result generated = answerGateway.generate(
-                    new CustomerChatAnswerGateway.Input(
-                            request.message().strip(),
-                            request.locale(),
-                            response.intent().name(),
-                            response.outcome(),
-                            // History may resolve the route, but current backend
-                            // evidence remains the answer model's only context.
-                            List.of(),
-                            answerEvidence(response)
-                    )
-            );
-            List<DemoCustomerChatTurnResponse.ToolEvent> events =
-                    appendAnswerEvents(
-                            response.toolEvents(),
-                            generated.provider().latencyMs(),
-                            true,
-                            null
-                    );
-            ModelCostEstimate answerCost = costEstimator.estimate(
-                    aiProperties.modelId(),
-                    generated.provider().tokenUsage()
-            );
-            DemoCustomerChatTurnResponse.Verification verification =
-                    new DemoCustomerChatTurnResponse.Verification(
-                            "completed",
-                            response.verification().fixedCustomerScope(),
-                            response.verification().orderSourceVerified(),
-                            response.verification().approvedPoliciesOnly(),
-                            true,
-                            false,
-                            true,
-                            false,
-                            "released_after_schema_citation_and_action_scan"
-                    );
-            return copyResponse(
-                    response,
-                    LIVE_AI_TRUTH_SV,
-                    LIVE_AI_TRUTH_EN,
-                    new DemoCustomerChatTurnResponse.AssistantMessage(
-                            generated.answer().textSv(),
-                            generated.answer().textEn()
-                    ),
-                    events,
-                    response.verifiedClaims(),
-                    verification,
-                    addModelCall(
-                            response.receipt(),
-                            answerCost,
-                            aiProperties.modelId(),
-                            generated.provider().latencyMs()
-                    ),
-                    null
-            );
-        } catch (ModelProviderException exception) {
-            DemoCustomerChatTurnResponse.ErrorDetail error =
-                    new DemoCustomerChatTurnResponse.ErrorDetail(
-                            "CUSTOMER_CHAT_ANSWER_"
-                                    + exception.failure().name(),
-                            "Geminis formulering kunde inte verifieras. Det säkra backend-svaret visas i stället.",
-                            "Gemini's wording could not be verified. The safe backend answer is shown instead."
-                    );
-            List<DemoCustomerChatTurnResponse.ToolEvent> events =
-                    appendAnswerEvents(
-                            response.toolEvents(),
-                            null,
-                            false,
-                            error
-                    );
-            DemoCustomerChatTurnResponse.Verification verification =
-                    new DemoCustomerChatTurnResponse.Verification(
-                            response.verification().evaluationStatus(),
-                            response.verification().fixedCustomerScope(),
-                            response.verification().orderSourceVerified(),
-                            response.verification().approvedPoliciesOnly(),
-                            response.verification().citationsWithinReturnedSources(),
-                            response.verification().semanticClaimSupportEvaluated(),
-                            true,
-                            false,
-                            "released_safe_backend_fallback_after_model_failure"
-                    );
-            return copyResponse(
-                    response,
-                    LIVE_AI_TRUTH_SV,
-                    LIVE_AI_TRUTH_EN,
-                    response.assistantMessage(),
-                    events,
-                    response.verifiedClaims(),
-                    verification,
-                    addUnknownModelCall(
-                            response.receipt(),
-                            aiProperties.modelId(),
-                            0
-                    ),
-                    error
-            );
-        }
     }
 
     private List<DemoCustomerChatTurnRequest.ConversationTurn>
@@ -677,47 +553,6 @@ public final class DemoCustomerChatService {
         );
     }
 
-    private List<CustomerChatAnswerGateway.Evidence> answerEvidence(
-            DemoCustomerChatTurnResponse response
-    ) {
-        return response.sources().stream()
-                .sorted(Comparator.comparing(DemoCustomerChatTurnResponse.Source::evidenceId))
-                .limit(CustomerChatAnswerGateway.MAX_EVIDENCE_ITEMS)
-                .map(source -> new CustomerChatAnswerGateway.Evidence(
-                        source.evidenceId(),
-                        source.title(),
-                        evidenceText(source, response.order())
-                ))
-                .toList();
-    }
-
-    private String evidenceText(
-            DemoCustomerChatTurnResponse.Source source,
-            DemoOrderSnapshot order
-    ) {
-        if ("order_snapshot".equals(source.kind()) && order != null) {
-            return "Synthetic current order. order_id=" + order.orderId()
-                    + "; status_sv=" + order.statusSv()
-                    + "; status_en=" + order.statusEn()
-                    + "; item_count=" + order.itemCount()
-                    + "; estimated_delivery_from="
-                    + order.estimatedDeliveryFrom()
-                    + "; estimated_delivery_through="
-                    + order.estimatedDeliveryThrough()
-                    + "; payment_state=" + order.paymentState()
-                    + "; fulfilment_state=" + order.fulfilmentState()
-                    + "; next_step_sv=" + order.nextStepSv()
-                    + "; next_step_en=" + order.nextStepEn()
-                    + "; product names are not available.";
-        }
-        if ("company_policy".equals(source.kind())) {
-            return corpus.metadata(source.evidenceId()).text();
-        }
-        return source.displaySummaryEn()
-                + " The public demo is read-only, uses one fixed synthetic "
-                + "customer and order, and exposes no business write tools.";
-    }
-
     private List<DemoCustomerChatTurnResponse.ToolEvent> insertAfterSafety(
             List<DemoCustomerChatTurnResponse.ToolEvent> existing,
             DemoCustomerChatTurnResponse.ToolEvent inserted
@@ -735,53 +570,6 @@ public final class DemoCustomerChatService {
         if (!added) {
             result.addFirst(inserted);
         }
-        return resequence(result);
-    }
-
-    private List<DemoCustomerChatTurnResponse.ToolEvent> appendAnswerEvents(
-            List<DemoCustomerChatTurnResponse.ToolEvent> existing,
-            Long latencyMs,
-            boolean verified,
-            DemoCustomerChatTurnResponse.ErrorDetail error
-    ) {
-        List<DemoCustomerChatTurnResponse.ToolEvent> result =
-                new ArrayList<>(existing);
-        result.add(new DemoCustomerChatTurnResponse.ToolEvent(
-                0,
-                "generation",
-                "gemini_customer_answer",
-                false,
-                "compose_customer_answer",
-                verified ? "completed" : "failed",
-                true,
-                verified
-                        ? "Gemini formulerade ett naturligt svar enbart från returnerade bevis."
-                        : "Geminis svar kunde inte användas; backendens säkra formulering behölls.",
-                verified
-                        ? "Gemini composed a natural reply only from returned evidence."
-                        : "Gemini's answer could not be used; the safe backend wording was retained.",
-                null,
-                List.of(),
-                latencyMs
-        ));
-        result.add(new DemoCustomerChatTurnResponse.ToolEvent(
-                0,
-                "verification",
-                "spring_orchestrator",
-                false,
-                "verify_customer_answer",
-                verified ? "completed" : "blocked",
-                true,
-                verified
-                        ? "Java verifierade format, käll-ID:n och att ingen affärsåtgärd påstods."
-                        : error.summarySv(),
-                verified
-                        ? "Java verified the schema, source IDs and that no business action was claimed."
-                        : error.summaryEn(),
-                null,
-                List.of(),
-                null
-        ));
         return resequence(result);
     }
 

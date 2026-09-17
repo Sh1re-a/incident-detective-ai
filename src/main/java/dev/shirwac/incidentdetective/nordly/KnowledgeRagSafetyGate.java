@@ -53,7 +53,13 @@ public final class KnowledgeRagSafetyGate {
             "(?:vad ar|vilken ar|what is|what'?s).{0,35}"
                     + "(?:kundens|customer(?:'?s)?).{0,25}"
                     + "(?:namn|e-post|epost|mejl|mail|adress|telefon|personnummer|"
-                    + "name|email|address|phone|ssn)"
+                    + "name|email|address|phone|ssn)",
+            "(?:vad ar min|vilken ar min|what is my|what'?s my).{0,25}"
+                    + "(?:e-post|epost|mejl|mail|adress|telefon|personnummer|"
+                    + "email|address|phone|ssn)",
+            "(?:avsloja|visa|show|disclose).{0,35}"
+                    + "(?:koparens identitet|buyer identity|hela kundposten|"
+                    + "full customer record|customer record)"
     );
     private static final List<Pattern> SECRET_REQUESTS = patterns(
             "(?:visa|ge(?: mig)?|hamta|lista|skriv ut|avsloja|beratta|show|"
@@ -77,7 +83,12 @@ public final class KnowledgeRagSafetyGate {
                     + "(?:pa nordly|at nordly|anstalld|medarbetare|employee|staff)",
             "(?:vad|hur mycket|what|how much).{0,45}"
                     + "(?:tjanar|far|earns?|is paid).{0,45}"
-                    + "(?:vd|ceo|chef|i manaden|per manad|per month)"
+                    + "(?:vd|ceo|chef|i manaden|per manad|per month)",
+            "(?:vad|hur mycket) tjanar\\s+[a-z][a-z' -]{1,40}[?!.]*$",
+            "(?:what is|how much is)\\s+[a-z][a-z' -]{1,40}"
+                    + "\\s+(?:paid|salary|compensation)[?!.]*$",
+            "(?:what does|how much does)\\s+[a-z][a-z' -]{1,40}"
+                    + "\\s+(?:earn|make|get paid)[?!.]*$"
     );
     private static final List<Pattern> PROMPT_INJECTIONS = patterns(
             "(?:ignorera|bortse fran|strunta i|glom|ignore|disregard|forget|override)"
@@ -96,7 +107,10 @@ public final class KnowledgeRagSafetyGate {
             "(?:glom|forget).{0,45}(?:allt|everything|vad du fatt veta|"
                     + "what you (?:know|were told))",
             "(?:latsas|pretend).{0,45}(?:regler|rules).{0,30}"
-                    + "(?:inte galler|do not apply|dont apply|not apply)"
+                    + "(?:inte galler|do not apply|dont apply|not apply)",
+            "(?:oversatt|translate).{0,35}"
+                    + "(?:developer instructions|developer message|"
+                    + "system prompt|systeminstruktioner|utvecklarinstruktioner)"
     );
     private static final List<Pattern> FINANCIAL_ACTIONS = patterns(
             "(?:aterbetala|genomfor en aterbetalning|utfor en aterbetalning|"
@@ -186,7 +200,10 @@ public final class KnowledgeRagSafetyGate {
                     + "(?:gor det|utfor det|genomfor det|do it|go ahead)"
                     + "(?: (?:at mig|for me|tack|please|nu|now))*[.!?]*$",
             "(?:rollback|roll back|rulla (?:tillbaka|tillbaks))"
-                    + "(?: nu| now| omedelbart)?$"
+                    + "(?: nu| now| omedelbart)?$",
+            "(?:mark|set|andra|uppdatera).{0,35}"
+                    + "(?:refund|aterbetalning|orderstatus|order status)"
+                    + ".{0,35}(?:complete|completed|klar|fardig|delivered|levererad)"
     );
 
     public Decision evaluate(String question) {
