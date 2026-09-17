@@ -1,20 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { IncidentApiError, runIncidentLabFollowUp } from "./api/client";
 import type {
   IncidentLabFollowUpCitation,
-  IncidentLabFollowUpClaim,
   IncidentLabFollowUpMode,
   IncidentLabFollowUpResponse,
   IncidentLabFollowUpStep,
+  IncidentLabRunResponse,
   KnowledgeRagLocale,
 } from "./api/generated";
 
 interface IncidentFollowUpChatProps {
   locale: KnowledgeRagLocale;
-  runReference: string;
+  run: IncidentLabRunResponse;
+  runReference: string | null;
   mode: IncidentLabFollowUpMode;
+  technicalDetailsOpen: boolean;
+  onToggleTechnicalDetails: () => void;
   onOpenCitation: (citation: IncidentLabFollowUpCitation) => void;
+  onOpenEvidenceScene: (target: IncidentLabFollowUpCitation["target_scene"]) => void;
 }
 
 interface ChatTurn {
@@ -28,89 +32,95 @@ interface ChatTurn {
 
 const INITIAL_SUGGESTIONS = {
   sv: [
-    { id: "how_conclusion", label: "Hur kom du fram till slutsatsen?" },
-    { id: "show_sources", label: "Vilka källor vägde tyngst?" },
-    { id: "what_unknown", label: "Vad går inte att fastställa?" },
-    { id: "customer_impact", label: "Hur påverkades kunderna?" },
-    { id: "agent_boundary", label: "Varför fick agenten inte åtgärda?" },
+    { id: "how_conclusion", label: "Hur vet du det?" },
+    { id: "show_sources", label: "Visa källorna" },
+    { id: "what_unknown", label: "Vad vet du inte?" },
   ],
   en: [
-    { id: "how_conclusion", label: "How did you reach that conclusion?" },
-    { id: "show_sources", label: "Which sources mattered most?" },
-    { id: "what_unknown", label: "What could not be established?" },
-    { id: "customer_impact", label: "How were customers affected?" },
-    { id: "agent_boundary", label: "Why could the agent not take action?" },
+    { id: "how_conclusion", label: "How do you know?" },
+    { id: "show_sources", label: "Show the sources" },
+    { id: "what_unknown", label: "What do you not know?" },
   ],
 } as const;
 
 const labels = {
   sv: {
-    eyebrow: "FÖLJDFRÅGOR · SAMMA INCIDENTKVITTO",
-    title: "Fråga Driftagenten om den här körningen.",
-    lead:
-      "Agenten får bara svara från körningens frysta loggar, mätvärden, RAG-källor och Java-kontroll. Varje fråga binds till samma körning.",
-    inputLabel: "Din fråga om utredningen",
-    placeholder: "Fråga fritt om problemet, orsaken, påverkan eller källorna…",
-    replayPlaceholder: "Den verifierade reprisen svarar via frågevalen ovan.",
-    liveSend: "Fråga med Live AI",
-    replaySend: "Välj en verifierad fråga ovan",
-    sending: "Kontrollerar kvittot…",
-    suggestions: "Du kan fråga",
-    liveMode: "Live AI · källbundet svar",
-    blockedMode: "Kontrollerad gräns",
-    replayMode: "Verifierad återspelning · 0 nya AI-anrop",
+    region: "Samtal med Nordly Driftagent",
+    complete: "Utredningen är klar",
+    replayMode: "Verifierad demo",
+    liveMode: "Live AI",
+    withheldTitle: "Jag kan se problemet – men inte bevisa orsaken än.",
+    impact: "Påverkan",
+    unknown: "Det här kan jag inte fastställa",
+    askPrompt: "Fråga mig om slutsatsen, påverkan eller källorna.",
+    showEvidence: "Visa underlag och källor",
+    location: "Var syns problemet?",
+    cause: "Vad pekar underlaget på?",
+    evidenceImpact: "Vad blev påverkan?",
+    logs: "Öppna loggarna",
+    rag: "Öppna RAG-källan",
+    java: "Öppna Java-kontrollen",
+    technical: "Visa tekniskt kvitto",
+    hideTechnical: "Dölj tekniskt kvitto",
+    inputLabel: "Fråga Driftagenten om larmet",
+    placeholder: "Fråga om larmet…",
+    send: "Skicka",
+    sending: "Driftagenten granskar underlaget…",
+    suggestions: "Frågor om slutsatsen",
+    exploreReplay: "Utforska den verifierade körningen",
+    exploreLive: "Vad vill du veta?",
+    replayNote: "Den här demon använder verifierade frågor och gör inga nya AI-anrop.",
+    liveNote: "Svaret får bara använda underlaget från den här incidenten.",
     answerLabel: "Svar från Nordly Driftagent",
-    problem: "Var finns problemet?",
-    cause: "Varför uppstod det?",
-    impact: "Vilken påverkan fick det?",
-    known: "Det här vet vi",
-    unknown: "Det här går inte att fastställa",
-    sources: "Källor",
-    verified: "Java verifierade svaret mot samma frysta incidentkvitto",
-    bounded: "Kontrollen höll svaret inom incidentens gräns",
-    boundedReceipt: "AI-anrop · Endast läsning · 0 ändringar",
-    readOnly: "Endast läsning · 0 ändringar",
-    certainty: "Bedömning",
-    journey: "Så kom jag fram till svaret",
+    evidenceCount: (count: number) => `Visa ${count} ${count === 1 ? "källa" : "källor"} och kontroll`,
+    sources: "Källor bakom svaret",
+    journey: "Så kontrollerades svaret",
     journeyNote: "Registrerade backendsteg – inte AI:ns dolda tankar.",
-    error: "Frågan kunde inte besvaras med ett verifierat svar.",
-    retry: "Du kan försöka igen utan att starta om incidenten.",
-    expired: "Incidentkvittot har gått ut. Historiken visas, men inga nya frågor kan ställas.",
-    replayNote: "Reprisen använder fasta verifierade frågor. Starta en liveincident för att skriva fritt.",
+    verified: "Verifierat av Java · endast läsning · 0 ändringar",
+    bounded: "Svaret hölls inom den här incidenten",
+    error: "Jag kunde inte lämna ett verifierat svar.",
+    retry: "Försök gärna igen utan att starta om utredningen.",
+    expired: "Incidenten har gått ut. Samtalet finns kvar, men nya frågor är stängda.",
+    unavailable: "Slutsatsen går att läsa, men den här körningen kan inte ta emot frågor.",
   },
   en: {
-    eyebrow: "FOLLOW-UPS · SAME INCIDENT RECEIPT",
-    title: "Ask the Incident Agent about this run.",
-    lead:
-      "The agent may only answer from the run's frozen logs, metrics, RAG sources and Java verification. Every question is bound to the same run.",
-    inputLabel: "Your question about the investigation",
-    placeholder: "Ask freely about the problem, cause, impact or sources…",
-    replayPlaceholder: "The verified recording answers through the choices above.",
-    liveSend: "Ask with Live AI",
-    replaySend: "Choose a verified question above",
-    sending: "Checking the receipt…",
-    suggestions: "You can ask",
-    liveMode: "Live AI · source-grounded answer",
-    blockedMode: "Controlled boundary",
-    replayMode: "Verified recording · 0 new AI calls",
+    region: "Conversation with the Nordly Incident Agent",
+    complete: "The investigation is complete",
+    replayMode: "Verified demo",
+    liveMode: "Live AI",
+    withheldTitle: "I can see the problem – but I cannot prove the cause yet.",
+    impact: "Impact",
+    unknown: "What I cannot establish",
+    askPrompt: "Ask me about the conclusion, impact or sources.",
+    showEvidence: "Show evidence and sources",
+    location: "Where is the problem visible?",
+    cause: "What does the evidence indicate?",
+    evidenceImpact: "What was the impact?",
+    logs: "Open the logs",
+    rag: "Open the RAG source",
+    java: "Open Java verification",
+    technical: "Show technical receipt",
+    hideTechnical: "Hide technical receipt",
+    inputLabel: "Ask the Incident Agent about the alert",
+    placeholder: "Ask about the alert…",
+    send: "Send",
+    sending: "The Incident Agent is checking the evidence…",
+    suggestions: "Questions about the conclusion",
+    exploreReplay: "Explore the verified run",
+    exploreLive: "What would you like to know?",
+    replayNote: "This demo uses verified questions and makes no new AI calls.",
+    liveNote: "The answer may only use evidence from this incident.",
     answerLabel: "Answer from the Nordly Incident Agent",
-    problem: "Where is the problem?",
-    cause: "Why did it happen?",
-    impact: "What was the impact?",
-    known: "What we know",
-    unknown: "What cannot be established",
-    sources: "Sources",
-    verified: "Java verified the answer against the same frozen incident receipt",
-    bounded: "The control kept the answer within the incident boundary",
-    boundedReceipt: "AI calls · Read-only · 0 changes",
-    readOnly: "Read-only · 0 changes",
-    certainty: "Assessment",
-    journey: "How I reached the answer",
+    evidenceCount: (count: number) => `Show ${count} ${count === 1 ? "source" : "sources"} and verification`,
+    sources: "Sources behind the answer",
+    journey: "How the answer was checked",
     journeyNote: "Recorded backend steps – not the AI's hidden reasoning.",
-    error: "The question could not be answered with a verified response.",
-    retry: "You can try again without restarting the incident.",
-    expired: "The incident receipt has expired. History remains visible, but no new questions can be asked.",
-    replayNote: "The recording uses fixed verified questions. Start a live incident to type freely.",
+    verified: "Verified by Java · read-only · 0 changes",
+    bounded: "The answer stayed within this incident",
+    error: "I could not provide a verified answer.",
+    retry: "Try again without restarting the investigation.",
+    expired: "The incident has expired. The conversation remains, but new questions are closed.",
+    unavailable: "The conclusion remains readable, but this run cannot accept questions.",
   },
 } as const;
 
@@ -120,136 +130,143 @@ function createTurnId() {
   return `incident-follow-up-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function claimsForSection(
-  claims: IncidentLabFollowUpClaim[],
-  section: IncidentLabFollowUpClaim["section"],
-) {
-  return claims.filter((claim) => claim.section === section);
+function humanise(value: string) {
+  return value.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase());
 }
 
-function SourceLinks({
-  claim,
+function lastAnsweredTurn(turns: ChatTurn[]) {
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    if (turns[index].response) return turns[index].response;
+  }
+  return null;
+}
+
+function CitationButtons({
   citations,
-  locale,
+  label,
   onOpenCitation,
 }: {
-  claim: IncidentLabFollowUpClaim | undefined;
   citations: IncidentLabFollowUpCitation[];
-  locale: KnowledgeRagLocale;
+  label: string;
   onOpenCitation: (citation: IncidentLabFollowUpCitation) => void;
 }) {
-  const copy = labels[locale];
-  if (!claim || claim.citation_ids.length === 0) return null;
-  const citationById = new Map(citations.map((citation) => [citation.evidence_id, citation]));
-  const linked = claim.citation_ids
-    .map((id) => citationById.get(id))
-    .filter((citation): citation is IncidentLabFollowUpCitation => citation !== undefined);
-  if (linked.length === 0) return null;
-
+  if (citations.length === 0) return null;
   return (
-    <span className="incident-followup-sources" aria-label={copy.sources}>
-      {linked.map((citation) => (
-        <button
-          key={citation.evidence_id}
-          type="button"
-          title={citation.label}
-          onClick={() => onOpenCitation(citation)}
-        >
-          <span>{citation.label}</span>
-          <code translate="no">{citation.evidence_id}</code>
+    <div className="incident-chat-source-list" aria-label={label}>
+      {citations.map((citation) => (
+        <button key={citation.evidence_id} type="button" onClick={() => onOpenCitation(citation)}>
+          <span aria-hidden="true">↗</span>
+          {citation.label}
         </button>
       ))}
-    </span>
-  );
-}
-
-function AnswerSection({
-  title,
-  value,
-  certainty,
-  claim,
-  citations,
-  locale,
-  onOpenCitation,
-}: {
-  title: string;
-  value: string;
-  certainty?: string;
-  claim: IncidentLabFollowUpClaim | undefined;
-  citations: IncidentLabFollowUpCitation[];
-  locale: KnowledgeRagLocale;
-  onOpenCitation: (citation: IncidentLabFollowUpCitation) => void;
-}) {
-  const copy = labels[locale];
-  return (
-    <section className="incident-followup-report__section">
-      <h6>{title}</h6>
-      <p>{value}</p>
-      {certainty ? <small><strong>{copy.certainty}:</strong> {certainty}</small> : null}
-      <SourceLinks claim={claim} citations={citations} locale={locale} onOpenCitation={onOpenCitation} />
-    </section>
+    </div>
   );
 }
 
 function AgentMovement({
   steps,
-  citations,
   locale,
-  onOpenCitation,
 }: {
   steps: IncidentLabFollowUpStep[];
-  citations: IncidentLabFollowUpCitation[];
   locale: KnowledgeRagLocale;
-  onOpenCitation: (citation: IncidentLabFollowUpCitation) => void;
 }) {
   const copy = labels[locale];
-  const citationById = new Map(citations.map((citation) => [citation.evidence_id, citation]));
+  if (steps.length === 0) return null;
   const orderedSteps = [...steps].sort((left, right) => left.sequence - right.sequence);
-
-  if (orderedSteps.length === 0) return null;
-
   return (
-    <section className="incident-followup-journey" aria-label={copy.journey}>
+    <section className="incident-chat-process" aria-label={copy.journey}>
       <header>
-        <h6>{copy.journey}</h6>
-        <p>{copy.journeyNote}</p>
+        <strong>{copy.journey}</strong>
+        <span>{copy.journeyNote}</span>
       </header>
       <ol>
-        {orderedSteps.map((step) => {
-          const linked = step.evidence_ids
-            .map((id) => citationById.get(id))
-            .filter((citation): citation is IncidentLabFollowUpCitation => citation !== undefined);
-          const completed = step.status === "completed";
-          return (
-            <li key={`${step.sequence}-${step.code}`} data-status={step.status}>
-              <span aria-hidden="true">{completed ? "✓" : "!"}</span>
-              <div>
-                <small>{String(step.sequence).padStart(2, "0")}</small>
-                <p>{step.summary}</p>
-                {linked.length > 0 ? (
-                  <span className="incident-followup-sources">
-                    {linked.slice(0, 2).map((citation) => (
-                      <button
-                        key={citation.evidence_id}
-                        type="button"
-                        title={citation.label}
-                        onClick={() => onOpenCitation(citation)}
-                      >
-                        <span>{citation.label}</span>
-                        <code translate="no">{citation.evidence_id}</code>
-                      </button>
-                    ))}
-                    {linked.length > 2 ? (
-                      <em>+{linked.length - 2} {locale === "sv" ? "källor" : "sources"}</em>
-                    ) : null}
-                  </span>
-                ) : null}
-              </div>
-            </li>
-          );
-        })}
+        {orderedSteps.map((step) => (
+          <li key={`${step.sequence}-${step.code}`} data-status={step.status}>
+            <span aria-hidden="true">{step.status === "completed" ? "✓" : "!"}</span>
+            <p>{step.summary}</p>
+          </li>
+        ))}
       </ol>
     </section>
+  );
+}
+
+function ConclusionMessage({
+  run,
+  locale,
+  mode,
+  technicalDetailsOpen,
+  onToggleTechnicalDetails,
+  onOpenEvidenceScene,
+}: {
+  run: IncidentLabRunResponse;
+  locale: KnowledgeRagLocale;
+  mode: IncidentLabFollowUpMode;
+  technicalDetailsOpen: boolean;
+  onToggleTechnicalDetails: () => void;
+  onOpenEvidenceScene: (target: IncidentLabFollowUpCitation["target_scene"]) => void;
+}) {
+  const copy = labels[locale];
+  const presentation = run.localized_presentations[locale];
+  const developerResponse = presentation.developer_response;
+  const location = developerResponse.affected_service
+    ? humanise(developerResponse.affected_service)
+    : run.alarm_receipt?.service
+      ? humanise(run.alarm_receipt.service)
+      : "–";
+  const unknown = presentation.business_response.what_remains_unknown[0] ?? null;
+  const cause = run.answer_state === "diagnosed" && developerResponse.root_cause_code
+    ? humanise(developerResponse.root_cause_code)
+    : unknown ?? "–";
+  const title = run.answer_state === "withheld"
+    ? copy.withheldTitle
+    : presentation.business_response.headline;
+
+  return (
+    <div className="message-row message-row--assistant incident-answer-chat__opening">
+      <span className="message-avatar" aria-hidden="true">N</span>
+      <article className="message-bubble message-bubble--assistant incident-conclusion" aria-label={copy.complete}>
+        <div className="incident-conclusion__status">
+          <span aria-hidden="true" />
+          {copy.complete}
+          <em>{mode === "live_ai" ? copy.liveMode : copy.replayMode}</em>
+        </div>
+        <h4>{title}</h4>
+        <p>{presentation.business_response.what_happened}</p>
+        <p className="incident-conclusion__fact"><strong>{copy.impact}:</strong> {presentation.business_response.impact}</p>
+        {unknown ? <p className="incident-conclusion__unknown"><strong>{copy.unknown}:</strong> {unknown}</p> : null}
+        <p className="incident-conclusion__prompt">{copy.askPrompt}</p>
+
+        <details className="incident-chat-disclosure incident-chat-disclosure--conclusion">
+          <summary>
+            <span>{copy.showEvidence}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </summary>
+          <div className="incident-chat-disclosure__body">
+            <dl className="incident-conclusion__evidence">
+              <div><dt>{copy.location}</dt><dd>{location}</dd></div>
+              <div><dt>{copy.cause}</dt><dd>{cause}</dd></div>
+              <div><dt>{copy.evidenceImpact}</dt><dd>{presentation.business_response.impact}</dd></div>
+            </dl>
+            <div className="incident-conclusion__source-actions">
+              <button type="button" onClick={() => onOpenEvidenceScene("logs")}>{copy.logs}</button>
+              <button type="button" onClick={() => onOpenEvidenceScene("agent_rag")}>{copy.rag}</button>
+              <button type="button" onClick={() => onOpenEvidenceScene("java")}>{copy.java}</button>
+            </div>
+            <p className="incident-conclusion__boundary">{presentation.action_receipt.summary}</p>
+            <button
+              className="incident-conclusion__technical"
+              type="button"
+              aria-expanded={technicalDetailsOpen}
+              aria-controls="incident-investigation-details"
+              onClick={onToggleTechnicalDetails}
+            >
+              {technicalDetailsOpen ? copy.hideTechnical : copy.technical}
+            </button>
+          </div>
+        </details>
+      </article>
+    </div>
   );
 }
 
@@ -263,128 +280,39 @@ function FollowUpAnswer({
   onOpenCitation: (citation: IncidentLabFollowUpCitation) => void;
 }) {
   const copy = labels[locale];
-  if (response.answer_state !== "answered") {
-    return (
-      <article className="message-bubble message-bubble--assistant incident-followup-answer" aria-label={copy.answerLabel}>
-        <div className="incident-followup-answer__mode" data-mode={response.mode}>
-          <span aria-hidden="true" />
-          {response.mode === "live_ai"
-            ? `${copy.blockedMode} · ${response.receipt.provider_calls} ${locale === "sv" ? "AI-anrop" : "AI calls"}`
-            : copy.replayMode}
-        </div>
-        <p className="incident-followup-answer__lead">{response.answer.text}</p>
-        <p className="incident-followup-answer__boundary">{response.answer.boundary}</p>
-        <div className="incident-followup-answer__verification incident-followup-answer__verification--bounded">
-          <span aria-hidden="true">!</span>
-          <p>
-            <strong>{copy.bounded}</strong>
-            <small>{response.receipt.provider_calls} {copy.boundedReceipt}</small>
-          </p>
-        </div>
-      </article>
-    );
-  }
-  const problemClaims = claimsForSection(response.claims, "problem_location");
-  const causeClaims = claimsForSection(response.claims, "cause");
-  const impactClaims = claimsForSection(response.claims, "customer_impact");
-  const knownClaims = claimsForSection(response.claims, "known");
-  const unknownClaims = claimsForSection(response.claims, "unknown");
-  const problemLocation = response.answer.problem_location.service
-    ? `${response.answer.problem_location.service} · ${response.answer.problem_location.summary}`
-    : response.answer.problem_location.summary;
-
+  const answered = response.answer_state === "answered";
   return (
-    <article className="message-bubble message-bubble--assistant incident-followup-answer" aria-label={copy.answerLabel}>
-      <div className="incident-followup-answer__mode" data-mode={response.mode}>
-        <span aria-hidden="true" />
-        {response.mode === "live_ai" ? copy.liveMode : copy.replayMode}
-      </div>
-      <p className="incident-followup-answer__lead">{response.answer.text}</p>
-
-      <div className="incident-followup-report">
-          <AnswerSection
-            title={copy.problem}
-            value={problemLocation}
-            certainty={response.answer.problem_location.certainty}
-            claim={problemClaims[0]}
-            citations={response.citations}
-            locale={locale}
-            onOpenCitation={onOpenCitation}
-          />
-          <AnswerSection
-            title={copy.cause}
-            value={response.answer.cause.summary}
-            certainty={response.answer.cause.certainty}
-            claim={causeClaims[0]}
-            citations={response.citations}
-            locale={locale}
-            onOpenCitation={onOpenCitation}
-          />
-          <AnswerSection
-            title={copy.impact}
-            value={response.answer.customer_impact}
-            claim={impactClaims[0]}
-            citations={response.citations}
-            locale={locale}
-            onOpenCitation={onOpenCitation}
-          />
-
-          <div className="incident-followup-report__knowledge">
-            <section>
-              <h6>{copy.known}</h6>
-              <ul>
-                {response.answer.known.map((item, index) => (
-                  <li key={`${item}-${index}`}>
-                    <span>{item}</span>
-                    <SourceLinks
-                      claim={knownClaims.find((claim) => claim.text === item) ?? knownClaims[index]}
-                      citations={response.citations}
-                      locale={locale}
-                      onOpenCitation={onOpenCitation}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <section>
-              <h6>{copy.unknown}</h6>
-              <ul>
-                {response.answer.unknown.map((item, index) => (
-                  <li key={`${item}-${index}`}>
-                    <span>{item}</span>
-                    <SourceLinks
-                      claim={unknownClaims.find((claim) => claim.text === item) ?? unknownClaims[index]}
-                      citations={response.citations}
-                      locale={locale}
-                      onOpenCitation={onOpenCitation}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
+    <article className="message-bubble message-bubble--assistant incident-chat-answer" aria-label={copy.answerLabel}>
+      <p>{response.answer.text}</p>
+      {answered ? (
+        <details className="incident-chat-disclosure incident-chat-disclosure--turn">
+          <summary>
+            <span>{copy.evidenceCount(response.citations.length)}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </summary>
+          <div className="incident-chat-disclosure__body">
+            <CitationButtons citations={response.citations} label={copy.sources} onOpenCitation={onOpenCitation} />
+            <AgentMovement steps={response.steps} locale={locale} />
+            <p className="incident-chat-answer__boundary">{response.answer.boundary}</p>
+            <small className="incident-chat-answer__verified">{copy.verified}</small>
           </div>
-      </div>
-
-      <AgentMovement
-        steps={response.steps}
-        citations={response.citations}
-        locale={locale}
-        onOpenCitation={onOpenCitation}
-      />
-      <p className="incident-followup-answer__boundary">{response.answer.boundary}</p>
-      <div className="incident-followup-answer__verification">
-        <span aria-hidden="true">✓</span>
-        <p><strong>{copy.verified}</strong><small>{copy.readOnly}</small></p>
-      </div>
+        </details>
+      ) : (
+        <p className="incident-chat-answer__bounded">{copy.bounded} · {response.answer.boundary}</p>
+      )}
     </article>
   );
 }
 
 export default function IncidentFollowUpChat({
   locale,
+  run,
   runReference,
   mode,
+  technicalDetailsOpen,
+  onToggleTechnicalDetails,
   onOpenCitation,
+  onOpenEvidenceScene,
 }: IncidentFollowUpChatProps) {
   const copy = labels[locale];
   const [question, setQuestion] = useState("");
@@ -394,11 +322,8 @@ export default function IncidentFollowUpChat({
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const latestTurnRef = useRef<HTMLElement | null>(null);
   const pending = turns.some((turn) => turn.pending);
-  const lastResponse = [...turns].reverse().find((turn) => turn.response)?.response ?? null;
-  const suggestions = useMemo(
-    () => lastResponse?.suggested_questions ?? INITIAL_SUGGESTIONS[locale],
-    [lastResponse, locale],
-  );
+  const latestResponse = lastAnsweredTurn(turns);
+  const suggestions = (latestResponse?.suggested_questions ?? INITIAL_SUGGESTIONS[locale]).slice(0, 3);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -413,7 +338,7 @@ export default function IncidentFollowUpChat({
 
   async function ask(nextQuestion: string, suggestionId: string | null) {
     const normalized = nextQuestion.trim();
-    if (!normalized || pending || expired) return;
+    if (!runReference || !normalized || pending || expired) return;
     if (mode === "recorded_replay" && !suggestionId) return;
 
     const controller = new AbortController();
@@ -469,20 +394,19 @@ export default function IncidentFollowUpChat({
   }
 
   return (
-    <section className="incident-followup" aria-labelledby="incident-followup-title">
-      <header className="incident-followup__header">
-        <p>{copy.eyebrow}</p>
-        <h4 id="incident-followup-title">{copy.title}</h4>
-        <span>{copy.lead}</span>
-      </header>
+    <section className="incident-answer-chat" aria-label={copy.region}>
+      <ConclusionMessage
+        run={run}
+        locale={locale}
+        mode={mode}
+        technicalDetailsOpen={technicalDetailsOpen}
+        onToggleTechnicalDetails={onToggleTechnicalDetails}
+        onOpenEvidenceScene={onOpenEvidenceScene}
+      />
 
       <div className="incident-followup__thread" aria-busy={pending}>
         {turns.map((turn, index) => (
-          <article
-            className="incident-followup-turn"
-            key={turn.id}
-            ref={index === turns.length - 1 ? latestTurnRef : undefined}
-          >
+          <article className="incident-followup-turn" key={turn.id} ref={index === turns.length - 1 ? latestTurnRef : undefined}>
             <div className="message-row message-row--user">
               <div className="message-bubble message-bubble--user">{turn.question}</div>
             </div>
@@ -518,45 +442,44 @@ export default function IncidentFollowUpChat({
         ))}
       </div>
 
-      <div className="incident-followup__suggestions" aria-label={copy.suggestions}>
-        {suggestions.map((suggestion) => (
-          <button
-            key={suggestion.id}
-            type="button"
-            disabled={pending || expired}
-            onClick={() => void ask(suggestion.label, suggestion.id)}
-          >
-            {suggestion.label}
-          </button>
-        ))}
-      </div>
+      {runReference ? (
+        <div className="incident-answer-chat__controls">
+          <p>{mode === "recorded_replay" ? copy.exploreReplay : copy.exploreLive}</p>
+          <div className="incident-followup__suggestions" aria-label={copy.suggestions}>
+            {suggestions.map((suggestion) => (
+              <button key={suggestion.id} type="button" disabled={pending || expired} onClick={() => void ask(suggestion.label, suggestion.id)}>
+                {suggestion.label}
+              </button>
+            ))}
+          </div>
 
-      <form className="incident-followup__composer" onSubmit={submit}>
-        <label className="sr-only" htmlFor="incident-followup-question">{copy.inputLabel}</label>
-        <textarea
-          id="incident-followup-question"
-          ref={inputRef}
-          name="incident_followup_question"
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={mode === "live_ai" ? copy.placeholder : copy.replayPlaceholder}
-          disabled={pending || expired || mode === "recorded_replay"}
-          maxLength={500}
-          rows={1}
-          autoComplete="off"
-        />
-        <button
-          type="submit"
-          disabled={pending || expired || mode === "recorded_replay" || !question.trim()}
-        >
-          <span>{pending ? copy.sending : mode === "live_ai" ? copy.liveSend : copy.replaySend}</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 11-6-3.2 12-2.1-4.1L6 12Zm5.7 1.9L17 6" /></svg>
-        </button>
-      </form>
-      <p className="incident-followup__note">
-        {mode === "recorded_replay" ? copy.replayNote : copy.readOnly}
-      </p>
+          {mode === "live_ai" ? (
+            <form className="incident-followup__composer" onSubmit={submit}>
+              <label className="sr-only" htmlFor="incident-followup-question">{copy.inputLabel}</label>
+              <textarea
+                id="incident-followup-question"
+                ref={inputRef}
+                name="incident_followup_question"
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={copy.placeholder}
+                disabled={pending || expired}
+                maxLength={500}
+                rows={1}
+                autoComplete="off"
+              />
+              <button type="submit" disabled={pending || expired || !question.trim()}>
+                <span>{pending ? copy.sending : copy.send}</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 11-6-3.2 12-2.1-4.1L6 12Zm5.7 1.9L17 6" /></svg>
+              </button>
+            </form>
+          ) : null}
+          <small className="incident-followup__note">{mode === "recorded_replay" ? copy.replayNote : copy.liveNote}</small>
+        </div>
+      ) : (
+        <p className="incident-followup-unavailable">{copy.unavailable}</p>
+      )}
     </section>
   );
 }

@@ -401,16 +401,17 @@ describe("Incident Lab recruiter portal", () => {
     expect(runRequest?.body).not.toHaveProperty("seed");
     expect(runRequest?.body).not.toHaveProperty("evidence_mode");
 
-    await user.click(screen.getByRole("button", { name: /Svar$/ }));
-    expect(await screen.findByRole("heading", { name: "Fråga Driftagenten om den här körningen." })).toBeVisible();
-    const followUpInput = screen.getByLabelText("Din fråga om utredningen");
+    await user.click(screen.getByRole("button", { name: "Driftagent" }));
+    expect(await screen.findByRole("heading", { name: "Inget larm behövde utredas" })).toBeVisible();
+    const followUpInput = screen.getByLabelText("Fråga Driftagenten om larmet");
     expect(followUpInput).toBeEnabled();
     await user.type(followUpInput, "Hur vet du det?");
-    await user.click(screen.getByRole("button", { name: "Visa avgörande loggar" }));
-    await user.click(screen.getByRole("button", { name: /Svar$/ }));
-    expect(screen.getByLabelText("Din fråga om utredningen")).toHaveValue("Hur vet du det?");
+    await user.click(screen.getByText("Visa underlag och källor"));
+    await user.click(screen.getByRole("button", { name: "Öppna loggarna" }));
+    await user.click(screen.getByRole("button", { name: "Driftagent" }));
+    expect(screen.getByLabelText("Fråga Driftagenten om larmet")).toHaveValue("Hur vet du det?");
     expect(screen.queryByText("Fortsätt observera testmiljön.")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Öppna tekniskt kvitto" }));
+    await user.click(screen.getByRole("button", { name: "Visa tekniskt kvitto" }));
     expect(await screen.findByText("Fortsätt observera testmiljön.")).toBeVisible();
   });
 
@@ -432,12 +433,12 @@ describe("Incident Lab recruiter portal", () => {
     await screen.findByText("Live AI redo");
     await user.click(screen.getByRole("button", { name: /Skapa ett säkert testfall/ }));
     await user.click(await screen.findByRole("button", { name: "Starta larmet" }));
-    await user.click(await screen.findByRole("button", { name: /Svar$/ }));
+    await user.click(await screen.findByRole("button", { name: "Driftagent" }));
 
     expect(await screen.findByText(
-      "Körningen saknar ett giltigt följdfrågekvitto. Rapporten är läsbar, men chatten öppnas inte.",
+      "Slutsatsen går att läsa, men den här körningen kan inte ta emot frågor.",
     )).toBeVisible();
-    expect(screen.queryByLabelText("Din fråga om utredningen")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Fråga Driftagenten om larmet")).not.toBeInTheDocument();
   });
 
   it("keeps a blocked planning result visible and never starts the run", async () => {
@@ -591,9 +592,10 @@ describe("Incident Lab recruiter portal", () => {
 
     expect(await screen.findByRole("heading", { name: "Följ vad som hände – i rätt ordning." })).toBeVisible();
     expect(screen.getByText("Verifierad repris · ingen AI körs nu")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /Svar$/ }));
+    await user.click(screen.getByRole("button", { name: "Driftagent" }));
     expect(await screen.findByRole("heading", { name: "Inget larm behövde utredas" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Öppna tekniskt kvitto" }));
+    await user.click(screen.getByText("Visa underlag och källor"));
+    await user.click(screen.getByRole("button", { name: "Visa tekniskt kvitto" }));
     expect(screen.getByText(/0 provideranrop · 0 modellanrop · 0 embeddings/)).toBeVisible();
     expect(screen.getByText(/Källinnehåll abcdef123456… · runtime-build ej verifierad · checksumma verifierad vid start/)).toBeVisible();
   });

@@ -2,7 +2,53 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import IncidentFollowUpChat from "./IncidentFollowUpChat";
-import type { IncidentLabFollowUpResponse } from "./api/generated";
+import type { IncidentLabFollowUpResponse, IncidentLabRunResponse } from "./api/generated";
+
+const run = {
+  answer_state: "withheld",
+  alarm_receipt: { service: "CATALOG_SERVICE" },
+  localized_presentations: {
+    sv: {
+      business_response: {
+        headline: "Nordly hittade ett tydligt felmönster.",
+        what_happened: "Katalogtjänsten började visa äldre data efter releasen.",
+        impact: "Vissa produktvisningar fick äldre pris- och lagerdata.",
+        what_is_known: ["Tre katalogversioner observerades."],
+        what_remains_unknown: ["Rotorsaken är inte verifierad."],
+      },
+      developer_response: {
+        affected_service: "catalog_service",
+        root_cause_code: null,
+      },
+      action_receipt: {
+        summary: "Agenten läste underlaget men ändrade ingenting.",
+      },
+    },
+    en: {
+      business_response: {
+        headline: "Nordly found a clear failure pattern.",
+        what_happened: "The catalogue service began returning older data after the release.",
+        impact: "Some product views received older price and stock data.",
+        what_is_known: ["Three catalogue versions were observed."],
+        what_remains_unknown: ["The root cause is not verified."],
+      },
+      developer_response: {
+        affected_service: "catalog_service",
+        root_cause_code: null,
+      },
+      action_receipt: {
+        summary: "The agent read the evidence and changed nothing.",
+      },
+    },
+  },
+} as IncidentLabRunResponse;
+
+const sharedProps = {
+  run,
+  technicalDetailsOpen: false,
+  onToggleTechnicalDetails: vi.fn(),
+  onOpenEvidenceScene: vi.fn(),
+};
 
 function response(
   mode: IncidentLabFollowUpResponse["mode"] = "live_ai",
@@ -170,6 +216,7 @@ describe("Incident follow-up chat", () => {
 
     render(
       <IncidentFollowUpChat
+        {...sharedProps}
         locale="sv"
         runReference="run-ref-1"
         mode="live_ai"
@@ -177,12 +224,17 @@ describe("Incident follow-up chat", () => {
       />,
     );
 
-    const input = screen.getByLabelText("Din fråga om utredningen");
+    expect(screen.getByText("Jag kan se problemet – men inte bevisa orsaken än.")).toBeVisible();
+    const input = screen.getByLabelText("Fråga Driftagenten om larmet");
     await user.type(input, "Hur vet du det?{Enter}");
 
     expect(await screen.findByText("Jag följde tre källbundna signaler till katalogtjänsten.")).toBeVisible();
-    expect(screen.getByText("Var finns problemet?")).toBeVisible();
-    expect(screen.getByRole("region", { name: "Så kom jag fram till svaret" })).toBeVisible();
+    const evidenceSummary = screen.getByText("Visa 3 källor och kontroll");
+    const evidenceDetails = evidenceSummary.closest("details");
+    expect(evidenceDetails).not.toHaveAttribute("open");
+    await user.click(evidenceSummary);
+    expect(evidenceDetails).toHaveAttribute("open");
+    expect(screen.getByRole("region", { name: "Så kontrollerades svaret" })).toBeVisible();
     expect(screen.getByText("Frågan kontrollerades mot den avgränsade incidenten.")).toBeVisible();
     expect(screen.getByText("Java verifierade källomfång, tillstånd och handlingsgräns.")).toBeVisible();
     expect(requests[0]).toMatchObject({
@@ -239,6 +291,7 @@ describe("Incident follow-up chat", () => {
 
     render(
       <IncidentFollowUpChat
+        {...sharedProps}
         locale="sv"
         runReference="run-ref-1"
         mode="live_ai"
@@ -246,12 +299,11 @@ describe("Incident follow-up chat", () => {
       />,
     );
 
-    const input = screen.getByLabelText("Din fråga om utredningen");
+    const input = screen.getByLabelText("Fråga Driftagenten om larmet");
     await user.type(input, "Ge mig kundens lön{Enter}");
     expect(await screen.findByText("Den frågan ligger utanför den här incidenten.")).toBeVisible();
-    expect(screen.queryByText("Var finns problemet?")).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Så kom jag fram till svaret" })).not.toBeInTheDocument();
-    expect(screen.getByText("0 AI-anrop · Endast läsning · 0 ändringar")).toBeVisible();
+    expect(screen.queryByRole("region", { name: "Så kontrollerades svaret" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Svaret hölls inom den här incidenten/)).toBeVisible();
     await user.type(input, "Vilka källor finns?{Enter}");
     await waitFor(() => expect(requests).toHaveLength(2));
 
@@ -272,6 +324,7 @@ describe("Incident follow-up chat", () => {
 
     render(
       <IncidentFollowUpChat
+        {...sharedProps}
         locale="sv"
         runReference="replay-ref-1"
         mode="recorded_replay"
@@ -279,14 +332,15 @@ describe("Incident follow-up chat", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Din fråga om utredningen")).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: "Hur kom du fram till slutsatsen?" }));
+    expect(screen.queryByLabelText("Fråga Driftagenten om larmet")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Hur vet du det?" }));
 
-    expect(await screen.findByText("Verifierad återspelning · 0 nya AI-anrop")).toBeVisible();
+    expect(await screen.findByText("Jag följde tre källbundna signaler till katalogtjänsten.")).toBeVisible();
+    expect(screen.getByText("Verifierad demo")).toBeVisible();
     expect(requests).toEqual([expect.objectContaining({
       run_reference: "replay-ref-1",
       suggestion_id: "how_conclusion",
-      question: "Hur kom du fram till slutsatsen?",
+      question: "Hur vet du det?",
       confirm_live_ai: false,
     })]);
     expect(requests[0]).not.toHaveProperty("recent_turns");

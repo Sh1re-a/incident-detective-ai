@@ -116,7 +116,7 @@ const copy = {
     playbackLive:
       "Återspelning av registrerade backendhändelser · AI-körningen är redan avslutad",
     playbackRecorded: "Verifierad repris · ingen AI körs nu",
-    sceneNames: ["Loggar", "Larm", "Agent + RAG", "Java", "Svar"],
+    sceneNames: ["Loggar", "Larm", "Agent + RAG", "Java", "Driftagent"],
     sceneLogsKicker: "01 · SYSTEMET SIGNALERAR",
     sceneLogsTitle: "Loggarna visar att något har förändrats.",
     sceneLogsLead:
@@ -261,7 +261,7 @@ const copy = {
     playbackTitle: "Follow what happened – in the right order.",
     playbackLive: "Replay of registered backend events · the AI run has already finished",
     playbackRecorded: "Verified recording · no AI is running now",
-    sceneNames: ["Logs", "Alert", "Agent + RAG", "Java", "Answer"],
+    sceneNames: ["Logs", "Alert", "Agent + RAG", "Java", "Incident agent"],
     sceneLogsKicker: "01 · THE SYSTEM SIGNALS",
     sceneLogsTitle: "The logs show that something changed.",
     sceneLogsLead:
@@ -741,91 +741,6 @@ function PlaybackJava({
   );
 }
 
-function PlaybackAnswer({
-  run,
-  locale,
-  detailsOpen,
-  onToggleDetails,
-  onSelectScene,
-}: {
-  run: IncidentLabRunResponse;
-  locale: KnowledgeRagLocale;
-  detailsOpen: boolean;
-  onToggleDetails: () => void;
-  onSelectScene: (scene: number) => void;
-}) {
-  const labels = copy[locale];
-  const presentation = run.localized_presentations[locale];
-  const developerResponse = presentation.developer_response;
-  const problemLocation = developerResponse.affected_service
-    ? humanise(developerResponse.affected_service)
-    : run.alarm_receipt?.service
-      ? `${labels.signalFrom} ${humanise(run.alarm_receipt.service)}`
-      : "–";
-  const cause = run.answer_state === "diagnosed" && developerResponse.root_cause_code
-    ? humanise(developerResponse.root_cause_code)
-    : presentation.business_response.what_remains_unknown[0] ?? labels.causeUnavailable;
-
-  return (
-    <div className="incident-playback-scene incident-playback-scene--answer">
-      <p className="incident-playback-scene__kicker">{labels.sceneAnswerKicker}</p>
-      <h3>{run.answer_state === "withheld" ? labels.safeWithheldTitle : presentation.business_response.headline}</h3>
-      <div className="incident-answer-analysis">
-        <span>{labels.analysis}</span>
-        <p className="incident-answer-copy">{presentation.business_response.what_happened}</p>
-      </div>
-      <dl className="incident-answer-summary">
-        <div>
-          <dt>{labels.location}</dt>
-          <dd>{problemLocation}</dd>
-        </div>
-        <div>
-          <dt>{labels.cause}</dt>
-          <dd>{cause}</dd>
-        </div>
-        <div>
-          <dt>{labels.impact}</dt>
-          <dd>{presentation.business_response.impact}</dd>
-        </div>
-      </dl>
-      <div className="incident-answer-knowledge">
-        <section>
-          <h4>{labels.known}</h4>
-          <ul>{presentation.business_response.what_is_known.map((item) => <li key={item}>{item}</li>)}</ul>
-        </section>
-        <section>
-          <h4>{labels.unknown}</h4>
-          {presentation.business_response.what_remains_unknown.length > 0 ? (
-            <ul>{presentation.business_response.what_remains_unknown.map((item) => <li key={item}>{item}</li>)}</ul>
-          ) : <p>{labels.nothingUnknown}</p>}
-        </section>
-      </div>
-      <div className="incident-answer-boundary" data-state={run.answer_state}>
-        <span aria-hidden="true">{run.answer_state === "diagnosed" ? "✓" : "!"}</span>
-        <p><strong>{presentation.action_receipt.summary}</strong></p>
-      </div>
-      <div className="incident-answer-explore">
-        <span>{labels.explore}</span>
-        <div>
-          <button type="button" onClick={() => onSelectScene(0)}>{labels.askLogs}</button>
-          <button type="button" onClick={() => onSelectScene(2)}>{labels.askRag}</button>
-          <button type="button" onClick={() => onSelectScene(3)}>{labels.askBoundary}</button>
-        </div>
-      </div>
-      <button
-        className="incident-technical-toggle"
-        type="button"
-        aria-expanded={detailsOpen}
-        aria-controls="incident-investigation-details"
-        onClick={onToggleDetails}
-      >
-        <span>{detailsOpen ? labels.hideTechnical : labels.technical}</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d={detailsOpen ? "m6 14 6-6 6 6" : "m6 10 6 6 6-6"} /></svg>
-      </button>
-    </div>
-  );
-}
-
 function IncidentPlayback({
   run,
   locale,
@@ -896,6 +811,15 @@ function IncidentPlayback({
     setScene(sceneByTarget[citation.target_scene]);
   }
 
+  function openEvidenceScene(target: IncidentLabFollowUpCitation["target_scene"]) {
+    const sceneByTarget: Record<IncidentLabFollowUpCitation["target_scene"], number> = {
+      logs: 0,
+      agent_rag: 2,
+      java: 3,
+    };
+    selectScene(sceneByTarget[target]);
+  }
+
   return (
     <article ref={playbackRef} className="incident-playback" aria-labelledby="incident-playback-title">
       <header className="incident-playback__header">
@@ -938,27 +862,18 @@ function IncidentPlayback({
           />
         ) : null}
         {scene === 3 ? <PlaybackJava run={run} locale={locale} /> : null}
-        {scene === 4 ? (
-          <PlaybackAnswer
-            run={run}
+        <div hidden={scene !== 4}>
+          <IncidentFollowUpChat
             locale={locale}
-            detailsOpen={detailsOpen}
-            onToggleDetails={onToggleDetails}
-            onSelectScene={selectScene}
+            run={run}
+            runReference={followUpReference}
+            mode={replay ? "recorded_replay" : "live_ai"}
+            technicalDetailsOpen={detailsOpen}
+            onToggleTechnicalDetails={onToggleDetails}
+            onOpenCitation={openCitation}
+            onOpenEvidenceScene={openEvidenceScene}
           />
-        ) : null}
-        {followUpReference ? (
-          <div hidden={scene !== 4}>
-            <IncidentFollowUpChat
-              locale={locale}
-              runReference={followUpReference}
-              mode={replay ? "recorded_replay" : "live_ai"}
-              onOpenCitation={openCitation}
-            />
-          </div>
-        ) : scene === 4 ? (
-          <p className="incident-followup-unavailable">{labels.followUpUnavailable}</p>
-        ) : null}
+        </div>
       </div>
 
       <footer className="incident-playback__controls">
