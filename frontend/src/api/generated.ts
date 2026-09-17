@@ -127,8 +127,82 @@ export interface PromptCacheCapability {
   cache_hit_claims_require_provider_metadata: boolean;
 }
 
+export type DiagnosticProbeId =
+  | "service_health"
+  | "dependency_status"
+  | "release_metadata"
+  | "config_fingerprint_diff";
+
+export interface DiagnosticProbeCapability {
+  function_name: "run_diagnostic_probe";
+  allowed_probe_ids: DiagnosticProbeId[];
+  case_bound: boolean;
+  read_only: boolean;
+  action_executed: false;
+}
+
+export interface LocalizedCopy {
+  sv: string;
+  en: string;
+}
+
+export type IncidentService =
+  | "storefront"
+  | "checkout_api"
+  | "payment_adapter"
+  | "catalog_service"
+  | "order_service"
+  | "order_event_consumer"
+  | "inventory_service";
+
+export interface IncidentFamilyCapability {
+  id: GeneratedIncidentFamily;
+  label: LocalizedCopy;
+  description: LocalizedCopy;
+  customer_impact: LocalizedCopy;
+  service: IncidentService;
+  alarm_signal: string;
+  alarm_signal_concept: LocalizedCopy;
+}
+
+export interface IncidentLabToolCapability {
+  function_name: "inspect_incident_evidence";
+  read_only: boolean;
+  case_bound: boolean;
+  read_operations: ToolName[];
+  diagnostic_probe_reference: "diagnostic_probe";
+  allowed_diagnostic_probe_ids: DiagnosticProbeId[];
+}
+
+export interface IncidentLabCapability {
+  enabled: boolean;
+  availability_reason:
+    | "enabled_by_configuration_not_health_checked"
+    | "rag_profile_required"
+    | "adk_disabled"
+    | "live_ai_disabled"
+    | "provider_routing_not_configured";
+  required_profiles: string[];
+  plan_contract_version: string;
+  run_contract_version: string;
+  orchestration: "sequential_agent";
+  expected_agent_order: string[];
+  delivery: "synchronous_post_run";
+  streaming: false;
+  alarm_required: true;
+  answer_states: IncidentLabAnswerState[];
+  explicit_confirmation_required: true;
+  synthetic_only: true;
+  write_tools_available: false;
+  action_executed: false;
+  human_approval_required: true;
+  registered_tool: IncidentLabToolCapability;
+  supported_locales: KnowledgeRagLocale[];
+  incident_families: IncidentFamilyCapability[];
+}
+
 export interface CapabilitiesResponse {
-  contract_version: "capabilities-v4";
+  contract_version: "capabilities-v5";
   synthetic_only: boolean;
   remediation_enabled: boolean;
   provider: ProviderCapability;
@@ -136,6 +210,8 @@ export interface CapabilitiesResponse {
   knowledge_corpus: KnowledgeCorpusCapability;
   modes: ModeCapability[];
   tools: ToolCapability[];
+  diagnostic_probe: DiagnosticProbeCapability;
+  incident_lab: IncidentLabCapability;
   live_ai: LiveAiCapability;
   generated_cases: GeneratedCasesCapability;
   retrieval: RetrievalCapability;
@@ -580,7 +656,7 @@ export interface AdkControlReceipt {
 }
 
 export interface AdkAgentTurnResponse {
-  contract_version: "nordly-adk-turn-v3";
+  contract_version: "nordly-adk-turn-v4";
   run_id: string;
   session_id: string | null;
   turn_id: string;
@@ -599,6 +675,237 @@ export interface AdkAgentTurnResponse {
   comparison: ReplayComparison | null;
   verification_event: AdkVerificationEvent | null;
   receipt: AdkControlReceipt;
+  limitations: string[];
+}
+
+export type LiveAiState =
+  | "available"
+  | "daily_budget_exhausted"
+  | "disabled"
+  | "not_configured";
+
+export interface LiveAiStatusResponse {
+  contract_version: "live-ai-status-v1";
+  live_state: LiveAiState;
+  reason_code: string;
+  resets_at: string | null;
+  retry_after_seconds: number | null;
+  replay_available: boolean;
+  daily_cost_guard_active: boolean;
+  quota_scope: "process_local" | "database_global";
+}
+
+export interface IncidentPlan {
+  contract_version: "incident-plan-v1";
+  incident_family: GeneratedIncidentFamily;
+  severity: string;
+  affected_services: string[];
+  summary: string;
+  synthetic_only: true;
+  write_actions_allowed: false;
+  human_approval_required: true;
+}
+
+export interface IncidentLabPlanProposal {
+  status: "candidate" | "unsupported";
+  summary: string;
+  incident_family: GeneratedIncidentFamily | null;
+  requested_severity: string | null;
+  affected_services: string[];
+  requested_blast_radius: string;
+}
+
+export interface IncidentLabPlanValidation {
+  decision: "APPROVED" | "NARROWED" | "REJECTED";
+  plan: IncidentPlan | null;
+  adjustments: string[];
+  rejection: { code: string; safe_message: string } | null;
+}
+
+export interface IncidentLabPlannerReceipt {
+  transport: string;
+  model: string;
+  provider_response_id: string | null;
+  token_usage: ModelTokenUsage | null;
+  latency_ms: number;
+}
+
+export interface IncidentLabPlanRequest {
+  instruction: string;
+  confirm_live_ai: boolean;
+}
+
+export interface IncidentLabPlanResponse {
+  contract_version: "incident-lab-plan-v1";
+  outcome: "plan_ready" | "plan_rejected" | "blocked_before_ai";
+  delivery: "synchronous_post_run" | "blocked_before_provider";
+  truth_label: string;
+  safety: IncidentLabSafetyDecision;
+  proposal: IncidentLabPlanProposal | null;
+  java_validation: IncidentLabPlanValidation | null;
+  provider_receipt: IncidentLabPlannerReceipt | null;
+  limitations: string[];
+}
+
+export interface IncidentLabSafetyDecision {
+  decision: "allowed" | "blocked";
+  reason_code: string;
+  summary_sv: string;
+  summary_en: string;
+}
+
+export interface IncidentLabRunRequest {
+  plan: IncidentPlan;
+  seed?: number;
+  evidence_mode?: GeneratedEvidenceMode;
+  confirm_live_ai: boolean;
+}
+
+export interface IncidentLabBusinessResponse {
+  headline: string;
+  what_happened: string;
+  impact: string;
+  what_is_known: string[];
+  what_remains_unknown: string[];
+  safe_next_step: string;
+  certainty: string;
+  human_approval_required: boolean;
+}
+
+export interface IncidentLabVerifiedClaim {
+  claim_code: string;
+  claim_value_code: string;
+  evidence_ids: string[];
+}
+
+export interface IncidentLabDeveloperResponse {
+  summary: string;
+  root_cause_code: string | null;
+  affected_service: string | null;
+  verified_claims: IncidentLabVerifiedClaim[];
+  highlighted_log_evidence_ids: string[];
+  missing_evidence_codes: string[];
+  failed_verification_checks: string[];
+  next_read: string;
+}
+
+export interface IncidentLabActionReceipt {
+  status: string;
+  read_operations: number;
+  write_tools_available: false;
+  action_executed: false;
+  human_approval_required: true;
+  proposed_next_step: string | null;
+  summary: string;
+}
+
+export interface IncidentLabLocalizedPresentation {
+  business_response: IncidentLabBusinessResponse;
+  developer_response: IncidentLabDeveloperResponse;
+  action_receipt: IncidentLabActionReceipt;
+}
+
+export interface IncidentLabAlarmReceipt {
+  alarm_id: string;
+  rule_id: string;
+  incident_family: GeneratedIncidentFamily;
+  scenario_id: string;
+  service: string;
+  triggered_at: string;
+  signal: {
+    name: string;
+    comparison: "at_least";
+    threshold_value: number;
+    observed_value: number;
+    unit: string;
+    lookback_seconds: number | null;
+  };
+  evidence_ids: string[];
+}
+
+export interface IncidentLabGenerationReceipt {
+  generator_version: string;
+  seed: number;
+  seed_origin: "server_generated" | "user_supplied";
+  incident_family: GeneratedIncidentFamily;
+  evidence_mode: GeneratedEvidenceMode;
+  noise_level: GeneratedNoiseLevel;
+  scenario_id: string;
+  variant: { variant_id: string; fingerprint: string };
+}
+
+export type IncidentLabAnswerState =
+  | "diagnosed"
+  | "insufficient_evidence"
+  | "withheld"
+  | "not_started";
+
+export interface IncidentLabRunResponse {
+  contract_version: "incident-lab-run-v3";
+  outcome: string;
+  delivery: "synchronous_post_run";
+  truth_label: string;
+  answer_state: IncidentLabAnswerState;
+  business_response: IncidentLabBusinessResponse;
+  developer_response: IncidentLabDeveloperResponse;
+  action_receipt: IncidentLabActionReceipt;
+  localized_presentations: Record<KnowledgeRagLocale, IncidentLabLocalizedPresentation>;
+  plan: IncidentPlan;
+  generation_receipt: IncidentLabGenerationReceipt;
+  scenario: Scenario;
+  backend_logs: LogEvidence[];
+  alarm_receipt: IncidentLabAlarmReceipt | null;
+  agent_turn: AdkAgentTurnResponse | null;
+  limitations: string[];
+}
+
+export interface IncidentLabReplayAvailabilityResponse {
+  contract_version: "incident-lab-replay-availability-v1";
+  available: boolean;
+  replay_contract_version: "incident-lab-replay-v1";
+  truth_label: string;
+  truth_label_en: string;
+  reason_code: string;
+}
+
+export interface IncidentLabReplayResponse {
+  contract_version: "incident-lab-replay-v1";
+  replay_id: string;
+  playback_id: string;
+  mode: "recorded_replay";
+  delivery: "synchronous_recorded_playback";
+  truth_label: string;
+  truth_label_en: string;
+  served_at: string;
+  recorded_instruction: string;
+  recorded_instruction_locale: string;
+  recorded_plan: IncidentLabPlanResponse;
+  recorded_run: IncidentLabRunResponse;
+  provenance: {
+    fixture_version: string;
+    recording_source: string;
+    recorded_at: string;
+    source_content_git_sha: string;
+    runtime_build_git_sha: string | null;
+    runtime_build_identity_verified: boolean;
+    resource_sha256: string;
+    resource_sha256_verified_at_startup: boolean;
+    original_plan_contract_version: string;
+    original_run_contract_version: string;
+  };
+  playback_receipt: {
+    provider_calls: 0;
+    model_calls: 0;
+    adk_tool_calls: 0;
+    read_operations: 0;
+    embedding_calls: 0;
+    vector_search_executed: false;
+    live_quota_consumed: false;
+    write_tools_available: false;
+    action_executed: false;
+    estimated_cost_usd: null;
+    cost_status: "not_incurred";
+  };
   limitations: string[];
 }
 
@@ -766,6 +1073,272 @@ export interface DemoWorldResponse {
   rag_examples: DemoWorldRagExample[];
   featured_scenario_id: string;
   corpus: DemoWorldCorpus;
+}
+
+export interface DemoOrder {
+  order_id: string;
+  market: string;
+  item_count: number;
+  created_at: string;
+  updated_at: string;
+  estimated_delivery_from: string;
+  estimated_delivery_through: string;
+  status_code: string;
+  status_sv: string;
+  status_en: string;
+  payment_state: string;
+  fulfilment_state: string;
+  summary_sv: string;
+  summary_en: string;
+  next_step_sv: string;
+  next_step_en: string;
+  source_ref: string;
+  evidence_id: string;
+}
+
+export interface DemoOrderReadReceipt {
+  operation: "list_demo_orders" | "get_demo_order";
+  read_operations: 1;
+  records_returned: number;
+  write_operations: 0;
+  ai_calls: 0;
+  write_tools_available: false;
+  action_executed: false;
+}
+
+export interface DemoOrderCatalogResponse {
+  contract_version: "nordly-demo-order-catalog-v1";
+  mode: "read_only_synthetic_order_catalog";
+  truth_label: string;
+  truth_label_en: string;
+  catalog_version: string;
+  snapshot_at: string;
+  synthetic_only: true;
+  order_count: number;
+  orders: DemoOrder[];
+  action_receipt: DemoOrderReadReceipt;
+  limitations: string[];
+}
+
+export interface DemoOrderLookupResponse {
+  contract_version: "nordly-demo-order-lookup-v1";
+  mode: "read_only_synthetic_order_lookup";
+  truth_label: string;
+  truth_label_en: string;
+  catalog_version: string;
+  snapshot_at: string;
+  synthetic_only: true;
+  order: DemoOrder;
+  action_receipt: DemoOrderReadReceipt;
+  limitations: string[];
+}
+
+export interface DemoCustomerChatTurnRequest {
+  message: string;
+  locale: KnowledgeRagLocale;
+  confirm_live_ai: boolean;
+  recent_conversation: DemoCustomerChatConversationTurn[];
+}
+
+export interface DemoCustomerChatConversationTurn {
+  customer_message: string;
+  assistant_message: string;
+}
+
+export type DemoCustomerChatOutcome =
+  | "answered"
+  | "outside_authority"
+  | "clarification_required"
+  | "confirmation_required"
+  | "insufficient_evidence"
+  | "refused"
+  | "unsupported"
+  | "unavailable";
+
+export type DemoCustomerChatIntentName =
+  | "order_status"
+  | "cancellation_policy"
+  | "cancel_order"
+  | "return_policy"
+  | "return_order"
+  | "refund_policy"
+  | "refund_order"
+  | "change_delivery_address"
+  | "purchase_item"
+  | "company_knowledge"
+  | "conversation"
+  | "clarification_required"
+  | "unsupported";
+
+export interface DemoCustomerChatSubmittedMessage {
+  text: string;
+  locale: KnowledgeRagLocale;
+  redacted: boolean;
+}
+
+export interface DemoCustomerChatContextReceipt {
+  context_version: string;
+  context_id: string;
+  current_order_id: string;
+  context_source_ref: string;
+  order_source_ref: string;
+  synthetic_only: true;
+  persistent_memory: false;
+  memory_scope: "request_scoped_bounded_history";
+}
+
+export interface DemoCustomerChatIntentDecision {
+  name: DemoCustomerChatIntentName;
+  classifier: string;
+  action_requested: boolean;
+}
+
+export interface DemoCustomerChatSafetyDecision {
+  decision: KnowledgeSafetyDecision;
+  reason_code: KnowledgeSafetyReason;
+  summary_sv: string;
+  summary_en: string;
+}
+
+export interface DemoCustomerChatAssistantMessage {
+  text_sv: string;
+  text_en: string;
+}
+
+export type DemoCustomerChatToolEventType =
+  | "safety"
+  | "context_binding"
+  | "backend_read"
+  | "model_routing"
+  | "verification"
+  | "embedding"
+  | "vector_search"
+  | "context_build"
+  | "generation"
+  | "backend_step";
+
+export type DemoCustomerChatToolEventStatus =
+  | KnowledgeRagPhaseStatus
+  | "clarification_required"
+  | "unsupported";
+
+export interface DemoCustomerChatToolEvent {
+  sequence: number;
+  type: DemoCustomerChatToolEventType;
+  initiated_by:
+    | "spring_orchestrator"
+    | "knowledge_rag_service"
+    | "gemini_customer_router"
+    | "gemini_customer_answer";
+  model_selected: boolean;
+  name: string;
+  status: DemoCustomerChatToolEventStatus;
+  executed: boolean;
+  summary_sv: string;
+  summary_en: string;
+  source_ref: string | null;
+  evidence_ids: string[];
+  latency_ms: number | null;
+}
+
+export interface DemoCustomerChatSource {
+  kind: "customer_context" | "order_snapshot" | "company_policy";
+  document_id: string | null;
+  chunk_id: string | null;
+  document_version: string | null;
+  title: string;
+  section_heading: string | null;
+  source_ref: string;
+  evidence_id: string;
+  lifecycle: string | null;
+  similarity: number | null;
+  display_summary_sv: string;
+  display_summary_en: string;
+}
+
+export interface DemoCustomerChatVerifiedClaim {
+  text_sv: string;
+  text_en: string;
+  citation_ids: string[];
+}
+
+export interface DemoCustomerChatRagExecution {
+  requested: boolean;
+  outcome: KnowledgeRagOutcome | "not_run";
+  backend: "pgvector_exact_cosine" | null;
+  corpus_version: string | null;
+  corpus_content_sha256: string | null;
+  current_vector_search: boolean;
+  embedding_executed: boolean;
+  embedding_provider: string | null;
+  embedding_model_id: string | null;
+  embedding_dimensions: number | null;
+  vector_match_count: number;
+  verification_outcome: string;
+  provider_route: GoogleGenAiProviderRoute | null;
+  generation_model_id: string | null;
+  provider_response_id: string | null;
+  token_usage: ModelTokenUsage | null;
+  error_code: string | null;
+}
+
+export interface DemoCustomerChatVerification {
+  evaluation_status: "completed" | "not_run" | "not_applicable";
+  fixed_customer_scope: boolean;
+  order_source_verified: boolean;
+  approved_policies_only: boolean;
+  citations_within_returned_sources: boolean;
+  semantic_claim_support_evaluated: boolean;
+  no_business_write_capability: true;
+  business_action_executed: false;
+  overall_outcome: string;
+}
+
+export interface DemoCustomerChatReceipt {
+  read_operations: number;
+  provider_calls: number;
+  embedding_calls: number;
+  vector_searches: number;
+  generation_calls: number;
+  business_write_operations: 0;
+  business_write_scope: "customer_order_and_refund_state";
+  business_write_tools_available: false;
+  business_action_executed: false;
+  persistent_memory_used: false;
+  total_latency_ms: number;
+  model_id: string | null;
+  estimated_cost_usd: number | null;
+  cost_status: string;
+  cost_basis: string;
+}
+
+export interface DemoCustomerChatErrorDetail {
+  code: string;
+  summary_sv: string;
+  summary_en: string;
+}
+
+export interface DemoCustomerChatTurnResponse {
+  contract_version: "nordly-demo-customer-chat-turn-v1";
+  turn_id: string;
+  mode: "controlled_synthetic_customer_chat";
+  truth_label: string;
+  truth_label_en: string;
+  outcome: DemoCustomerChatOutcome;
+  submitted_message: DemoCustomerChatSubmittedMessage;
+  context: DemoCustomerChatContextReceipt;
+  intent: DemoCustomerChatIntentDecision;
+  safety: DemoCustomerChatSafetyDecision;
+  assistant_message: DemoCustomerChatAssistantMessage;
+  order: DemoOrder | null;
+  tool_events: DemoCustomerChatToolEvent[];
+  sources: DemoCustomerChatSource[];
+  verified_claims: DemoCustomerChatVerifiedClaim[];
+  rag: DemoCustomerChatRagExecution;
+  verification: DemoCustomerChatVerification;
+  receipt: DemoCustomerChatReceipt;
+  error: DemoCustomerChatErrorDetail | null;
+  limitations: string[];
 }
 
 export interface KnowledgeReplayQuestion {
@@ -1040,11 +1613,13 @@ export interface KnowledgeRagRetrieval {
 }
 
 export interface KnowledgeRagVerification {
+  evaluation_status: "completed" | "not_run" | "not_applicable";
   schema_pass: boolean;
   citations_within_retrieved_context: boolean;
   approved_documents_only: boolean;
   output_pii_scan_pass: boolean;
   output_policy_scan_pass: boolean;
+  semantic_claim_support_evaluated: false;
   no_write_capability: boolean;
   overall_outcome: string;
 }
@@ -1071,7 +1646,7 @@ export interface KnowledgeRagError {
 }
 
 export interface KnowledgeRagResponse {
-  contract_version: "nordly-knowledge-rag-v2";
+  contract_version: "nordly-knowledge-rag-v3";
   run_id: string;
   mode: "live_rag";
   truth_label: string;

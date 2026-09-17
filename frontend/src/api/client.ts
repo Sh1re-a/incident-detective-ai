@@ -3,15 +3,26 @@ import type {
   AdkAgentTurnResponse,
   ApiProblemResponse,
   CapabilitiesResponse,
+  DemoCustomerChatTurnRequest,
+  DemoCustomerChatTurnResponse,
+  DemoOrderCatalogResponse,
+  DemoOrderLookupResponse,
   GeneratedCaseLiveRequest,
   GeneratedCaseRunResult,
   DemoWorldResponse,
+  IncidentLabPlanRequest,
+  IncidentLabPlanResponse,
+  IncidentLabReplayAvailabilityResponse,
+  IncidentLabReplayResponse,
+  IncidentLabRunRequest,
+  IncidentLabRunResponse,
   KnowledgeRagRequest,
   KnowledgeRagResponse,
   KnowledgeDocumentLibraryResponse,
   KnowledgeReplayResponse,
   LiveInvestigationRequest,
   LiveInvestigationResult,
+  LiveAiStatusResponse,
   RecordedReplayResult,
   RetrievalEvalProofResponse,
   ScenarioCatalogResponse,
@@ -22,6 +33,7 @@ export class IncidentApiError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "IncidentApiError";
@@ -49,14 +61,63 @@ async function getJson<T>(
       problem?.detail ?? `Request failed with status ${response.status}.`,
       response.status,
       problem?.code,
+      parseRetryAfter(response.headers?.get?.("Retry-After") ?? null),
     );
   }
 
   return response.json() as Promise<T>;
 }
 
+function parseRetryAfter(value: string | null) {
+  if (value === null) return undefined;
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
+}
+
 export function getCapabilities(signal?: AbortSignal) {
   return getJson<CapabilitiesResponse>("/api/v1/capabilities", { signal });
+}
+
+export function getLiveAiStatus(signal?: AbortSignal) {
+  return getJson<LiveAiStatusResponse>("/api/v1/live-ai/status", { signal });
+}
+
+export function getIncidentLabReplayAvailability(signal?: AbortSignal) {
+  return getJson<IncidentLabReplayAvailabilityResponse>(
+    "/api/v1/incident-lab/recorded-replay",
+    { signal },
+  );
+}
+
+export function createIncidentLabPlan(
+  request: IncidentLabPlanRequest,
+  signal?: AbortSignal,
+) {
+  return getJson<IncidentLabPlanResponse>("/api/v1/incident-lab/plans", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+    signal,
+  });
+}
+
+export function runIncidentLab(
+  request: IncidentLabRunRequest,
+  signal?: AbortSignal,
+) {
+  return getJson<IncidentLabRunResponse>("/api/v1/incident-lab/runs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+    signal,
+  });
+}
+
+export function runIncidentLabReplay(signal?: AbortSignal) {
+  return getJson<IncidentLabReplayResponse>(
+    "/api/v1/incident-lab/runs/recorded-replay",
+    { method: "POST", signal },
+  );
 }
 
 export function getScenarios(signal?: AbortSignal) {
@@ -72,6 +133,32 @@ export function getRetrievalEvalProof(signal?: AbortSignal) {
 
 export function getDemoWorld(signal?: AbortSignal) {
   return getJson<DemoWorldResponse>("/api/v1/demo-world", { signal });
+}
+
+export function getDemoOrders(signal?: AbortSignal) {
+  return getJson<DemoOrderCatalogResponse>("/api/v1/demo-orders", { signal });
+}
+
+export function getDemoOrder(orderId: string, signal?: AbortSignal) {
+  return getJson<DemoOrderLookupResponse>(
+    `/api/v1/demo-orders/${encodeURIComponent(orderId)}`,
+    { signal },
+  );
+}
+
+export function runDemoCustomerChatTurn(
+  request: DemoCustomerChatTurnRequest,
+  signal?: AbortSignal,
+) {
+  return getJson<DemoCustomerChatTurnResponse>(
+    "/api/v1/demo-customer/chat/turns",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      signal,
+    },
+  );
 }
 
 export function getKnowledgeDocuments(signal?: AbortSignal) {

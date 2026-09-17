@@ -499,7 +499,7 @@ function EventTrajectory({
   );
 }
 
-function BehindTheAnswer({
+export function BehindTheAnswer({
   result,
   locale,
 }: {
@@ -582,7 +582,7 @@ function BehindTheAnswer({
       </div>
 
       <div className="agent-chapter">
-        <div className="agent-chapter__number">01</div>
+        <div className="agent-chapter__number" aria-hidden="true" />
         <div className="agent-chapter__content">
           <p className="agent-chapter__eyebrow">RUNNER · SESSION · EVENTS</p>
           <h4>{labels.trajectory}</h4>
@@ -591,7 +591,7 @@ function BehindTheAnswer({
       </div>
 
       <div className="agent-chapter">
-        <div className="agent-chapter__number">02</div>
+        <div className="agent-chapter__number" aria-hidden="true" />
         <div className="agent-chapter__content">
           <p className="agent-chapter__eyebrow">FUNCTION TOOL · READ ONLY</p>
           <h4>{labels.oneTool}</h4>
@@ -629,7 +629,7 @@ function BehindTheAnswer({
 
       {logs.length > 0 && (
         <div className="agent-chapter">
-          <div className="agent-chapter__number">03</div>
+          <div className="agent-chapter__number" aria-hidden="true" />
           <div className="agent-chapter__content">
             <p className="agent-chapter__eyebrow">STRUCTURED LOGS · CITATION TRACE</p>
             <h4>{labels.logTitle}</h4>
@@ -668,7 +668,7 @@ function BehindTheAnswer({
 
       {retrieval && (
         <div className="agent-chapter">
-          <div className="agent-chapter__number">04</div>
+          <div className="agent-chapter__number" aria-hidden="true" />
           <div className="agent-chapter__content">
             <p className="agent-chapter__eyebrow">EMBEDDINGS · PGVECTOR · SEMANTIC SEARCH</p>
             <h4>{labels.ragTitle}</h4>
@@ -725,7 +725,7 @@ function BehindTheAnswer({
 
       {verification && (
         <div className="agent-chapter agent-chapter--last">
-          <div className="agent-chapter__number">05</div>
+          <div className="agent-chapter__number" aria-hidden="true" />
           <div className="agent-chapter__content">
             <p className="agent-chapter__eyebrow">DETERMINISTIC JAVA VERIFIER</p>
             <h4>{labels.javaTitle}</h4>

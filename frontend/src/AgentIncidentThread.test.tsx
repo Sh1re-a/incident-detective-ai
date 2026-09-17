@@ -8,7 +8,7 @@ const scenarioId = "generated-catalog-cache-42";
 const citedLogId = "log-config-change";
 
 const completedResponse = {
-  contract_version: "nordly-adk-turn-v3",
+  contract_version: "nordly-adk-turn-v4",
   run_id: "adk-run-42",
   session_id: "session-42",
   turn_id: "turn-42",
