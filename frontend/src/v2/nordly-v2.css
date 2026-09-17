@@ -1013,7 +1013,7 @@ button.agent-identity__badge:hover {
   height: 16px;
 }
 
-.support-end-conversation {
+.end-conversation-button {
   position: absolute;
   top: 68px;
   right: 4px;
@@ -1021,26 +1021,38 @@ button.agent-identity__badge:hover {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 0;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #dfe6ef;
   border-radius: 999px;
-  background: rgba(247, 249, 252, 0.9);
-  color: #718099;
-  font-size: 11px;
-  font-weight: 590;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 5px 16px rgba(26, 48, 78, 0.07);
+  color: #566985;
+  font-size: 12px;
+  font-weight: 630;
   cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
-.support-end-conversation:hover {
-  background: #eef3fa;
+.end-conversation-button:hover {
+  border-color: #cbd7e6;
+  background: #f7faff;
   color: var(--n-ink);
+  transform: translateY(-1px);
 }
 
-.support-end-conversation svg {
-  width: 13px;
-  height: 13px;
+.end-conversation-button:focus-visible {
+  outline: 3px solid rgba(20, 108, 255, 0.22);
+  outline-offset: 2px;
+}
+
+.end-conversation-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.chat-column--has-end-control .chat-thread {
+  padding-top: 50px;
 }
 
 .drift-requesting {
@@ -2259,7 +2271,7 @@ button.agent-identity__badge:hover {
     width: 100%;
   }
 
-  .support-end-conversation {
+  .end-conversation-button {
     top: 63px;
     right: 0;
   }

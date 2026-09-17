@@ -105,7 +105,7 @@ const COPY = {
   sv: {
     modes: { drift: "Driftagent", support: "Supportagent", documents: "Dokumentarkiv" },
     footer: "Verifierade källor · Endast läsning · Interaktiv AI-demo",
-    synthetic: "All data är syntetisk",
+    synthetic: "Portfolio-demo med syntetisk data · Använd Live-AI ansvarsfullt – begränsad dagskvot",
     supportIdentity: "Hjälper Nordlys kunder",
     driftIdentity: "Bevakar Nordlys köpflöde",
     greeting: "Hej Shirre! Vad kan jag hjälpa dig med?",
@@ -193,7 +193,7 @@ const COPY = {
   en: {
     modes: { drift: "Operations agent", support: "Support agent", documents: "Document archive" },
     footer: "Verified sources · Read only · Interactive AI demo",
-    synthetic: "All data is synthetic",
+    synthetic: "Portfolio demo with synthetic data · Please use Live AI responsibly — limited daily quota",
     supportIdentity: "Helps Nordly customers",
     driftIdentity: "Watches Nordly's checkout flow",
     greeting: "Hi Shirre! How can I help?",
@@ -404,6 +404,7 @@ export default function NordlyV2App() {
   const [driftTurns, setDriftTurns] = useState<DriftTurn[]>([]);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const supportSessionVersionRef = useRef(0);
+  const driftSessionVersionRef = useRef(0);
   const copy = COPY[locale];
 
   useEffect(() => {
@@ -546,17 +547,29 @@ export default function NordlyV2App() {
 
   const startReplay = useCallback(async () => {
     if (replayState === "requesting") return;
+    const sessionVersion = driftSessionVersionRef.current;
     setReplayState("requesting");
     setPlaybackStage(0);
     setDriftTurns([]);
     try {
       const response = await runIncidentLabReplay();
+      if (driftSessionVersionRef.current !== sessionVersion) return;
       setReplay(response);
       setReplayState("playing");
     } catch {
+      if (driftSessionVersionRef.current !== sessionVersion) return;
       setReplayState("error");
     }
   }, [replayState]);
+
+  const resetDriftConversation = useCallback(() => {
+    driftSessionVersionRef.current += 1;
+    setReplay(null);
+    setReplayState("idle");
+    setPlaybackStage(0);
+    setDriftTurns([]);
+    setEvidence(null);
+  }, []);
 
   const skipPlayback = useCallback(() => {
     setPlaybackStage(5);
@@ -569,6 +582,7 @@ export default function NordlyV2App() {
   ) => {
     const question = rawQuestion.trim();
     if (!question || !replay) return;
+    const sessionVersion = driftSessionVersionRef.current;
     const id = clientId("drift");
     const logs = alarmLogs(replay);
     if (["when", "what_unknown_receipt", "customer_impact_receipt"].includes(suggestionId ?? "")) {
@@ -615,10 +629,12 @@ export default function NordlyV2App() {
         locale,
         confirm_live_ai: false,
       });
+      if (driftSessionVersionRef.current !== sessionVersion) return;
       setDriftTurns((current) => current.map((item) => item.id === id
         ? { ...item, response, pending: false }
         : item));
     } catch (error) {
+      if (driftSessionVersionRef.current !== sessionVersion) return;
       setDriftTurns((current) => current.map((item) => item.id === id
         ? { ...item, pending: false, error: apiErrorText(error, locale) }
         : item));
@@ -679,6 +695,7 @@ export default function NordlyV2App() {
                     playbackStage={playbackStage}
                     turns={driftTurns}
                     startReplay={startReplay}
+                    resetConversation={resetDriftConversation}
                     refreshLiveAiStatus={() => refreshLiveAiStatus()}
                     skipPlayback={skipPlayback}
                     submit={submitDrift}
@@ -847,6 +864,15 @@ function AgentIdleState({
   );
 }
 
+function EndConversationButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" className="end-conversation-button" onClick={onClick}>
+      <CloseIcon />
+      <span>{label}</span>
+    </button>
+  );
+}
+
 function SupportAgentView({
   locale,
   liveAiStatus,
@@ -886,16 +912,6 @@ function SupportAgentView({
   const liveAvailable = liveAiStatusResolved && liveAiStatus?.live_state === "available";
   const offline = liveAiStatusResolved && !liveAvailable;
   const replayAvailable = liveAiStatus?.replay_available === true;
-  const statusBadge: AgentBadge = !liveAiStatusResolved
-    ? { label: localized(locale, "Kontrollerar AI…", "Checking AI…"), tone: "replay" }
-    : liveAiStatus?.live_state === "available"
-    ? { label: copy.liveAvailable, tone: "online" }
-    : liveAiStatus?.live_state === "daily_budget_exhausted"
-      ? { label: replayAvailable ? copy.livePaused : localized(locale, "Live-AI pausad", "Live AI paused"), tone: "paused" }
-      : liveAiStatus
-        ? { label: replayAvailable ? copy.liveOffline : localized(locale, "AI offline", "AI offline"), tone: "offline" }
-        : { label: localized(locale, "AI-status okänd", "AI status unknown"), tone: "offline" };
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [turns.length, pendingId, offlineReplayStage, offlineReplayState]);
@@ -990,16 +1006,10 @@ function SupportAgentView({
 
   return (
     <section className="chat-stage" aria-label={copy.modes.support}>
-      <div className="chat-column">
-        <AgentIdentity
-          kind="support"
-          locale={locale}
-          badge={liveAvailable ? statusBadge : undefined}
-        />
+      <div className={`chat-column${conversationActive ? " chat-column--has-end-control" : ""}`}>
+        <AgentIdentity kind="support" locale={locale} />
         {conversationActive ? (
-          <button type="button" className="support-end-conversation" onClick={endConversation}>
-            <CloseIcon />{copy.endConversation}
-          </button>
+          <EndConversationButton label={copy.endConversation} onClick={endConversation} />
         ) : null}
         <div className={`chat-thread${!showConversation ? " chat-thread--offline" : ""}`} role="log" aria-live="polite" aria-relevant="additions text" aria-busy={Boolean(pendingId) || !liveAiStatusResolved || offlineReplayState === "requesting" || offlineReplayState === "playing"}>
           {liveAvailable ? <MessageBubble side="assistant">
@@ -1254,6 +1264,7 @@ function DriftAgentView({
   playbackStage,
   turns,
   startReplay,
+  resetConversation,
   refreshLiveAiStatus,
   skipPlayback,
   submit,
@@ -1266,6 +1277,7 @@ function DriftAgentView({
   playbackStage: number;
   turns: DriftTurn[];
   startReplay: () => Promise<void>;
+  resetConversation: () => void;
   refreshLiveAiStatus: () => Promise<void>;
   skipPlayback: () => void;
   submit: (question: string, suggestionId?: IncidentLabFollowUpSuggestionId | LocalDriftSuggestion) => Promise<void>;
@@ -1274,6 +1286,7 @@ function DriftAgentView({
   const copy = COPY[locale];
   const bottomRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState("");
+  const [slow, setSlow] = useState(false);
   const logs = alarmLogs(replay);
   const alarm = replay?.recorded_run.alarm_receipt;
   const count = Number(alarm?.signal.observed_value ?? logs.length);
@@ -1289,16 +1302,17 @@ function DriftAgentView({
     .filter((item): item is RunbookEvidence => item.evidence_type === "runbook") ?? [];
   const replayAvailable = liveAiStatus?.replay_available === true;
   const replayExplicitlyUnavailable = liveAiStatus?.replay_available === false;
-  const statusBadge: AgentBadge = liveAiStatus?.live_state === "available"
-    ? { label: copy.liveAvailable, tone: "online" }
-    : liveAiStatus?.live_state === "daily_budget_exhausted"
-      ? { label: replayAvailable ? copy.livePaused : localized(locale, "Live-AI pausad", "Live AI paused"), tone: "paused" }
-      : liveAiStatus
-        ? { label: replayAvailable ? copy.liveOffline : localized(locale, "AI offline", "AI offline"), tone: "offline" }
-        : { label: localized(locale, "AI-status okänd", "AI status unknown"), tone: "offline" };
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [playbackStage, replayState, turns.length]);
+  useEffect(() => {
+    if (!pending) {
+      setSlow(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setSlow(true), 6000);
+    return () => window.clearTimeout(timer);
+  }, [pending]);
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!canChat || !draft.trim()) return;
@@ -1306,15 +1320,17 @@ function DriftAgentView({
     setDraft("");
     void submit(question);
   };
+  const endConversation = useCallback(() => {
+    setDraft("");
+    resetConversation();
+  }, [resetConversation]);
+  const reportActive = ["requesting", "playing", "ready"].includes(replayState);
   return (
     <section className="chat-stage" aria-label={copy.modes.drift}>
-      <div className="chat-column">
-        <AgentIdentity
-          kind="drift"
-          locale={locale}
-          badge={replayState === "idle" && liveAiStatus?.live_state !== "available" ? undefined : statusBadge}
-        />
-        <div className="chat-thread chat-thread--drift" role="log" aria-live="polite" aria-relevant="additions text" aria-busy={replayState === "requesting"}>
+      <div className={`chat-column${reportActive ? " chat-column--has-end-control" : ""}`}>
+        <AgentIdentity kind="drift" locale={locale} />
+        {reportActive ? <EndConversationButton label={copy.endConversation} onClick={endConversation} /> : null}
+        <div className="chat-thread chat-thread--drift" role="log" aria-live="polite" aria-relevant="additions text" aria-busy={replayState === "requesting" || pending}>
           {replayState === "idle" ? (
             <AgentIdleState
               title={copy.driftIdleTitle}
@@ -1407,7 +1423,7 @@ function DriftAgentView({
                 <motion.div key={turn.id} className="chat-turn" layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                   <MessageBubble side="user"><p>{turn.question}</p></MessageBubble>
                   <MessageBubble side="assistant" tone={turn.error ? "error" : "default"}>
-                    {turn.pending ? <TypingIndicator label={localized(locale, "Kontrollerar det frysta kvittot…", "Checking the frozen receipt…")} /> : null}
+                    {turn.pending ? <TypingIndicator label={slow ? copy.slow : copy.waiting} /> : null}
                     {turn.localAnswer ? <p>{turn.localAnswer}</p> : null}
                     {turn.localAnswer ? <div className="verified-row"><CheckIcon />{localized(locale, "Från larmkvittot · inget nytt AI-anrop", "From the alarm receipt · no new AI call")}</div> : null}
                     {turn.response ? (
@@ -1435,18 +1451,20 @@ function DriftAgentView({
 
         {ready && replay ? (
           <div className="chat-composer-wrap">
-            <div className="suggestion-row suggestion-row--drift">
-              <button type="button" onClick={() => void submit(copy.whenQuestion, "when")} disabled={pending}>{copy.whenQuestion}</button>
-              {replay.run_reference ? FOLLOW_UP_IDS.slice(0, 3).map((id) => (
-                <button key={id} type="button" onClick={() => void submit(copy.driftSuggestions[id], id)} disabled={pending}>{copy.driftSuggestions[id]}</button>
-              )) : (
-                <>
-                  <button type="button" onClick={() => void submit(copy.driftSuggestions.what_unknown, "what_unknown_receipt")} disabled={pending}>{copy.driftSuggestions.what_unknown}</button>
-                  <button type="button" onClick={() => void submit(copy.driftSuggestions.customer_impact, "customer_impact_receipt")} disabled={pending}>{copy.driftSuggestions.customer_impact}</button>
-                  <button type="button" onClick={() => openEvidence()}>{copy.driftSuggestions.show_sources}</button>
-                </>
-              )}
-            </div>
+            {turns.length === 0 ? (
+              <div className="suggestion-row suggestion-row--drift">
+                <button type="button" onClick={() => void submit(copy.whenQuestion, "when")} disabled={pending}>{copy.whenQuestion}</button>
+                {replay.run_reference ? FOLLOW_UP_IDS.slice(0, 3).map((id) => (
+                  <button key={id} type="button" onClick={() => void submit(copy.driftSuggestions[id], id)} disabled={pending}>{copy.driftSuggestions[id]}</button>
+                )) : (
+                  <>
+                    <button type="button" onClick={() => void submit(copy.driftSuggestions.what_unknown, "what_unknown_receipt")} disabled={pending}>{copy.driftSuggestions.what_unknown}</button>
+                    <button type="button" onClick={() => void submit(copy.driftSuggestions.customer_impact, "customer_impact_receipt")} disabled={pending}>{copy.driftSuggestions.customer_impact}</button>
+                    <button type="button" onClick={() => openEvidence()}>{copy.driftSuggestions.show_sources}</button>
+                  </>
+                )}
+              </div>
+            ) : null}
             <form className="chat-composer" onSubmit={onSubmit} aria-label={localized(locale, "Fråga Driftagenten", "Ask the Operations agent")}>
               <label className="sr-only" htmlFor="drift-message">{copy.driftPlaceholder}</label>
               <input
