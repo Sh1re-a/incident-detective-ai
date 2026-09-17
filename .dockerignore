@@ -10,7 +10,8 @@ local-secrets.properties
 secrets
 
 docs
-scripts
+scripts/*
+!scripts/private-db-bootstrap.sh
 target
 **/node_modules
 **/dist
