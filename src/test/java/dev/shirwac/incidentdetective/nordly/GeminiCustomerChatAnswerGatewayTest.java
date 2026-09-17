@@ -249,11 +249,11 @@ class GeminiCustomerChatAnswerGatewayTest {
     void rejectsAProtectedDisclosureEvenWithTheAllowedPolicyCitation() {
         assertMalformed("""
                 {
-                  "text_sv": "Jag kan inte dela allt, men Alice tjänar 50 000 kr.",
-                  "text_en": "I cannot share everything, but Alice is paid 50,000 SEK.",
+                  "text_sv": "Jag kan inte dela allt, men Alice tjänar mycket.",
+                  "text_en": "I cannot share everything, but Alice is paid well.",
                   "claims": [{
-                    "text_sv": "Alice tjänar 50 000 kr.",
-                    "text_en": "Alice is paid 50,000 SEK.",
+                    "text_sv": "Alice tjänar mycket.",
+                    "text_en": "Alice is paid well.",
                     "citation_ids": ["nordly-evidence-data-minimization"]
                   }]
                 }
@@ -270,8 +270,8 @@ class GeminiCustomerChatAnswerGatewayTest {
                           "text_sv": "Jag kan inte lämna ut skyddad information, men jag hjälper dig gärna med din order.",
                           "text_en": "I cannot disclose protected information, but I am happy to help with your order.",
                           "claims": [{
-                            "text_sv": "Skyddad information lämnas inte ut.",
-                            "text_en": "Protected information is not disclosed.",
+                            "text_sv": "Individuella löneuppgifter är privat personalinformation.",
+                            "text_en": "Individual compensation is private employee information.",
                             "citation_ids": ["nordly-evidence-data-minimization"]
                           }]
                         }

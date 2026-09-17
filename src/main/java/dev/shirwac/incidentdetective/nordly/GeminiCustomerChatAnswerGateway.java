@@ -111,21 +111,21 @@ public final class GeminiCustomerChatAnswerGateway
                     + "\\b(?:api[-_ ]?key|password|secret|token)\\s*[:=]\\s*\\S+)"
     );
     private static final Pattern SWEDISH_BOUNDARY_LANGUAGE = Pattern.compile(
-            "(?:kan inte|far inte|lamnar inte ut|hall(?:s|er).{0,24}utanfor|"
-                    + "skyddad information|privat information|"
-                    + "utanfor min befogenhet)"
+            "(?:(?:kan|far).{0,24}inte|lamnar.{0,16}inte.{0,16}ut|"
+                    + "delar.{0,16}inte|har inte behorighet|"
+                    + "hall(?:s|er).{0,24}utanfor|skyddad information|"
+                    + "privat information|utanfor min befogenhet)"
     );
     private static final Pattern ENGLISH_BOUNDARY_LANGUAGE = Pattern.compile(
             "(?:cannot|can't|do not disclose|does not disclose|"
+                    + "do not share|does not share|won't share|cannot access|"
                     + "kept.{0,24}outside|protected information|"
                     + "private information|outside my authority|not authorized)"
     );
-    private static final Pattern PROTECTED_DISCLOSURE_ASSERTION = Pattern.compile(
-            "(?:\\b(?:tjanar|far i lon|heter|bor pa|earns?|is paid|lives at)\\b|"
-                    + "\\b(?:lon(?:en)?|ersattning|e-?post(?:adress)?|mejl|adress|"
-                    + "telefonnummer|personnummer|salary|compensation|pay|"
-                    + "email(?: address)?|address|phone number|ssn)"
-                    + "\\s*(?:ar|is|:))"
+    private static final Pattern NAMED_PROTECTED_DISCLOSURE = Pattern.compile(
+            "\\b\\p{Lu}[\\p{L}'-]{1,30}\\s+"
+                    + "(?:tjanar|tjänar|har lon|har lön|bor pa|bor på|"
+                    + "earns?|is paid|lives at)\\b"
     );
     private static final Pattern DECIMAL_DIGIT = Pattern.compile("\\d");
 
@@ -354,14 +354,8 @@ public final class GeminiCustomerChatAnswerGateway
                 || answer.claims().isEmpty()
                 || answer.claims().stream().anyMatch(claim ->
                 !claim.citationIds().equals(List.of(DATA_BOUNDARY_EVIDENCE))
-                        || !boundaryText(
-                        claim.textSv(),
-                        SWEDISH_BOUNDARY_LANGUAGE
-                )
-                        || !boundaryText(
-                        claim.textEn(),
-                        ENGLISH_BOUNDARY_LANGUAGE
-                ))) {
+                        || unsafeProtectedText(claim.textSv())
+                        || unsafeProtectedText(claim.textEn()))) {
             throw protectedBoundaryFailure();
         }
     }
@@ -369,8 +363,12 @@ public final class GeminiCustomerChatAnswerGateway
     private boolean boundaryText(String value, Pattern boundaryLanguage) {
         String normalized = normalize(value);
         return boundaryLanguage.matcher(normalized).find()
-                && !DECIMAL_DIGIT.matcher(normalized).find()
-                && !PROTECTED_DISCLOSURE_ASSERTION.matcher(normalized).find();
+                && !unsafeProtectedText(value);
+    }
+
+    private boolean unsafeProtectedText(String value) {
+        return DECIMAL_DIGIT.matcher(value).find()
+                || NAMED_PROTECTED_DISCLOSURE.matcher(value).find();
     }
 
     private ModelProviderException protectedBoundaryFailure() {
