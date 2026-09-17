@@ -249,6 +249,29 @@ GRANT SELECT
 GRANT INSERT, UPDATE
   ON TABLE incident_detective.global_live_daily_quota
   TO incident_detective_runtime;
+GRANT INSERT (
+  run_reference,
+  mode,
+  scenario_id,
+  answer_state,
+  snapshot_sha256,
+  snapshot_json,
+  expires_at
+) ON TABLE incident_detective.incident_followup_runs
+  TO incident_detective_runtime;
+GRANT INSERT (
+  run_reference,
+  client_turn_id,
+  request_sha256,
+  status
+) ON TABLE incident_detective.incident_followup_turns
+  TO incident_detective_runtime;
+GRANT UPDATE (
+  status,
+  response_json,
+  completed_at
+) ON TABLE incident_detective.incident_followup_turns
+  TO incident_detective_runtime;
 REVOKE ALL PRIVILEGES
   ON ALL SEQUENCES IN SCHEMA incident_detective
   FROM incident_detective_runtime;
@@ -283,9 +306,9 @@ SQL
     SELECT ('[1,0]'::vector(2) <=> '[1,0]'::vector(2))::text
   ")"
 
-  assert_equal "flyway_version" "7" "${flyway_version}"
+  assert_equal "flyway_version" "9" "${flyway_version}"
   assert_equal "failed_migrations" "0" "${failed_migrations}"
-  assert_equal "embedding_rows" "40" "${embedding_rows}"
+  assert_equal "embedding_rows" "44" "${embedding_rows}"
   assert_equal "vector_distance" "0" "${vector_distance}"
 
   runtime_psql <<'SQL'
@@ -366,8 +389,8 @@ SQL
   printf '%s\n' \
     'BOOTSTRAP_STAGE=COMPLETE' \
     'VECTOR_EXTENSION=READY' \
-    'FLYWAY_VERSION=7' \
-    'EMBEDDING_ROWS=40' \
+    'FLYWAY_VERSION=9' \
+    'EMBEDDING_ROWS=44' \
     'MIGRATOR_CLOUDSQLSUPERUSER=false' \
     'RUNTIME_CLOUDSQLSUPERUSER=false' \
     'RUNTIME_CORPUS_WRITE=false' \

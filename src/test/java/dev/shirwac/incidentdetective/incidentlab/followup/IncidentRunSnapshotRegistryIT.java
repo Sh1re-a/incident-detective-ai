@@ -34,16 +34,35 @@ class IncidentRunSnapshotRegistryIT {
             .withPassword("test");
 
     private static HikariDataSource dataSource;
+    private static HikariDataSource adminDataSource;
     private static IncidentRunSnapshotRegistry registry;
 
     @BeforeAll
     static void migrate() {
-        HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(POSTGRES.getJdbcUrl());
-        config.setUsername(POSTGRES.getUsername());
-        config.setPassword(POSTGRES.getPassword());
-        dataSource = new HikariDataSource(config);
-        Flyway.configure().dataSource(dataSource).load().migrate();
+        HikariConfig adminConfig = new HikariConfig();
+        adminConfig.setJdbcUrl(POSTGRES.getJdbcUrl());
+        adminConfig.setUsername(POSTGRES.getUsername());
+        adminConfig.setPassword(POSTGRES.getPassword());
+        adminDataSource = new HikariDataSource(adminConfig);
+        JdbcClient admin = JdbcClient.create(adminDataSource);
+        admin.sql("CREATE SCHEMA incident_detective").update();
+        admin.sql("CREATE ROLE incident_detective_runtime NOLOGIN").update();
+        admin.sql("CREATE ROLE incident_detective_runtime_login LOGIN PASSWORD 'runtime-test'").update();
+        admin.sql("GRANT incident_detective_runtime TO incident_detective_runtime_login").update();
+        admin.sql("GRANT USAGE ON SCHEMA incident_detective TO incident_detective_runtime").update();
+        admin.sql("ALTER ROLE incident_detective_runtime_login IN DATABASE incident_followup_test SET search_path TO incident_detective, public").update();
+        Flyway.configure()
+                .dataSource(adminDataSource)
+                .defaultSchema("incident_detective")
+                .schemas("incident_detective")
+                .load()
+                .migrate();
+
+        HikariConfig runtimeConfig = new HikariConfig();
+        runtimeConfig.setJdbcUrl(POSTGRES.getJdbcUrl());
+        runtimeConfig.setUsername("incident_detective_runtime_login");
+        runtimeConfig.setPassword("runtime-test");
+        dataSource = new HikariDataSource(runtimeConfig);
         JsonMapper mapper = JsonMapper.builder()
                 .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
                 .build();
@@ -61,6 +80,9 @@ class IncidentRunSnapshotRegistryIT {
     static void close() {
         if (dataSource != null) {
             dataSource.close();
+        }
+        if (adminDataSource != null) {
+            adminDataSource.close();
         }
     }
 
@@ -89,6 +111,30 @@ class IncidentRunSnapshotRegistryIT {
                         fingerprint
                 ).orElseThrow()
         );
+    }
+
+    @Test
+    void runtimeRoleHasOnlyTheSnapshotWritesUsedByTheRegistry() {
+        JdbcClient runtime = JdbcClient.create(dataSource);
+
+        assertTrue(privilege(runtime,
+                "has_table_privilege(current_user, 'incident_followup_runs', 'SELECT')"));
+        assertTrue(privilege(runtime,
+                "has_column_privilege(current_user, 'incident_followup_runs', 'run_reference', 'INSERT')"));
+        assertTrue(privilege(runtime,
+                "has_column_privilege(current_user, 'incident_followup_turns', 'status', 'UPDATE')"));
+        assertFalse(privilege(runtime,
+                "has_table_privilege(current_user, 'incident_followup_runs', 'UPDATE')"));
+        assertFalse(privilege(runtime,
+                "has_column_privilege(current_user, 'incident_followup_turns', 'run_reference', 'UPDATE')"));
+        assertFalse(privilege(runtime,
+                "has_table_privilege(current_user, 'incident_followup_turns', 'DELETE')"));
+    }
+
+    private boolean privilege(JdbcClient client, String expression) {
+        return client.sql("SELECT " + expression)
+                .query(Boolean.class)
+                .single();
     }
 
     private IncidentFollowUpSnapshot snapshot() {
