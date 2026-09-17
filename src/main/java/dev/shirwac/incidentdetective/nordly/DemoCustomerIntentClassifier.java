@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 @Component
 public final class DemoCustomerIntentClassifier {
 
-    public static final String CLASSIFIER = "deterministic_rules_v2";
+    public static final String CLASSIFIER = "deterministic_rules_v3";
 
     private static final String CANCEL_TERM =
             "(?:avbestall\\w*|avbryt\\w*|avboka\\w*|annullera\\w*|cancel\\w*)";
@@ -19,11 +19,11 @@ public final class DemoCustomerIntentClassifier {
             "(?:avbestall(?:a|er|t)?|avbryt(?:a|er|it)?|"
                     + "avboka(?:r|t)?|annullera(?:r|t)?|cancel(?:led)?)\\b";
     private static final String REFUND_ACTION_TERM =
-            "(?:aterbetala(?:r|t)?\\b|betala tillbaka|issue (?:a )?refund|"
+            "(?:aterbetala(?:r|t)?\\b|betala tillbak(?:a|s)|issue (?:a )?refund|"
                     + "process (?:a )?refund|refund (?:it|den|ordern|my order)|"
                     + "give me (?:my )?money back)";
     private static final String REFUND_POLICY_TERM =
-            "(?:aterbetal\\w*|pengar(?:na)? tillbaka|refund\\w*)";
+            "(?:aterbetal\\w*|pengar(?:na)? tillbak(?:a|s)|refund\\w*)";
     private static final String RETURN_ACTION_TERM =
             "(?:returnera(?:r|t)?\\b|return (?:it|my order|my item))";
     private static final String RETURN_POLICY_TERM =
@@ -51,6 +51,11 @@ public final class DemoCustomerIntentClassifier {
     );
 
     private static final List<Pattern> CANCEL_ACTION = patterns(
+            "(?:jag|vi) (?:vill|onskar|behover) inte "
+                    + "(?:ha|behalla|ta emot) (?:paketet|ordern|bestallningen|varan)"
+                    + "(?: langre)?",
+            "i (?:do not|don'?t) want "
+                    + "(?:the |my )?(?:package|parcel|order|item)(?: anymore)?",
             "(?:kan|skulle) (?:du|ni).{0,35}" + CANCEL_ACTION_TERM,
             "(?:can|could|would) you.{0,35}" + CANCEL_ACTION_TERM,
             "(?:jag vill att (?:du|ni)|snalla|please|i want you to)"
@@ -85,7 +90,7 @@ public final class DemoCustomerIntentClassifier {
     private static final List<Pattern> REFUND_ACTION = patterns(
             "(?:kan|skulle) (?:du|ni).{0,35}" + REFUND_ACTION_TERM,
             "(?:can|could|would) you.{0,35}" + REFUND_ACTION_TERM,
-            "(?:kan|skulle) (?:du|ni).{0,35}(?:ge mig )?pengar(?:na)? tillbaka",
+            "(?:kan|skulle) (?:du|ni).{0,35}(?:ge mig )?pengar(?:na)? tillbak(?:a|s)",
             "(?:jag vill att (?:du|ni)|snalla|please|i want you to)"
                     + ".{0,35}"
                     + REFUND_ACTION_TERM,
@@ -95,8 +100,8 @@ public final class DemoCustomerIntentClassifier {
             "(?:jag vill (?:ha|fa)|i want (?:to (?:get|request) )?)"
                     + ".{0,5}(?:en aterbetalning|a refund)",
             "i would like a refund",
-            "(?:jag vill ha|i want).{0,15}pengar(?:na)? tillbaka",
-            "^(?:jag (?:vill|behover|onskar) (?:fa|ha) tillbaka pengarna|"
+            "(?:jag vill ha|i want).{0,15}pengar(?:na)? tillbak(?:a|s)",
+            "^(?:jag (?:vill|behover|onskar) (?:fa|ha) tillbak(?:a|s) pengarna|"
                     + "i (?:want|need) (?:my )?money back)[.!?]*$",
             "^(?:refund (?:me|it|my order)|"
                     + REFUND_ACTION_TERM + ")"
@@ -114,6 +119,21 @@ public final class DemoCustomerIntentClassifier {
                     + "(?: (?:at mig|for me|tack|please|nu|now))*[.!?]*$",
             "^(?:jag behover|jag onskar|i need|i would like)"
                     + " (?:en aterbetalning|a refund)[.!?]*$"
+    );
+    private static final List<Pattern> PURCHASE_ACTION = patterns(
+            "^(?:(?:okej|ok|okay)[,!]?\\s*)?"
+                    + "(?:jag|vi) (?:vill|behover|onskar) "
+                    + "(?:bestalla|kopa|lagga till).{0,35}"
+                    + "(?:vara|produkt|artikel|item|product)",
+            "(?:kan|skulle) (?:du|ni).{0,35}"
+                    + "(?:bestalla|kopa|lagga till).{0,35}"
+                    + "(?:vara|produkt|artikel|item|product)",
+            "^(?:bestall|kop|lagg till).{0,35}"
+                    + "(?:vara|produkt|artikel)",
+            "^i (?:want|need|would like) (?:to )?"
+                    + "(?:order|buy|add).{0,35}(?:item|product)",
+            "(?:can|could|would) you.{0,35}"
+                    + "(?:order|buy|add).{0,35}(?:item|product)"
     );
     private static final List<Pattern> RETURN_ACTION = patterns(
             "(?:kan|skulle) (?:du|ni).{0,35}" + RETURN_ACTION_TERM,
@@ -178,6 +198,9 @@ public final class DemoCustomerIntentClassifier {
         if (matches(RETURN_ACTION, normalized)) {
             return decision(Intent.RETURN_ORDER, true);
         }
+        if (matches(PURCHASE_ACTION, normalized)) {
+            return decision(Intent.PURCHASE_ITEM, true);
+        }
         if (matches(CLARIFICATION_REQUIRED, normalized)) {
             return decision(Intent.CLARIFICATION_REQUIRED, false);
         }
@@ -234,7 +257,10 @@ public final class DemoCustomerIntentClassifier {
         RETURN_ORDER("return_order"),
         REFUND_POLICY("refund_policy"),
         REFUND_ORDER("refund_order"),
+        PURCHASE_ITEM("purchase_item"),
         CHANGE_DELIVERY_ADDRESS("change_delivery_address"),
+        COMPANY_KNOWLEDGE("company_knowledge"),
+        CONVERSATION("conversation"),
         CLARIFICATION_REQUIRED("clarification_required"),
         UNSUPPORTED("unsupported");
 

@@ -35,7 +35,7 @@ class DemoCustomerChatApiTest {
     private DemoCustomerChatService service;
 
     @Test
-    void acceptsOnlyTheSmallStatelessTurnContract() throws Exception {
+    void acceptsTheSmallBoundedConversationContract() throws Exception {
         when(service.run(any())).thenReturn(sampleResponse());
 
         mockMvc.perform(post(PATH)
@@ -44,7 +44,13 @@ class DemoCustomerChatApiTest {
                                 {
                                   "message": "Var är min beställning?",
                                   "locale": "sv",
-                                  "confirm_live_ai": false
+                                  "confirm_live_ai": false,
+                                  "recent_conversation": [
+                                    {
+                                      "customer_message": "Hej",
+                                      "assistant_message": "Hej! Hur kan jag hjälpa dig?"
+                                    }
+                                  ]
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -86,8 +92,54 @@ class DemoCustomerChatApiTest {
         verify(service).run(new DemoCustomerChatTurnRequest(
                 "Var är min beställning?",
                 "sv",
-                false
+                false,
+                List.of(new DemoCustomerChatTurnRequest.ConversationTurn(
+                        "Hej",
+                        "Hej! Hur kan jag hjälpa dig?"
+                ))
         ));
+    }
+
+    @Test
+    void rejectsOversizedOrOverlongConversationContext() throws Exception {
+        String turn = """
+                {"customer_message":"Hej","assistant_message":"Hej!"}
+                """.strip();
+        String sevenTurns = String.join(",", java.util.Collections.nCopies(
+                7,
+                turn
+        ));
+
+        mockMvc.perform(post(PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "message": "Var är min beställning?",
+                                  "locale": "sv",
+                                  "confirm_live_ai": true,
+                                  "recent_conversation": [%s]
+                                }
+                                """.formatted(sevenTurns)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST_BODY"));
+
+        mockMvc.perform(post(PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "message": "Var är min beställning?",
+                                  "locale": "sv",
+                                  "confirm_live_ai": true,
+                                  "recent_conversation": [{
+                                    "customer_message": "Hej",
+                                    "assistant_message": "%s"
+                                  }]
+                                }
+                                """.formatted("x".repeat(701))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST_BODY"));
+
+        verify(service, never()).run(any());
     }
 
     @Test
@@ -181,7 +233,7 @@ class DemoCustomerChatApiTest {
                         order.sourceRef(),
                         true,
                         false,
-                        "request_only_fixed_context"
+                        "request_scoped_bounded_history"
                 ),
                 new DemoCustomerChatTurnResponse.IntentDecision(
                         "order_status",

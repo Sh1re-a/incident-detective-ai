@@ -194,6 +194,16 @@ class DemoCustomerIntentClassifierTest {
                         true
                 ),
                 Arguments.of(
+                        "Jag vill inte ha paketet längre",
+                        DemoCustomerIntentClassifier.Intent.CANCEL_ORDER,
+                        true
+                ),
+                Arguments.of(
+                        "I don't want the package anymore",
+                        DemoCustomerIntentClassifier.Intent.CANCEL_ORDER,
+                        true
+                ),
+                Arguments.of(
                         "Kan ni avbeställa min beställning?",
                         DemoCustomerIntentClassifier.Intent.CANCEL_ORDER,
                         true
@@ -255,6 +265,16 @@ class DemoCustomerIntentClassifierTest {
                 ),
                 Arguments.of(
                         "Kan du ge mig pengarna tillbaka?",
+                        DemoCustomerIntentClassifier.Intent.REFUND_ORDER,
+                        true
+                ),
+                Arguments.of(
+                        "Kan du betala tillbaks till mig?",
+                        DemoCustomerIntentClassifier.Intent.REFUND_ORDER,
+                        true
+                ),
+                Arguments.of(
+                        "Jag vill ha pengarna tillbaks",
                         DemoCustomerIntentClassifier.Intent.REFUND_ORDER,
                         true
                 ),
@@ -351,6 +371,26 @@ class DemoCustomerIntentClassifierTest {
                 Arguments.of(
                         "I need a refund",
                         DemoCustomerIntentClassifier.Intent.REFUND_ORDER,
+                        true
+                ),
+                Arguments.of(
+                        "Jag vill beställa en till vara",
+                        DemoCustomerIntentClassifier.Intent.PURCHASE_ITEM,
+                        true
+                ),
+                Arguments.of(
+                        "Okej jag vill beställa en till vara",
+                        DemoCustomerIntentClassifier.Intent.PURCHASE_ITEM,
+                        true
+                ),
+                Arguments.of(
+                        "Kan du lägga till en produkt åt mig?",
+                        DemoCustomerIntentClassifier.Intent.PURCHASE_ITEM,
+                        true
+                ),
+                Arguments.of(
+                        "I want to order another item",
+                        DemoCustomerIntentClassifier.Intent.PURCHASE_ITEM,
                         true
                 ),
                 Arguments.of(

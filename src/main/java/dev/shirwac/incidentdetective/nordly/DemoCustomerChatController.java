@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/demo-customer/chat")
 @Tag(
         name = "Nordly controlled customer chat",
-        description = "Runs one stateless, read-only chat turn for the same "
+        description = "Runs one request-scoped, read-only chat turn for the same "
                 + "synthetic Nordly customer and backend-owned current order."
 )
 public final class DemoCustomerChatController {
@@ -38,12 +38,17 @@ public final class DemoCustomerChatController {
     )
     @Operation(
             summary = "Run one controlled Nordly customer-chat turn",
-            description = "The request accepts only a message, locale and an "
-                    + "explicit live-AI confirmation. The server selects the "
-                    + "fixed synthetic customer and NORD-2051; it exposes no "
-                    + "customer-selected ID, session memory or write tool. "
-                    + "Returned events are completed system receipts, never "
-                    + "private model reasoning."
+            description = "The request accepts a message, locale, explicit "
+                    + "live-AI confirmation and up to six recent dialogue turns "
+                    + "for continuity. The transcript is untrusted request data, "
+                    + "not factual evidence or persistent backend memory. When "
+                    + "confirmed, Gemini "
+                    + "selects exactly one allowlisted read or boundary tool; "
+                    + "Java executes it against the fixed synthetic customer "
+                    + "and NORD-2051, then verifies the grounded answer. The "
+                    + "API exposes no customer-selected ID, persistent session "
+                    + "memory or business write tool. Returned events are "
+                    + "completed system receipts, never private model reasoning."
     )
     @ApiResponses({
             @ApiResponse(

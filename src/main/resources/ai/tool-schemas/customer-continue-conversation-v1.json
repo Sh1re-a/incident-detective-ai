@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["greeting", "thanks", "clarification", "out_of_scope"]
+    }
+  }
+}

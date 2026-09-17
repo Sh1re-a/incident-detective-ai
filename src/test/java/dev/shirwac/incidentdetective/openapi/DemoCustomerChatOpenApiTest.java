@@ -79,7 +79,12 @@ class DemoCustomerChatOpenApiTest {
         JsonNode schemas = document.at("/components/schemas");
         JsonNode request = schemas.get("DemoCustomerChatTurnRequest");
         assertEquals(
-                Set.of("message", "locale", "confirm_live_ai"),
+                Set.of(
+                        "message",
+                        "locale",
+                        "confirm_live_ai",
+                        "recent_conversation"
+                ),
                 fieldNames(request.get("properties"))
         );
         assertFalse(request.get("properties").has("customer_id"));
@@ -92,6 +97,13 @@ class DemoCustomerChatOpenApiTest {
                 request.get("properties").get("message").get("maxLength").asInt());
         assertEquals("sv|en",
                 request.get("properties").get("locale").get("pattern").asText());
+        assertEquals(6, request.get("properties")
+                .get("recent_conversation").get("maxItems").asInt());
+        assertEquals(
+                "#/components/schemas/ConversationTurn",
+                request.get("properties").get("recent_conversation")
+                        .get("items").get("$ref").asText()
+        );
 
         JsonNode response = schemas.get("DemoCustomerChatTurnResponse");
         assertEquals(

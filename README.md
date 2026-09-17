@@ -64,6 +64,7 @@ Backendens publika demo-API omfattar:
 |---|---|---|
 | `GET` | `/api/v1/capabilities` | Konfigurerat modellmål, retrieval-, cache-, budget-, deployment- och index-readiness utan credentials. Faktiskt observerad modell hör till ett specifikt run-kvitto. |
 | `GET` | `/api/v1/demo-world` | Nordlys syntetiska företagsvärld och korpusöversikt. |
+| `POST` | `/api/v1/demo-customer/chat/turns` | Fri kunddialog där Gemini väljer exakt en tillåten read-only- eller stoppfunktion; Java binder kundkontext, hämtar aktuell evidens och verifierar svaret. |
 | `GET` | `/api/v1/knowledge/documents` | Read-only dokumentbibliotek med lifecycle, åtkomstbeslut och innehållshashar. |
 | `POST` | `/api/v1/knowledge/questions/runs/rag` | Fri, säkerhetsgrindad fråga genom embeddings, pgvector, avgränsad kontext och Java-verifiering. |
 | `POST` | `/api/v1/knowledge/questions/{questionId}/runs/recorded-replay` | Providerfri kunskapsreplay. |
@@ -121,6 +122,7 @@ Starta sedan backend med RAG och uttryckligen aktiverad live-AI:
 ```bash
 SPRING_PROFILES_ACTIVE=rag \
 INCIDENT_DETECTIVE_LIVE_AI_ENABLED=true \
+INCIDENT_DETECTIVE_ADK_ENABLED=true \
 ./mvnw spring-boot:run
 ```
 

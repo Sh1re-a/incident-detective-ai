@@ -1,13 +1,23 @@
 package dev.shirwac.incidentdetective.nordly;
 
+import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
+import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
+import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
+import dev.shirwac.incidentdetective.ai.ModelProviderException;
+import dev.shirwac.incidentdetective.live.LiveAiBudgetStoreUnavailableException;
+import dev.shirwac.incidentdetective.live.LiveInvestigationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,18 +45,25 @@ public final class DemoCustomerChatService {
     private static final String NO_AI_TRUTH_EN =
             "SYNTHETIC CUSTOMER · FIXED BACKEND CONTEXT · NO PROVIDER CALL · "
                     + "BUSINESS DATA READ-ONLY · NO PERSISTENT MEMORY";
-    private static final String LIVE_RAG_TRUTH_SV =
-            "SYNTETISK KUND · FAST BACKENDKONTEXT · KONTROLLERAD LIVE RAG · "
+    private static final String LIVE_AI_TRUTH_SV =
+            "SYNTETISK KUND · FAST BACKENDKONTEXT · KONTROLLERAD LIVE AI · "
                     + "AFFÄRSDATA READ-ONLY · INGET PERMANENT MINNE";
-    private static final String LIVE_RAG_TRUTH_EN =
-            "SYNTHETIC CUSTOMER · FIXED BACKEND CONTEXT · CONTROLLED LIVE RAG · "
+    private static final String LIVE_AI_TRUTH_EN =
+            "SYNTHETIC CUSTOMER · FIXED BACKEND CONTEXT · CONTROLLED LIVE AI · "
+                    + "BUSINESS DATA READ-ONLY · NO PERSISTENT MEMORY";
+    private static final String FALLBACK_TRUTH_SV =
+            "SYNTETISK KUND · SÄKERT RESERVLÄGE · AI-ROUTERN KUNDE INTE ANVÄNDAS · "
+                    + "AFFÄRSDATA READ-ONLY · INGET PERMANENT MINNE";
+    private static final String FALLBACK_TRUTH_EN =
+            "SYNTHETIC CUSTOMER · SAFE FALLBACK · AI ROUTER UNAVAILABLE · "
                     + "BUSINESS DATA READ-ONLY · NO PERSISTENT MEMORY";
     private static final List<String> LIMITATIONS = List.of(
             "The customer, order, company documents and phone number are synthetic.",
-            "The browser may retain the visible transcript; the backend keeps no persistent conversation memory.",
+            "The browser may send up to six recent turns for continuity; the backend stores no persistent conversation memory and never treats that transcript as factual evidence.",
             "Every turn resolves the same fixed synthetic customer and one backend-owned current order.",
             "The assistant can read and explain but has no create, cancel, refund, contact or update tool.",
             "Zero business writes covers customer, order and refund state; live quota accounting and observability may write technical records.",
+            "Natural model wording is checked for schema, returned source IDs and prohibited action claims; canonical verified_claims remain the factual projection.",
             "Refund eligibility is never decided because the demo order has no product-condition or authenticated return data.",
             "Semantic similarity ranks approved text; it is not factual confidence or complete semantic verification."
     );
@@ -55,6 +72,11 @@ public final class DemoCustomerChatService {
     private final DemoCustomerIntentClassifier classifier;
     private final KnowledgeRagSafetyGate safetyGate;
     private final KnowledgeRagService knowledgeRagService;
+    private final NordlyKnowledgeCorpus corpus;
+    private final CustomerChatModelRouter modelRouter;
+    private final CustomerChatAnswerGateway answerGateway;
+    private final GeminiCostEstimator costEstimator;
+    private final GeminiAiProperties aiProperties;
     private final NordlyKnowledgeCorpus.EntryMetadata cancellationPolicy;
     private final NordlyKnowledgeCorpus.EntryMetadata returnPolicy;
     private final NordlyKnowledgeCorpus.EntryMetadata refundTimingPolicy;
@@ -68,10 +90,40 @@ public final class DemoCustomerChatService {
             KnowledgeRagService knowledgeRagService,
             NordlyKnowledgeCorpus corpus
     ) {
+        this(
+                contextCatalog,
+                classifier,
+                safetyGate,
+                knowledgeRagService,
+                corpus,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    @Autowired
+    public DemoCustomerChatService(
+            DemoCustomerContextCatalog contextCatalog,
+            DemoCustomerIntentClassifier classifier,
+            KnowledgeRagSafetyGate safetyGate,
+            KnowledgeRagService knowledgeRagService,
+            NordlyKnowledgeCorpus corpus,
+            CustomerChatModelRouter modelRouter,
+            CustomerChatAnswerGateway answerGateway,
+            GeminiCostEstimator costEstimator,
+            GeminiAiProperties aiProperties
+    ) {
         this.contextCatalog = contextCatalog;
         this.classifier = classifier;
         this.safetyGate = safetyGate;
         this.knowledgeRagService = knowledgeRagService;
+        this.corpus = corpus;
+        this.modelRouter = modelRouter;
+        this.answerGateway = answerGateway;
+        this.costEstimator = costEstimator;
+        this.aiProperties = aiProperties;
         cancellationPolicy = approved(
                 corpus.metadata(CANCELLATION_EVIDENCE),
                 CANCELLATION_EVIDENCE
@@ -102,13 +154,107 @@ public final class DemoCustomerChatService {
         KnowledgeRagSafetyGate.Decision safety = safetyGate.evaluate(
                 request.message()
         );
-        DemoCustomerIntentClassifier.Decision intent = classifier.classify(
-                request.message()
-        );
-
-        if (!safety.allowed() && !isBoundedAction(intent, safety)) {
-            return refused(turnId, started, request, intent, safety);
+        if (isHardSafetyStop(safety)) {
+            DemoCustomerIntentClassifier.Decision safeFallback =
+                    classifier.classify(request.message());
+            return refused(
+                    turnId,
+                    started,
+                    request,
+                    safeFallback,
+                    safety
+            );
         }
+        List<DemoCustomerChatTurnRequest.ConversationTurn> recentConversation =
+                safeRecentConversation(request.recentConversation());
+
+        if (!request.confirmLiveAi() || modelRouter == null) {
+            DemoCustomerIntentClassifier.Decision deterministic =
+                    classifier.classify(request.message());
+            if (!safety.allowed()
+                    && !isBoundedAction(deterministic, safety)) {
+                return refused(
+                        turnId,
+                        started,
+                        request,
+                        deterministic,
+                        safety
+                );
+            }
+            return dispatch(
+                    turnId,
+                    started,
+                    request,
+                    deterministic,
+                    safety
+            );
+        }
+
+        CustomerChatModelRouter.RoutingResult route;
+        try {
+            route = modelRouter.route(new CustomerChatModelRouter.RoutingRequest(
+                    request.message(),
+                    request.locale(),
+                    true,
+                    safety.allowed()
+                            ? CustomerChatModelRouter.RoutingScope.STANDARD
+                            : CustomerChatModelRouter.RoutingScope.DENY_ONLY,
+                    recentConversation
+            ));
+        } catch (RuntimeException exception) {
+            if (!recoverableRoutingFailure(exception)) {
+                throw exception;
+            }
+            DemoCustomerIntentClassifier.Decision fallback =
+                    fallbackDecision(request.message(), exception);
+            DemoCustomerChatTurnResponse response = dispatch(
+                    turnId,
+                    started,
+                    request,
+                    fallback,
+                    safety
+            );
+            return attachRoutingFailure(response, exception);
+        }
+
+        DemoCustomerIntentClassifier.Decision intent = decision(route);
+        DemoCustomerChatTurnResponse response;
+        try {
+            response = dispatch(
+                    turnId,
+                    started,
+                    request,
+                    intent,
+                    safety
+            );
+        } catch (RuntimeException exception) {
+            if (!recoverableRoutingFailure(exception)) {
+                throw exception;
+            }
+            response = downstreamUnavailable(
+                    turnId,
+                    started,
+                    request,
+                    intent,
+                    safety,
+                    exception
+            );
+            return attachRoute(response, route);
+        }
+        response = attachRoute(response, route);
+        if (shouldGenerateNaturalAnswer(response)) {
+            response = generateNaturalAnswer(response, request);
+        }
+        return response;
+    }
+
+    private DemoCustomerChatTurnResponse dispatch(
+            String turnId,
+            long started,
+            DemoCustomerChatTurnRequest request,
+            DemoCustomerIntentClassifier.Decision intent,
+            KnowledgeRagSafetyGate.Decision safety
+    ) {
         return switch (intent.intent()) {
             case ORDER_STATUS -> orderStatus(
                     turnId,
@@ -124,8 +270,22 @@ public final class DemoCustomerChatService {
                     intent,
                     safety
             );
-            case CANCEL_ORDER, RETURN_ORDER, REFUND_ORDER,
+            case CANCEL_ORDER, RETURN_ORDER, REFUND_ORDER, PURCHASE_ITEM,
                     CHANGE_DELIVERY_ADDRESS -> outsideAuthority(
+                    turnId,
+                    started,
+                    request,
+                    intent,
+                    safety
+            );
+            case COMPANY_KNOWLEDGE -> companyKnowledge(
+                    turnId,
+                    started,
+                    request,
+                    intent,
+                    safety
+            );
+            case CONVERSATION -> conversation(
                     turnId,
                     started,
                     request,
@@ -147,6 +307,643 @@ public final class DemoCustomerChatService {
                     safety
             );
         };
+    }
+
+    private boolean isHardSafetyStop(
+            KnowledgeRagSafetyGate.Decision safety
+    ) {
+        if (safety.allowed()) {
+            return false;
+        }
+        return safety.reasonCode()
+                != KnowledgeRagSafetyGate.ReasonCode.WRITE_ACTION
+                && safety.reasonCode()
+                != KnowledgeRagSafetyGate.ReasonCode.FINANCIAL_ACTION;
+    }
+
+    private DemoCustomerIntentClassifier.Decision decision(
+            CustomerChatModelRouter.RoutingResult route
+    ) {
+        DemoCustomerIntentClassifier.Intent intent = switch (route.tool()) {
+            case GET_CURRENT_ORDER ->
+                    DemoCustomerIntentClassifier.Intent.ORDER_STATUS;
+            case SEARCH_APPROVED_COMPANY_KNOWLEDGE ->
+                    DemoCustomerIntentClassifier.Intent.COMPANY_KNOWLEDGE;
+            case DENY_BUSINESS_ACTION -> switch (route.deniedAction()) {
+                case CANCEL_ORDER ->
+                        DemoCustomerIntentClassifier.Intent.CANCEL_ORDER;
+                case RETURN_ORDER ->
+                        DemoCustomerIntentClassifier.Intent.RETURN_ORDER;
+                case REFUND_ORDER ->
+                        DemoCustomerIntentClassifier.Intent.REFUND_ORDER;
+                case PURCHASE_ITEM ->
+                        DemoCustomerIntentClassifier.Intent.PURCHASE_ITEM;
+                case CHANGE_DELIVERY_ADDRESS ->
+                        DemoCustomerIntentClassifier.Intent.CHANGE_DELIVERY_ADDRESS;
+            };
+            case CONTINUE_CUSTOMER_CONVERSATION ->
+                    switch (route.conversationKind()) {
+                        case GREETING, THANKS ->
+                                DemoCustomerIntentClassifier.Intent.CONVERSATION;
+                        case CLARIFICATION ->
+                                DemoCustomerIntentClassifier.Intent.CLARIFICATION_REQUIRED;
+                        case OUT_OF_SCOPE ->
+                                DemoCustomerIntentClassifier.Intent.UNSUPPORTED;
+                    };
+        };
+        return new DemoCustomerIntentClassifier.Decision(
+                intent,
+                route.classifier(),
+                route.tool()
+                        == CustomerChatModelRouter.Tool.DENY_BUSINESS_ACTION
+        );
+    }
+
+    private DemoCustomerIntentClassifier.Decision fallbackDecision(
+            String message,
+            RuntimeException exception
+    ) {
+        DemoCustomerIntentClassifier.Decision deterministic =
+                classifier.classify(message);
+        return new DemoCustomerIntentClassifier.Decision(
+                deterministic.intent(),
+                DemoCustomerIntentClassifier.CLASSIFIER
+                        + "_fallback_"
+                        + routingFailureCode(exception).toLowerCase(Locale.ROOT),
+                deterministic.actionRequested()
+        );
+    }
+
+    private boolean recoverableRoutingFailure(RuntimeException exception) {
+        if (exception instanceof ModelProviderException
+                || exception instanceof LiveInvestigationException
+                || exception instanceof LiveAiBudgetStoreUnavailableException) {
+            return true;
+        }
+        return Set.of(
+                "LiveDailyQuotaExceededException",
+                "LiveAdmissionRejectedException"
+        ).contains(exception.getClass().getSimpleName());
+    }
+
+    private String routingFailureCode(RuntimeException exception) {
+        if (exception instanceof ModelProviderException provider) {
+            return switch (provider.failure()) {
+                case TIMEOUT -> "MODEL_TIMEOUT";
+                case RATE_LIMITED -> "MODEL_RATE_LIMITED";
+                case UPSTREAM -> "MODEL_UPSTREAM";
+                case MALFORMED_RESPONSE -> "MODEL_RESPONSE_REJECTED";
+            };
+        }
+        return switch (exception.getClass().getSimpleName()) {
+            case "LiveDailyQuotaExceededException" -> "DAILY_LIMIT";
+            case "LiveAdmissionRejectedException" -> "LIVE_BUSY";
+            case "LiveAiBudgetStoreUnavailableException" -> "BUDGET_GUARD";
+            case "LiveInvestigationException" -> "LIVE_CONFIGURATION";
+            default -> "ROUTER_UNAVAILABLE";
+        };
+    }
+
+    private boolean shouldGenerateNaturalAnswer(
+            DemoCustomerChatTurnResponse response
+    ) {
+        return answerGateway != null
+                && !response.rag().requested()
+                && !Set.of("refused", "unavailable")
+                .contains(response.outcome());
+    }
+
+    private DemoCustomerChatTurnResponse attachRoute(
+            DemoCustomerChatTurnResponse response,
+            CustomerChatModelRouter.RoutingResult route
+    ) {
+        List<DemoCustomerChatTurnResponse.ToolEvent> events =
+                insertAfterSafety(
+                        response.toolEvents(),
+                        new DemoCustomerChatTurnResponse.ToolEvent(
+                                0,
+                                "model_routing",
+                                "gemini_customer_router",
+                                true,
+                                route.tool().wireValue(),
+                                "completed",
+                                true,
+                                "Gemini tolkade den fria texten och valde ett tillåtet läs- eller stoppverktyg.",
+                                "Gemini interpreted the free text and selected one allowed read or boundary tool.",
+                                null,
+                                List.of(),
+                                route.latencyMs()
+                        )
+                );
+        DemoCustomerChatTurnResponse.Receipt receipt = addModelCall(
+                response.receipt(),
+                route.costEstimate(),
+                route.configuredModelId()
+        );
+        return copyResponse(
+                response,
+                LIVE_AI_TRUTH_SV,
+                LIVE_AI_TRUTH_EN,
+                response.assistantMessage(),
+                events,
+                response.verifiedClaims(),
+                response.verification(),
+                receipt,
+                response.error()
+        );
+    }
+
+    private DemoCustomerChatTurnResponse generateNaturalAnswer(
+            DemoCustomerChatTurnResponse response,
+            DemoCustomerChatTurnRequest request
+    ) {
+        try {
+            CustomerChatAnswerGateway.Result generated = answerGateway.generate(
+                    new CustomerChatAnswerGateway.Input(
+                            request.message().strip(),
+                            request.locale(),
+                            response.intent().name(),
+                            response.outcome(),
+                            // History may resolve the route, but current backend
+                            // evidence remains the answer model's only context.
+                            List.of(),
+                            answerEvidence(response)
+                    )
+            );
+            List<DemoCustomerChatTurnResponse.ToolEvent> events =
+                    appendAnswerEvents(
+                            response.toolEvents(),
+                            generated.provider().latencyMs(),
+                            true,
+                            null
+                    );
+            ModelCostEstimate answerCost = costEstimator.estimate(
+                    aiProperties.modelId(),
+                    generated.provider().tokenUsage()
+            );
+            DemoCustomerChatTurnResponse.Verification verification =
+                    new DemoCustomerChatTurnResponse.Verification(
+                            "completed",
+                            response.verification().fixedCustomerScope(),
+                            response.verification().orderSourceVerified(),
+                            response.verification().approvedPoliciesOnly(),
+                            true,
+                            false,
+                            true,
+                            false,
+                            "released_after_schema_citation_and_action_scan"
+                    );
+            return copyResponse(
+                    response,
+                    LIVE_AI_TRUTH_SV,
+                    LIVE_AI_TRUTH_EN,
+                    new DemoCustomerChatTurnResponse.AssistantMessage(
+                            generated.answer().textSv(),
+                            generated.answer().textEn()
+                    ),
+                    events,
+                    response.verifiedClaims(),
+                    verification,
+                    addModelCall(
+                            response.receipt(),
+                            answerCost,
+                            aiProperties.modelId(),
+                            generated.provider().latencyMs()
+                    ),
+                    null
+            );
+        } catch (ModelProviderException exception) {
+            DemoCustomerChatTurnResponse.ErrorDetail error =
+                    new DemoCustomerChatTurnResponse.ErrorDetail(
+                            "CUSTOMER_CHAT_ANSWER_"
+                                    + exception.failure().name(),
+                            "Geminis formulering kunde inte verifieras. Det säkra backend-svaret visas i stället.",
+                            "Gemini's wording could not be verified. The safe backend answer is shown instead."
+                    );
+            List<DemoCustomerChatTurnResponse.ToolEvent> events =
+                    appendAnswerEvents(
+                            response.toolEvents(),
+                            null,
+                            false,
+                            error
+                    );
+            DemoCustomerChatTurnResponse.Verification verification =
+                    new DemoCustomerChatTurnResponse.Verification(
+                            response.verification().evaluationStatus(),
+                            response.verification().fixedCustomerScope(),
+                            response.verification().orderSourceVerified(),
+                            response.verification().approvedPoliciesOnly(),
+                            response.verification().citationsWithinReturnedSources(),
+                            response.verification().semanticClaimSupportEvaluated(),
+                            true,
+                            false,
+                            "released_safe_backend_fallback_after_model_failure"
+                    );
+            return copyResponse(
+                    response,
+                    LIVE_AI_TRUTH_SV,
+                    LIVE_AI_TRUTH_EN,
+                    response.assistantMessage(),
+                    events,
+                    response.verifiedClaims(),
+                    verification,
+                    addUnknownModelCall(
+                            response.receipt(),
+                            aiProperties.modelId(),
+                            0
+                    ),
+                    error
+            );
+        }
+    }
+
+    private List<DemoCustomerChatTurnRequest.ConversationTurn>
+    safeRecentConversation(
+            List<DemoCustomerChatTurnRequest.ConversationTurn> history
+    ) {
+        return history.stream()
+                .filter(turn -> !isHardSafetyStop(
+                        safetyGate.evaluate(turn.customerMessage())
+                ))
+                .filter(turn -> !isHardSafetyStop(
+                        safetyGate.evaluate(turn.assistantMessage())
+                ))
+                .toList();
+    }
+
+    private DemoCustomerChatTurnResponse attachRoutingFailure(
+            DemoCustomerChatTurnResponse response,
+            RuntimeException exception
+    ) {
+        String failureCode = routingFailureCode(exception);
+        DemoCustomerChatTurnResponse.ToolEvent failureEvent =
+                new DemoCustomerChatTurnResponse.ToolEvent(
+                        0,
+                        "model_routing",
+                        "gemini_customer_router",
+                        true,
+                        "route_customer_message",
+                        "failed",
+                        exception instanceof ModelProviderException,
+                        "AI-routern kunde inte användas. Java växlade tydligt till det säkra reservläget.",
+                        "The AI router was unavailable. Java explicitly switched to the safe fallback.",
+                        null,
+                        List.of(),
+                        null
+                );
+        DemoCustomerChatTurnResponse.Receipt receipt =
+                exception instanceof ModelProviderException
+                        ? addUnknownModelCall(
+                        response.receipt(),
+                        aiProperties == null ? null : aiProperties.modelId()
+                )
+                        : response.receipt();
+        return copyResponse(
+                response,
+                FALLBACK_TRUTH_SV,
+                FALLBACK_TRUTH_EN,
+                response.assistantMessage(),
+                insertAfterSafety(response.toolEvents(), failureEvent),
+                response.verifiedClaims(),
+                response.verification(),
+                receipt,
+                new DemoCustomerChatTurnResponse.ErrorDetail(
+                        "CUSTOMER_CHAT_ROUTER_" + failureCode,
+                        "Live-AI kunde inte tolka frågan just nu. Svaret kommer från det märkta reservläget och ingen ändring gjordes.",
+                        "Live AI could not route the question right now. The answer came from the labelled fallback and no change was made."
+                )
+        );
+    }
+
+    private DemoCustomerChatTurnResponse downstreamUnavailable(
+            String turnId,
+            long started,
+            DemoCustomerChatTurnRequest request,
+            DemoCustomerIntentClassifier.Decision intent,
+            KnowledgeRagSafetyGate.Decision safety,
+            RuntimeException exception
+    ) {
+        String failureCode = routingFailureCode(exception);
+        List<DemoCustomerChatTurnResponse.ToolEvent> events = List.of(
+                safetyEvent(1, safety),
+                contextEvent(2),
+                new DemoCustomerChatTurnResponse.ToolEvent(
+                        3,
+                        "provider_boundary",
+                        "spring_orchestrator",
+                        false,
+                        "run_selected_customer_capability",
+                        "failed",
+                        false,
+                        "AI:n tolkade frågan, men nästa skyddade steg kunde inte starta. Inget svar hittades på och ingen ändring gjordes.",
+                        "AI interpreted the question, but the next protected step could not start. No answer was invented and no change was made.",
+                        null,
+                        List.of(),
+                        null
+                )
+        );
+        return response(
+                turnId,
+                request,
+                intent,
+                safety,
+                "unavailable",
+                new DemoCustomerChatTurnResponse.AssistantMessage(
+                        "Jag förstod frågan, men kunde inte starta den skyddade informationshämtningen just nu. Jag vill inte gissa. Ingen ändring gjordes.",
+                        "I understood the question, but could not start the protected information retrieval right now. I will not guess. No change was made."
+                ),
+                null,
+                events,
+                List.of(contextSource()),
+                List.of(),
+                noRag(),
+                new DemoCustomerChatTurnResponse.Verification(
+                        "not_run",
+                        true,
+                        false,
+                        false,
+                        false,
+                        false,
+                        true,
+                        false,
+                        "not_released_downstream_live_boundary"
+                ),
+                receipt(0, 0, 0, 0, 0, started, null),
+                new DemoCustomerChatTurnResponse.ErrorDetail(
+                        "CUSTOMER_CHAT_DOWNSTREAM_" + failureCode,
+                        "Frågan tolkades, men det valda live-steget stoppades av systemets skyddsgräns.",
+                        "The question was routed, but the selected live step was stopped by the system boundary."
+                )
+        );
+    }
+
+    private List<CustomerChatAnswerGateway.Evidence> answerEvidence(
+            DemoCustomerChatTurnResponse response
+    ) {
+        return response.sources().stream()
+                .sorted(Comparator.comparing(DemoCustomerChatTurnResponse.Source::evidenceId))
+                .limit(CustomerChatAnswerGateway.MAX_EVIDENCE_ITEMS)
+                .map(source -> new CustomerChatAnswerGateway.Evidence(
+                        source.evidenceId(),
+                        source.title(),
+                        evidenceText(source, response.order())
+                ))
+                .toList();
+    }
+
+    private String evidenceText(
+            DemoCustomerChatTurnResponse.Source source,
+            DemoOrderSnapshot order
+    ) {
+        if ("order_snapshot".equals(source.kind()) && order != null) {
+            return "Synthetic current order. order_id=" + order.orderId()
+                    + "; status_sv=" + order.statusSv()
+                    + "; status_en=" + order.statusEn()
+                    + "; item_count=" + order.itemCount()
+                    + "; estimated_delivery_from="
+                    + order.estimatedDeliveryFrom()
+                    + "; estimated_delivery_through="
+                    + order.estimatedDeliveryThrough()
+                    + "; payment_state=" + order.paymentState()
+                    + "; fulfilment_state=" + order.fulfilmentState()
+                    + "; next_step_sv=" + order.nextStepSv()
+                    + "; next_step_en=" + order.nextStepEn()
+                    + "; product names are not available.";
+        }
+        if ("company_policy".equals(source.kind())) {
+            return corpus.metadata(source.evidenceId()).text();
+        }
+        return source.displaySummaryEn()
+                + " The public demo is read-only, uses one fixed synthetic "
+                + "customer and order, and exposes no business write tools.";
+    }
+
+    private List<DemoCustomerChatTurnResponse.ToolEvent> insertAfterSafety(
+            List<DemoCustomerChatTurnResponse.ToolEvent> existing,
+            DemoCustomerChatTurnResponse.ToolEvent inserted
+    ) {
+        List<DemoCustomerChatTurnResponse.ToolEvent> result =
+                new ArrayList<>(existing.size() + 1);
+        boolean added = false;
+        for (DemoCustomerChatTurnResponse.ToolEvent event : existing) {
+            result.add(event);
+            if (!added && "safety".equals(event.type())) {
+                result.add(inserted);
+                added = true;
+            }
+        }
+        if (!added) {
+            result.addFirst(inserted);
+        }
+        return resequence(result);
+    }
+
+    private List<DemoCustomerChatTurnResponse.ToolEvent> appendAnswerEvents(
+            List<DemoCustomerChatTurnResponse.ToolEvent> existing,
+            Long latencyMs,
+            boolean verified,
+            DemoCustomerChatTurnResponse.ErrorDetail error
+    ) {
+        List<DemoCustomerChatTurnResponse.ToolEvent> result =
+                new ArrayList<>(existing);
+        result.add(new DemoCustomerChatTurnResponse.ToolEvent(
+                0,
+                "generation",
+                "gemini_customer_answer",
+                false,
+                "compose_customer_answer",
+                verified ? "completed" : "failed",
+                true,
+                verified
+                        ? "Gemini formulerade ett naturligt svar enbart från returnerade bevis."
+                        : "Geminis svar kunde inte användas; backendens säkra formulering behölls.",
+                verified
+                        ? "Gemini composed a natural reply only from returned evidence."
+                        : "Gemini's answer could not be used; the safe backend wording was retained.",
+                null,
+                List.of(),
+                latencyMs
+        ));
+        result.add(new DemoCustomerChatTurnResponse.ToolEvent(
+                0,
+                "verification",
+                "spring_orchestrator",
+                false,
+                "verify_customer_answer",
+                verified ? "completed" : "blocked",
+                true,
+                verified
+                        ? "Java verifierade format, käll-ID:n och att ingen affärsåtgärd påstods."
+                        : error.summarySv(),
+                verified
+                        ? "Java verified the schema, source IDs and that no business action was claimed."
+                        : error.summaryEn(),
+                null,
+                List.of(),
+                null
+        ));
+        return resequence(result);
+    }
+
+    private List<DemoCustomerChatTurnResponse.ToolEvent> resequence(
+            List<DemoCustomerChatTurnResponse.ToolEvent> events
+    ) {
+        List<DemoCustomerChatTurnResponse.ToolEvent> result =
+                new ArrayList<>(events.size());
+        int sequence = 1;
+        for (DemoCustomerChatTurnResponse.ToolEvent event : events) {
+            result.add(new DemoCustomerChatTurnResponse.ToolEvent(
+                    sequence++,
+                    event.type(),
+                    event.initiatedBy(),
+                    event.modelSelected(),
+                    event.name(),
+                    event.status(),
+                    event.executed(),
+                    event.summarySv(),
+                    event.summaryEn(),
+                    event.sourceRef(),
+                    event.evidenceIds(),
+                    event.latencyMs()
+            ));
+        }
+        return List.copyOf(result);
+    }
+
+    private DemoCustomerChatTurnResponse.Receipt addModelCall(
+            DemoCustomerChatTurnResponse.Receipt receipt,
+            ModelCostEstimate estimate,
+            String modelId
+    ) {
+        return addModelCall(receipt, estimate, modelId, 0);
+    }
+
+    private DemoCustomerChatTurnResponse.Receipt addModelCall(
+            DemoCustomerChatTurnResponse.Receipt receipt,
+            ModelCostEstimate estimate,
+            String modelId,
+            long additionalLatencyMs
+    ) {
+        BigDecimal combinedCost = combineKnownCosts(
+                receipt.providerCalls(),
+                receipt.estimatedCostUsd(),
+                estimate == null ? null : estimate.estimatedUsd()
+        );
+        return new DemoCustomerChatTurnResponse.Receipt(
+                receipt.readOperations(),
+                receipt.providerCalls() + 1,
+                receipt.embeddingCalls(),
+                receipt.vectorSearches(),
+                receipt.generationCalls() + 1,
+                0,
+                receipt.businessWriteScope(),
+                false,
+                false,
+                false,
+                receipt.totalLatencyMs() + Math.max(0, additionalLatencyMs),
+                modelId,
+                combinedCost,
+                combinedCost == null
+                        ? "provider_usage_not_reported"
+                        : "estimated_model_generation_only",
+                joinCostBasis(
+                        receipt.providerCalls() == 0
+                                ? null
+                                : receipt.costBasis(),
+                        estimate == null ? null : estimate.basis()
+                )
+        );
+    }
+
+    private DemoCustomerChatTurnResponse.Receipt addUnknownModelCall(
+            DemoCustomerChatTurnResponse.Receipt receipt,
+            String modelId
+    ) {
+        return addUnknownModelCall(receipt, modelId, 0);
+    }
+
+    private DemoCustomerChatTurnResponse.Receipt addUnknownModelCall(
+            DemoCustomerChatTurnResponse.Receipt receipt,
+            String modelId,
+            long additionalLatencyMs
+    ) {
+        return new DemoCustomerChatTurnResponse.Receipt(
+                receipt.readOperations(),
+                receipt.providerCalls() + 1,
+                receipt.embeddingCalls(),
+                receipt.vectorSearches(),
+                receipt.generationCalls() + 1,
+                0,
+                receipt.businessWriteScope(),
+                false,
+                false,
+                false,
+                receipt.totalLatencyMs() + Math.max(0, additionalLatencyMs),
+                modelId,
+                null,
+                "provider_usage_not_reported",
+                joinCostBasis(
+                        receipt.providerCalls() == 0
+                                ? null
+                                : receipt.costBasis(),
+                        "The attempted model call did not return usable usage metadata."
+                )
+        );
+    }
+
+    private BigDecimal combineKnownCosts(
+            int existingProviderCalls,
+            BigDecimal existing,
+            BigDecimal added
+    ) {
+        if (added == null || (existingProviderCalls > 0 && existing == null)) {
+            return null;
+        }
+        return (existing == null ? BigDecimal.ZERO : existing).add(added);
+    }
+
+    private String joinCostBasis(String first, String second) {
+        return java.util.stream.Stream.of(first, second)
+                .filter(Objects::nonNull)
+                .map(String::strip)
+                .filter(value -> !value.isBlank())
+                .distinct()
+                .collect(java.util.stream.Collectors.joining(" "));
+    }
+
+    private DemoCustomerChatTurnResponse copyResponse(
+            DemoCustomerChatTurnResponse response,
+            String truthLabel,
+            String truthLabelEn,
+            DemoCustomerChatTurnResponse.AssistantMessage assistant,
+            List<DemoCustomerChatTurnResponse.ToolEvent> events,
+            List<DemoCustomerChatTurnResponse.VerifiedClaim> claims,
+            DemoCustomerChatTurnResponse.Verification verification,
+            DemoCustomerChatTurnResponse.Receipt receipt,
+            DemoCustomerChatTurnResponse.ErrorDetail error
+    ) {
+        return new DemoCustomerChatTurnResponse(
+                response.contractVersion(),
+                response.turnId(),
+                response.mode(),
+                truthLabel,
+                truthLabelEn,
+                response.outcome(),
+                response.submittedMessage(),
+                response.context(),
+                response.intent(),
+                response.safety(),
+                assistant,
+                response.order(),
+                events,
+                response.sources(),
+                claims,
+                response.rag(),
+                verification,
+                receipt,
+                error,
+                response.limitations()
+        );
     }
 
     private DemoCustomerChatTurnResponse refused(
@@ -278,17 +1075,21 @@ public final class DemoCustomerChatService {
         ) {
             case CANCEL_ORDER -> cancellationPolicy;
             case RETURN_ORDER -> returnPolicy;
-            case REFUND_ORDER, CHANGE_DELIVERY_ADDRESS -> authorityPolicy;
+            case REFUND_ORDER, PURCHASE_ITEM,
+                    CHANGE_DELIVERY_ADDRESS -> authorityPolicy;
             default -> throw new IllegalArgumentException(
                     "No action policy for " + intent.intent()
             );
         };
-        List<DemoCustomerChatTurnResponse.Source> sources = List.of(
-                contextSource(),
-                orderSource(order),
-                policySource(actionPolicy, null),
-                policySource(contactPolicy, null)
-        );
+        boolean hasApprovedManualRoute =
+                intent.intent() != DemoCustomerIntentClassifier.Intent.PURCHASE_ITEM;
+        List<DemoCustomerChatTurnResponse.Source> sources = new ArrayList<>();
+        sources.add(contextSource());
+        sources.add(orderSource(order));
+        sources.add(policySource(actionPolicy, null));
+        if (hasApprovedManualRoute) {
+            sources.add(policySource(contactPolicy, null));
+        }
         List<DemoCustomerChatTurnResponse.ToolEvent> events = new ArrayList<>();
         events.add(safetyEvent(1, safety));
         events.add(contextEvent(2));
@@ -316,20 +1117,23 @@ public final class DemoCustomerChatService {
                 List.of(actionPolicy.evidenceId()),
                 null
         ));
+        int verificationSequence = 5;
+        if (hasApprovedManualRoute) {
+            events.add(event(
+                    verificationSequence++,
+                    "backend_read",
+                    "read_manual_support_route",
+                    "completed",
+                    true,
+                    "Läste den fiktiva vägen till mänsklig hjälp.",
+                    "Read the approved route to human support.",
+                    contactPolicy.sourceRef(),
+                    List.of(contactPolicy.evidenceId()),
+                    null
+            ));
+        }
         events.add(event(
-                5,
-                "backend_read",
-                "read_manual_support_route",
-                "completed",
-                true,
-                "Läste den fiktiva vägen till mänsklig hjälp.",
-                "Read the approved route to human support.",
-                contactPolicy.sourceRef(),
-                List.of(contactPolicy.evidenceId()),
-                null
-        ));
-        events.add(event(
-                6,
+                verificationSequence,
                 "verification",
                 "verify_read_only_boundary",
                 "completed",
@@ -350,7 +1154,12 @@ public final class DemoCustomerChatService {
                 order,
                 events,
                 sources,
-                authorityClaims(intent, order, actionPolicy, contactPolicy),
+                authorityClaims(
+                        intent,
+                        order,
+                        actionPolicy,
+                        hasApprovedManualRoute ? contactPolicy : null
+                ),
                 noRag(),
                 new DemoCustomerChatTurnResponse.Verification(
                         "completed",
@@ -363,7 +1172,77 @@ public final class DemoCustomerChatService {
                         false,
                         "released_outside_authority"
                 ),
-                receipt(3, 0, 0, 0, 0, started, null),
+                receipt(
+                        hasApprovedManualRoute ? 3 : 2,
+                        0,
+                        0,
+                        0,
+                        0,
+                        started,
+                        null
+                ),
+                null
+        );
+    }
+
+    private DemoCustomerChatTurnResponse conversation(
+            String turnId,
+            long started,
+            DemoCustomerChatTurnRequest request,
+            DemoCustomerIntentClassifier.Decision intent,
+            KnowledgeRagSafetyGate.Decision safety
+    ) {
+        List<DemoCustomerChatTurnResponse.Source> sources = List.of(
+                contextSource(),
+                policySource(authorityPolicy, null)
+        );
+        List<DemoCustomerChatTurnResponse.ToolEvent> events = List.of(
+                safetyEvent(1, safety),
+                contextEvent(2),
+                event(
+                        3,
+                        "backend_read",
+                        "read_assistant_scope",
+                        "completed",
+                        true,
+                        "Läste assistentens godkända roll och befogenhet.",
+                        "Read the assistant's approved role and authority.",
+                        authorityPolicy.sourceRef(),
+                        List.of(authorityPolicy.evidenceId()),
+                        null
+                )
+        );
+        return response(
+                turnId,
+                request,
+                intent,
+                safety,
+                "answered",
+                new DemoCustomerChatTurnResponse.AssistantMessage(
+                        "Hej! Jag kan hjälpa dig att kontrollera din order eller förklara Nordlys godkända kundregler.",
+                        "Hi! I can help check your order or explain Nordly's approved customer policies."
+                ),
+                null,
+                events,
+                sources,
+                List.of(new DemoCustomerChatTurnResponse.VerifiedClaim(
+                        authorityPolicy.displaySummarySv(),
+                        authorityPolicy.displaySummaryEn(),
+                        List.of(authorityPolicy.evidenceId())
+                )),
+                noRag(),
+                new DemoCustomerChatTurnResponse.Verification(
+                        "completed",
+                        true,
+                        false,
+                        true,
+                        true,
+                        false,
+                        true,
+                        false,
+                        "released_bounded_conversation"
+                ),
+                receipt(1, 0, 0, 0, 0, started, null),
                 null
         );
     }
@@ -516,6 +1395,81 @@ public final class DemoCustomerChatService {
         );
     }
 
+    private DemoCustomerChatTurnResponse companyKnowledge(
+            String turnId,
+            long started,
+            DemoCustomerChatTurnRequest request,
+            DemoCustomerIntentClassifier.Decision intent,
+            KnowledgeRagSafetyGate.Decision safety
+    ) {
+        KnowledgeRagResponse rag = knowledgeRagService.ask(
+                new KnowledgeRagRequest(
+                        request.message().strip(),
+                        request.locale(),
+                        request.confirmLiveAi()
+                )
+        );
+        List<DemoCustomerChatTurnResponse.Source> sources = new ArrayList<>();
+        sources.add(contextSource());
+        sources.addAll(ragSources(rag));
+        List<DemoCustomerChatTurnResponse.ToolEvent> events = new ArrayList<>();
+        events.add(safetyEvent(1, safety));
+        events.add(contextEvent(2));
+        appendRagEvents(events, rag, 3);
+
+        List<KnowledgeRagResponse.AnswerClaim> claims = rag.answer() == null
+                || rag.answer().claims() == null
+                ? List.of()
+                : rag.answer().claims();
+        boolean releasable = answerReleasable(rag) && !claims.isEmpty();
+        String outcome = customerOutcome(rag, releasable);
+        boolean citationsWithinSources = citationsWithinSources(rag, sources);
+        boolean approvedOnly = rag.verification().approvedDocumentsOnly()
+                && sources.stream()
+                .filter(source -> "company_policy".equals(source.kind()))
+                .allMatch(source -> "APPROVED".equals(source.lifecycle()));
+        int vectorSearches = rag.retrieval().currentVectorSearch() ? 1 : 0;
+
+        return response(
+                turnId,
+                request,
+                intent,
+                safety,
+                outcome,
+                knowledgeAssistant(rag, outcome),
+                null,
+                events,
+                sources,
+                verifiedClaims(claims, releasable),
+                ragExecution(rag),
+                new DemoCustomerChatTurnResponse.Verification(
+                        releasable
+                                ? "completed"
+                                : rag.verification().evaluationStatus(),
+                        true,
+                        false,
+                        approvedOnly,
+                        citationsWithinSources,
+                        rag.verification().semanticClaimSupportEvaluated(),
+                        true,
+                        false,
+                        releasable
+                                ? "released_grounded_company_answer"
+                                : rag.verification().overallOutcome()
+                ),
+                receipt(
+                        vectorSearches,
+                        rag.receipt().providerCalls(),
+                        rag.receipt().embeddingCalls(),
+                        vectorSearches,
+                        rag.receipt().generationCalls(),
+                        started,
+                        rag
+                ),
+                ragError(rag, releasable)
+        );
+    }
+
     private DemoCustomerChatTurnResponse unsupported(
             String turnId,
             long started,
@@ -590,13 +1544,13 @@ public final class DemoCustomerChatService {
         String submittedText = redacted
                 ? "sv".equals(request.locale()) ? REDACTED_SV : REDACTED_EN
                 : request.message().strip();
-        boolean liveRag = receipt.providerCalls() > 0;
+        boolean liveAi = receipt.providerCalls() > 0;
         return new DemoCustomerChatTurnResponse(
                 DemoCustomerChatTurnResponse.CONTRACT_VERSION,
                 turnId,
                 DemoCustomerChatTurnResponse.MODE,
-                liveRag ? LIVE_RAG_TRUTH_SV : NO_AI_TRUTH_SV,
-                liveRag ? LIVE_RAG_TRUTH_EN : NO_AI_TRUTH_EN,
+                liveAi ? LIVE_AI_TRUTH_SV : NO_AI_TRUTH_SV,
+                liveAi ? LIVE_AI_TRUTH_EN : NO_AI_TRUTH_EN,
                 outcome,
                 new DemoCustomerChatTurnResponse.SubmittedMessage(
                         submittedText,
@@ -633,32 +1587,38 @@ public final class DemoCustomerChatService {
                 order.sourceRef(),
                 true,
                 false,
-                "request_only_fixed_context"
+                "request_scoped_bounded_history"
         );
     }
 
     private DemoCustomerChatTurnResponse.AssistantMessage orderMessage(
             DemoOrderSnapshot order
     ) {
+        String itemsSv = order.itemCount() == 1
+                ? "1 vara"
+                : order.itemCount() + " varor";
+        String itemsEn = order.itemCount() == 1
+                ? "1 item"
+                : order.itemCount() + " items";
         return new DemoCustomerChatTurnResponse.AssistantMessage(
-                "Ja – din order " + order.orderId()
-                        + " är skickad och överlämnad till transportören. "
-                        + "Den beräknas komma "
+                "Hej! Jag har kontrollerat din order " + order.orderId()
+                        + ". Orderstatus: " + order.statusSv()
+                        + ". Den beräknas komma "
                         + dateRangeSv(
                         order.estimatedDeliveryFrom(),
                         order.estimatedDeliveryThrough()
-                ) + ". Den innehåller "
-                        + order.itemCount()
-                        + " vara. Produktnamnet finns inte i den orderinformation jag får läsa. Nästa uppdatering kommer från transportören.",
-                "Yes – your order " + order.orderId()
-                        + " has shipped and was handed to the carrier. "
-                        + "It is expected to arrive "
+                ) + ". Ordern innehåller " + itemsSv + ". "
+                        + "Produktnamnet finns inte i den orderinformation "
+                        + "jag har tillgång till. " + order.nextStepSv(),
+                "Hi! I checked your order " + order.orderId()
+                        + ". Order status: " + order.statusEn()
+                        + ". It is expected to arrive "
                         + dateRangeEn(
                         order.estimatedDeliveryFrom(),
                         order.estimatedDeliveryThrough()
-                ) + ". It contains "
-                        + order.itemCount()
-                        + " item. The product name is not included in the order information I am allowed to read. The next update will come from the carrier."
+                ) + ". The order contains " + itemsEn + ". "
+                        + "The product name is not included in the order "
+                        + "information I can access. " + order.nextStepEn()
         );
     }
 
@@ -685,6 +1645,8 @@ public final class DemoCustomerChatService {
                     "Assistenten får förklara returregeln men inte skapa en retur.";
             case REFUND_ORDER ->
                     "Assistenten är read-only och en ekonomisk åtgärd kräver en människa.";
+            case PURCHASE_ITEM ->
+                    "Assistenten får läsa den befintliga ordern men inte skapa köp eller lägga till varor.";
             case CHANGE_DELIVERY_ADDRESS ->
                     "Assistenten får läsa ordern men inte ändra leveransadressen.";
             default -> throw new IllegalArgumentException(
@@ -698,29 +1660,34 @@ public final class DemoCustomerChatService {
                     "The assistant may explain the return rule but cannot create a return.";
             case REFUND_ORDER ->
                     "The assistant is read-only and a financial action requires a human.";
+            case PURCHASE_ITEM ->
+                    "The assistant may read the existing order but cannot create purchases or add items.";
             case CHANGE_DELIVERY_ADDRESS ->
                     "The assistant may read the order but cannot change its delivery address.";
             default -> throw new IllegalArgumentException(
                     "No authority claim for " + intent.intent()
             );
         };
-        return List.of(
-                new DemoCustomerChatTurnResponse.VerifiedClaim(
-                        "Ordern är " + order.statusSv() + ".",
-                        "The order is " + order.statusEn() + ".",
-                        List.of(order.evidenceId())
-                ),
-                new DemoCustomerChatTurnResponse.VerifiedClaim(
-                        actionSv,
-                        actionEn,
-                        List.of(actionPolicy.evidenceId())
-                ),
-                new DemoCustomerChatTurnResponse.VerifiedClaim(
-                        "Den fiktiva manuella supportvägen är telefon 123.",
-                        "The approved manual support route is phone 123.",
-                        List.of(supportPolicy.evidenceId())
-                )
-        );
+        List<DemoCustomerChatTurnResponse.VerifiedClaim> claims =
+                new ArrayList<>();
+        claims.add(new DemoCustomerChatTurnResponse.VerifiedClaim(
+                "Ordern är " + order.statusSv() + ".",
+                "The order is " + order.statusEn() + ".",
+                List.of(order.evidenceId())
+        ));
+        claims.add(new DemoCustomerChatTurnResponse.VerifiedClaim(
+                actionSv,
+                actionEn,
+                List.of(actionPolicy.evidenceId())
+        ));
+        if (supportPolicy != null) {
+            claims.add(new DemoCustomerChatTurnResponse.VerifiedClaim(
+                    "Den fiktiva manuella supportvägen är telefon 123.",
+                    "The approved manual support route is phone 123.",
+                    List.of(supportPolicy.evidenceId())
+            ));
+        }
+        return List.copyOf(claims);
     }
 
     private List<DemoCustomerChatTurnResponse.VerifiedClaim> verifiedClaims(
@@ -744,20 +1711,54 @@ public final class DemoCustomerChatService {
     ) {
         return switch (intent.intent()) {
             case CANCEL_ORDER -> new DemoCustomerChatTurnResponse.AssistantMessage(
-                    "Det ligger utanför min befogenhet. Paketet är redan på väg och jag gjorde ingen ändring. Ring 123 så hjälper vi dig vidare.",
-                    "That is outside my authority. The parcel is already on its way and I made no change. Call 123 and our support team can help you further."
+                    "Jag förstår att du vill avbeställa ordern. Paketet är "
+                            + "redan på väg. Det ligger utanför min befogenhet "
+                            + "att avbeställa eller ändra det. Ingen ändring "
+                            + "gjordes. Ring 123 så hjälper vi dig vidare.",
+                    "I understand that you want to cancel the order. The parcel "
+                            + "is already on its way, and I am not authorized to "
+                            + "cancel or change it. No change was made. Call 123 "
+                            + "and our support team can help you further."
             );
             case RETURN_ORDER -> new DemoCustomerChatTurnResponse.AssistantMessage(
-                    "Det ligger utanför min befogenhet. Jag kan förklara returreglerna men inte skapa en retur. Jag gjorde ingen ändring. Ring 123 så hjälper vi dig vidare.",
-                    "That is outside my authority. I can explain the return rules but cannot create a return. I made no change. Call 123 and our support team can help you further."
+                    "Jag förstår att du vill göra en retur. Jag kan förklara "
+                            + "returreglerna, men det ligger utanför min befogenhet "
+                            + "att skapa eller godkänna returen. Ingen ändring "
+                            + "gjordes. Ring 123 så hjälper vi dig vidare.",
+                    "I understand that you want to make a return. I can explain "
+                            + "the return rules, but I am not authorized to create "
+                            + "or approve the return. No change was made. Call 123 "
+                            + "and our support team can help you further."
             );
             case REFUND_ORDER -> new DemoCustomerChatTurnResponse.AssistantMessage(
-                    "Det ligger utanför min befogenhet att genomföra en återbetalning. Jag har inte ändrat ordern. Ring 123 så hjälper vi dig vidare.",
-                    "Issuing a refund is outside my authority. I have not changed the order. Call 123 and our support team can help you further."
+                    "Jag förstår att du vill ha en återbetalning. Jag kan "
+                            + "förklara reglerna, men det ligger utanför min "
+                            + "befogenhet att godkänna eller genomföra den. Ingen "
+                            + "ändring gjordes. Ring 123 så hjälper vi dig vidare.",
+                    "I understand that you want a refund. I can explain the "
+                            + "rules, but I am not authorized to approve or issue "
+                            + "a refund. No change was made. Call 123 and our "
+                            + "support team can help you further."
+            );
+            case PURCHASE_ITEM -> new DemoCustomerChatTurnResponse.AssistantMessage(
+                    "Jag förstår att du vill beställa en vara till. Den här "
+                            + "chatten kan läsa din befintliga order, men den "
+                            + "kan inte skapa köp eller lägga till varor. Ingen "
+                            + "ändring gjordes. Jag kan gärna hjälpa dig med "
+                            + "statusen på ordern som redan finns.",
+                    "I understand that you want to order another item. This "
+                            + "chat can read your existing order, but it cannot "
+                            + "create purchases or add items. No change was made. "
+                            + "I can help with the status of the order you already have."
             );
             case CHANGE_DELIVERY_ADDRESS -> new DemoCustomerChatTurnResponse.AssistantMessage(
-                    "Det ligger utanför min befogenhet att ändra leveransadressen. Jag har inte ändrat ordern. Ring 123 så hjälper vi dig vidare.",
-                    "Changing the delivery address is outside my authority. I have not changed the order. Call 123 and our support team can help you further."
+                    "Jag förstår att du vill ändra leveransadressen, men det "
+                            + "ligger utanför min befogenhet. Ingen ändring gjordes. "
+                            + "Ring 123 så hjälper vi dig vidare.",
+                    "I understand that you want to change the delivery address, "
+                            + "but changing it is outside my authority. I have "
+                            + "not changed the order. Call 123 and our support "
+                            + "team can help you further."
             );
             default -> throw new IllegalArgumentException(
                     "No authority message for " + intent.intent()
@@ -819,6 +1820,40 @@ public final class DemoCustomerChatService {
         return new DemoCustomerChatTurnResponse.AssistantMessage(
                 "Det verifierade policysvaret kunde inte visas.",
                 "The verified policy answer could not be displayed."
+        );
+    }
+
+    private DemoCustomerChatTurnResponse.AssistantMessage knowledgeAssistant(
+            KnowledgeRagResponse rag,
+            String outcome
+    ) {
+        if ("answered".equals(outcome) && rag.answer() != null) {
+            return new DemoCustomerChatTurnResponse.AssistantMessage(
+                    rag.answer().summarySv(),
+                    rag.answer().summaryEn()
+            );
+        }
+        if ("confirmation_required".equals(outcome)) {
+            return new DemoCustomerChatTurnResponse.AssistantMessage(
+                    "Jag behöver söka i Nordlys godkända dokument för att svara säkert. Vill du fortsätta?",
+                    "I need to search Nordly's approved documents to answer safely. Would you like to continue?"
+            );
+        }
+        if ("insufficient_evidence".equals(outcome)) {
+            return new DemoCustomerChatTurnResponse.AssistantMessage(
+                    "Jag hittar inget tillräckligt säkert stöd i Nordlys godkända dokument och vill därför inte gissa.",
+                    "I cannot find sufficiently safe support in Nordly's approved documents, so I will not guess."
+            );
+        }
+        if (rag.error() != null) {
+            return new DemoCustomerChatTurnResponse.AssistantMessage(
+                    rag.error().summarySv(),
+                    rag.error().summaryEn()
+            );
+        }
+        return new DemoCustomerChatTurnResponse.AssistantMessage(
+                "Det verifierade svaret kunde inte visas just nu.",
+                "The verified answer could not be displayed right now."
         );
     }
 
@@ -1300,7 +2335,8 @@ public final class DemoCustomerChatService {
             return false;
         }
         return switch (intent.intent()) {
-            case CANCEL_ORDER, CHANGE_DELIVERY_ADDRESS -> safety.reasonCode()
+            case CANCEL_ORDER, PURCHASE_ITEM,
+                    CHANGE_DELIVERY_ADDRESS -> safety.reasonCode()
                     == KnowledgeRagSafetyGate.ReasonCode.WRITE_ACTION;
             case RETURN_ORDER, REFUND_ORDER -> safety.reasonCode()
                     == KnowledgeRagSafetyGate.ReasonCode.FINANCIAL_ACTION;
@@ -1321,13 +2357,21 @@ public final class DemoCustomerChatService {
     ) {
         return switch (safety.reasonCode()) {
             case PII_REQUEST -> new DemoCustomerChatTurnResponse.AssistantMessage(
-                    "Jag kan inte lämna ut eller behandla privata personuppgifter.",
-                    "I cannot disclose or process private personal information."
+                    "Jag kan inte hjälpa till att lämna ut eller behandla privata "
+                            + "personuppgifter. Jag kan däremot hjälpa dig med "
+                            + "statusen för din egen order.",
+                    "I cannot disclose or process private personal information. "
+                            + "I can still help with the status of your own order."
             );
             case EMPLOYEE_COMPENSATION_REQUEST ->
                     new DemoCustomerChatTurnResponse.AssistantMessage(
-                            "Jag kan inte lämna ut privat information om en medarbetares lön eller ersättning.",
-                            "I cannot disclose private information about an employee's salary or compensation."
+                            "Jag kan inte hjälpa till att lämna ut privat "
+                                    + "information om en medarbetares lön eller "
+                                    + "ersättning. Jag kan däremot hjälpa dig med "
+                                    + "din egen order.",
+                            "I cannot help disclose private information about an "
+                                    + "employee's salary or compensation. I can "
+                                    + "still help with your own order."
                     );
             case SECRET_REQUEST -> new DemoCustomerChatTurnResponse.AssistantMessage(
                     "Jag kan inte lämna ut nycklar, lösenord eller andra hemligheter.",

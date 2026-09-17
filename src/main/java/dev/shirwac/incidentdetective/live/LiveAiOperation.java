@@ -8,6 +8,7 @@ package dev.shirwac.incidentdetective.live;
  * even when usage metadata is missing or the provider outcome is uncertain.</p>
  */
 public enum LiveAiOperation {
+    CUSTOMER_CHAT_ROUTE(5_000, false),
     INCIDENT_PLAN(5_000, false),
     KNOWLEDGE_RAG(10_000, true),
     ADK_TURN(20_000, true),
