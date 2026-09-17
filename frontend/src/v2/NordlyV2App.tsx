@@ -628,8 +628,8 @@ export default function NordlyV2App() {
       const plan = await createIncidentLabPlan({
         instruction: localized(
           locale,
-          "Skapa ett syntetiskt driftlarm i Nordlys köpflöde. Undersök bevisen och rapportera vad de faktiskt stödjer utan skrivåtgärder.",
-          "Create a synthetic operations alert in Nordly's checkout flow. Inspect the evidence and report only what it supports, without write actions.",
+          "Simulera tre tidsgränsöverskridna betalningar i Nordlys syntetiska köpflöde. Undersök bevisen och rapportera vad de faktiskt stödjer utan skrivåtgärder.",
+          "Simulate three timed-out payments in Nordly's synthetic checkout flow. Inspect the evidence and report only what it supports, without write actions.",
         ),
         confirm_live_ai: true,
       });

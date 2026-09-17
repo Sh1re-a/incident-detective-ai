@@ -513,6 +513,7 @@ describe("Nordly v2", () => {
     const runRequest = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/v1/incident-lab/runs"));
     const followUpRequest = fetchMock.mock.calls.find(([url]) => String(url).includes("/incident-lab/follow-ups"));
     expect(String((planRequest?.[1] as RequestInit | undefined)?.body)).toContain('"confirm_live_ai":true');
+    expect(String((planRequest?.[1] as RequestInit | undefined)?.body)).toContain("tre tidsgränsöverskridna betalningar");
     expect(String((runRequest?.[1] as RequestInit | undefined)?.body)).toContain('"confirm_live_ai":true');
     expect(String((followUpRequest?.[1] as RequestInit | undefined)?.body)).toContain('"confirm_live_ai":true');
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/runs/recorded-replay"))).toHaveLength(0);
