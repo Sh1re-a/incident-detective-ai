@@ -59,6 +59,10 @@ public final class GeminiCustomerChatAnswerGateway
     static final int TIMEOUT_MS = 15_000;
     private static final String APPROVED_CONTACT_EVIDENCE =
             "nordly-evidence-manual-support-contact";
+    private static final String DATA_BOUNDARY_EVIDENCE =
+            "nordly-evidence-data-minimization";
+    private static final String PROTECTED_BOUNDARY_INTENT =
+            "protected_boundary";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(
             GeminiCustomerChatAnswerGateway.class
@@ -106,6 +110,24 @@ public final class GeminiCustomerChatAnswerGateway
             "(?i)(?:\\bAIza[0-9a-z_-]{20,}\\b|\\bsk-[0-9a-z_-]{16,}\\b|"
                     + "\\b(?:api[-_ ]?key|password|secret|token)\\s*[:=]\\s*\\S+)"
     );
+    private static final Pattern SWEDISH_BOUNDARY_LANGUAGE = Pattern.compile(
+            "(?:kan inte|far inte|lamnar inte ut|hall(?:s|er).{0,24}utanfor|"
+                    + "skyddad information|privat information|"
+                    + "utanfor min befogenhet)"
+    );
+    private static final Pattern ENGLISH_BOUNDARY_LANGUAGE = Pattern.compile(
+            "(?:cannot|can't|do not disclose|does not disclose|"
+                    + "kept.{0,24}outside|protected information|"
+                    + "private information|outside my authority|not authorized)"
+    );
+    private static final Pattern PROTECTED_DISCLOSURE_ASSERTION = Pattern.compile(
+            "(?:\\b(?:tjanar|far i lon|heter|bor pa|earns?|is paid|lives at)\\b|"
+                    + "\\b(?:lon(?:en)?|ersattning|e-?post(?:adress)?|mejl|adress|"
+                    + "telefonnummer|personnummer|salary|compensation|pay|"
+                    + "email(?: address)?|address|phone number|ssn)"
+                    + "\\s*(?:ar|is|:))"
+    );
+    private static final Pattern DECIMAL_DIGIT = Pattern.compile("\\d");
 
     private final GeminiAiProperties properties;
     private final GoogleGenAiClientFactory clientFactory;
@@ -303,6 +325,9 @@ public final class GeminiCustomerChatAnswerGateway
                     null
             );
         }
+        if (PROTECTED_BOUNDARY_INTENT.equals(input.routedIntent())) {
+            verifyProtectedBoundary(answer, input);
+        }
         verifyContactOutput(answer, input);
         if (EMAIL.matcher(combined).find()
                 || SWEDISH_PERSONAL_NUMBER.matcher(combined).find()
@@ -314,6 +339,46 @@ public final class GeminiCustomerChatAnswerGateway
                     null
             );
         }
+    }
+
+    private void verifyProtectedBoundary(Answer answer, Input input) {
+        boolean exactBoundaryEvidence = input.evidence().size() == 1
+                && DATA_BOUNDARY_EVIDENCE.equals(
+                input.evidence().getFirst().id()
+        );
+        if (!exactBoundaryEvidence) {
+            throw protectedBoundaryFailure();
+        }
+        if (!boundaryText(answer.textSv(), SWEDISH_BOUNDARY_LANGUAGE)
+                || !boundaryText(answer.textEn(), ENGLISH_BOUNDARY_LANGUAGE)
+                || answer.claims().isEmpty()
+                || answer.claims().stream().anyMatch(claim ->
+                !claim.citationIds().equals(List.of(DATA_BOUNDARY_EVIDENCE))
+                        || !boundaryText(
+                        claim.textSv(),
+                        SWEDISH_BOUNDARY_LANGUAGE
+                )
+                        || !boundaryText(
+                        claim.textEn(),
+                        ENGLISH_BOUNDARY_LANGUAGE
+                ))) {
+            throw protectedBoundaryFailure();
+        }
+    }
+
+    private boolean boundaryText(String value, Pattern boundaryLanguage) {
+        String normalized = normalize(value);
+        return boundaryLanguage.matcher(normalized).find()
+                && !DECIMAL_DIGIT.matcher(normalized).find()
+                && !PROTECTED_DISCLOSURE_ASSERTION.matcher(normalized).find();
+    }
+
+    private ModelProviderException protectedBoundaryFailure() {
+        return failure(
+                ModelProviderFailure.MALFORMED_RESPONSE,
+                "Gemini customer chat answer violated the protected boundary",
+                null
+        );
     }
 
     private void verifyContactOutput(Answer answer, Input input) {

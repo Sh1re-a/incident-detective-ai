@@ -190,6 +190,16 @@ public final class IncidentFollowUpService {
                         snapshot.originalAnswerState().name()
                 ))
         );
+        if (!safety.allowed()) {
+            return response(
+                    stored,
+                    request,
+                    IncidentFollowUpResponse.AnswerState.OUTSIDE_SCOPE,
+                    List.of(IncidentFollowUpRouter.Section.BOUNDARY),
+                    routed.provider(),
+                    true
+            );
+        }
         boolean outside = routed.decision().intent()
                 == IncidentFollowUpRouter.Intent.OUTSIDE_SCOPE;
         return response(

@@ -215,7 +215,7 @@ class IncidentFollowUpServiceTest {
     }
 
     @Test
-    void conceptualSafetyQuestionRoutesOnlyCanonicalBoundaryQuestion() {
+    void conceptualSafetyQuestionClampsANoncompliantRouteToBoundaryOnly() {
         IncidentFollowUpSnapshot snapshot = snapshot(
                 IncidentFollowUpResponse.Mode.LIVE_AI
         );
@@ -236,7 +236,10 @@ class IncidentFollowUpServiceTest {
         when(router.route(any())).thenReturn(new IncidentFollowUpRouter.Result(
                 new IncidentFollowUpRouter.Decision(
                         IncidentFollowUpRouter.Intent.INCIDENT_QUESTION,
-                        List.of(IncidentFollowUpRouter.Section.BOUNDARY)
+                        List.of(
+                                IncidentFollowUpRouter.Section.CAUSE,
+                                IncidentFollowUpRouter.Section.SOURCES
+                        )
                 ),
                 new IncidentFollowUpRouter.ProviderMetadata(
                         new GoogleGenAiProviderRoute(
@@ -264,7 +267,7 @@ class IncidentFollowUpServiceTest {
                 true
         ));
 
-        assertEquals(IncidentFollowUpResponse.AnswerState.ANSWERED,
+        assertEquals(IncidentFollowUpResponse.AnswerState.OUTSIDE_SCOPE,
                 response.answerState());
         assertEquals(1, response.receipt().providerCalls());
         assertEquals(1, response.receipt().modelCalls());
@@ -272,7 +275,14 @@ class IncidentFollowUpServiceTest {
         assertEquals(0, response.receipt().toolCalls());
         assertFalse(response.receipt().writeToolsAvailable());
         assertFalse(response.receipt().actionExecuted());
-        assertEquals("Ingen åtgärd utfördes.", response.answer().text());
+        assertTrue(response.answer().text().contains(
+                "Frågan ligger utanför det frysta körningskvittot"
+        ));
+        assertNull(response.answer().problemLocation().service());
+        assertTrue(response.answer().known().isEmpty());
+        assertTrue(response.answer().unknown().isEmpty());
+        assertTrue(response.claims().isEmpty());
+        assertTrue(response.citations().isEmpty());
 
         ArgumentCaptor<IncidentFollowUpRouter.Input> input =
                 ArgumentCaptor.forClass(IncidentFollowUpRouter.Input.class);

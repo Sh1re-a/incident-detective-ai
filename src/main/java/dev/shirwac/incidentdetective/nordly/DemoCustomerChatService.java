@@ -178,7 +178,8 @@ public final class DemoCustomerChatService {
                         response,
                         request,
                         List.of(),
-                        safeBoundaryPrompt(safety, request.locale())
+                        safeBoundaryPrompt(safety, request.locale()),
+                        "protected_boundary"
                 );
             } catch (RuntimeException exception) {
                 if (!recoverableRoutingFailure(exception)) {
@@ -265,7 +266,8 @@ public final class DemoCustomerChatService {
                         response,
                         request,
                         recentConversation,
-                        request.message()
+                        request.message(),
+                        response.intent().name()
                 );
             } catch (RuntimeException exception) {
                 if (!recoverableRoutingFailure(exception)) {
@@ -502,7 +504,8 @@ public final class DemoCustomerChatService {
             DemoCustomerChatTurnResponse response,
             DemoCustomerChatTurnRequest request,
             List<DemoCustomerChatTurnRequest.ConversationTurn> recentConversation,
-            String modelMessage
+            String modelMessage,
+            String routedIntent
     ) {
         if (answerGateway == null) {
             throw new LiveInvestigationException(
@@ -521,7 +524,7 @@ public final class DemoCustomerChatService {
                 new CustomerChatAnswerGateway.Input(
                         modelMessage,
                         request.locale(),
-                        response.intent().name(),
+                        routedIntent,
                         response.outcome(),
                         recentConversation,
                         evidence
@@ -693,10 +696,12 @@ public final class DemoCustomerChatService {
         return "sv".equals(locale)
                 ? "Svara vänligt och naturligt på en begäran med den säkra riskklassen "
                 + reason
-                + ". Förklara bara gränsen och erbjud hjälp inom vanlig kundservice."
+                + ". Förklara bara gränsen och erbjud hjälp inom vanlig kundservice. "
+                + "Upprepa inte det efterfrågade personfältet, namn eller värden."
                 : "Reply naturally and politely to a request with the safe risk class "
                 + reason
-                + ". Explain only the boundary and offer help within ordinary customer service.";
+                + ". Explain only the boundary and offer help within ordinary customer service. "
+                + "Do not repeat the requested personal field, names or values.";
     }
 
     private CustomerChatAnswerGateway.Evidence answerEvidence(

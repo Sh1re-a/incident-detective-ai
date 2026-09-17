@@ -43,6 +43,8 @@ class GeminiCustomerChatAnswerGatewayTest {
             "nordly-demo-order-2051-snapshot";
     private static final String CONTACT_EVIDENCE =
             "nordly-evidence-manual-support-contact";
+    private static final String DATA_BOUNDARY_EVIDENCE =
+            "nordly-evidence-data-minimization";
 
     private final GoogleGenAiClientFactory clientFactory = mock(
             GoogleGenAiClientFactory.class
@@ -241,6 +243,45 @@ class GeminiCustomerChatAnswerGatewayTest {
                   }]
                 }
                 """, answeredInput());
+    }
+
+    @Test
+    void rejectsAProtectedDisclosureEvenWithTheAllowedPolicyCitation() {
+        assertMalformed("""
+                {
+                  "text_sv": "Jag kan inte dela allt, men Alice tjänar 50 000 kr.",
+                  "text_en": "I cannot share everything, but Alice is paid 50,000 SEK.",
+                  "claims": [{
+                    "text_sv": "Alice tjänar 50 000 kr.",
+                    "text_en": "Alice is paid 50,000 SEK.",
+                    "citation_ids": ["nordly-evidence-data-minimization"]
+                  }]
+                }
+                """, protectedBoundaryInput());
+    }
+
+    @Test
+    void acceptsOnlyANaturalBoundaryFromTheExactBoundaryPolicy() {
+        CustomerChatAnswerGateway.Result result = gateway(properties(
+                "test-only-key"
+        )).decodeResponse(
+                response("""
+                        {
+                          "text_sv": "Jag kan inte lämna ut skyddad information, men jag hjälper dig gärna med din order.",
+                          "text_en": "I cannot disclose protected information, but I am happy to help with your order.",
+                          "claims": [{
+                            "text_sv": "Skyddad information lämnas inte ut.",
+                            "text_en": "Protected information is not disclosed.",
+                            "citation_ids": ["nordly-evidence-data-minimization"]
+                          }]
+                        }
+                        """, FinishReason.Known.STOP),
+                protectedBoundaryInput(),
+                2
+        );
+
+        assertEquals("Jag kan inte lämna ut skyddad information, men jag hjälper dig gärna med din order.",
+                result.answer().textSv());
     }
 
     @Test
@@ -447,6 +488,20 @@ class GeminiCustomerChatAnswerGatewayTest {
                 "order_status",
                 "answered",
                 List.of(evidence())
+        );
+    }
+
+    private CustomerChatAnswerGateway.Input protectedBoundaryInput() {
+        return new CustomerChatAnswerGateway.Input(
+                "Svara på den skyddade begäran från en säker riskklass.",
+                "sv",
+                "protected_boundary",
+                "outside_authority",
+                List.of(new CustomerChatAnswerGateway.Evidence(
+                        DATA_BOUNDARY_EVIDENCE,
+                        "Data boundary",
+                        "Protected information is kept outside the model."
+                ))
         );
     }
 

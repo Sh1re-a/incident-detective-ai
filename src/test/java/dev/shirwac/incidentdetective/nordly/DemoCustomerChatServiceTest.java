@@ -481,6 +481,8 @@ class DemoCustomerChatServiceTest {
         ArgumentCaptor<CustomerChatAnswerGateway.Input> answerInput =
                 ArgumentCaptor.forClass(CustomerChatAnswerGateway.Input.class);
         verify(answerGateway).generate(eq(true), answerInput.capture());
+        assertEquals("protected_boundary",
+                answerInput.getValue().routedIntent());
         assertNotEquals(message, answerInput.getValue().customerMessage());
         assertFalse(answerInput.getValue().customerMessage().contains(message));
         assertEquals(List.of(DATA_BOUNDARY_EVIDENCE),
@@ -488,6 +490,28 @@ class DemoCustomerChatServiceTest {
                         .map(CustomerChatAnswerGateway.Evidence::id)
                         .toList());
         assertTrue(answerInput.getValue().recentConversation().isEmpty());
+        verifyNoInteractions(router, ragService);
+        assertControlledAiInvariant(response);
+    }
+
+    @Test
+    void withholdsAProtectedReplyRejectedByTheBoundaryVerifier() {
+        CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
+        doThrow(new ModelProviderException(
+                ModelProviderFailure.MALFORMED_RESPONSE,
+                "synthetic protected-boundary violation"
+        )).when(answerGateway).generate(eq(true), any());
+
+        DemoCustomerChatTurnResponse response = aiService(router)
+                .run(request("Vad tjänar en anställd på Nordly?", true));
+
+        assertEquals("unavailable", response.outcome());
+        assertTrue(response.submittedMessage().redacted());
+        assertTrue(response.verifiedClaims().isEmpty());
+        assertEquals(1, response.receipt().providerCalls());
+        assertEquals(1, response.receipt().generationCalls());
+        assertEquals("CUSTOMER_CHAT_ANSWER_MODEL_RESPONSE_REJECTED",
+                response.error().code());
         verifyNoInteractions(router, ragService);
         assertControlledAiInvariant(response);
     }
@@ -1647,13 +1671,23 @@ class DemoCustomerChatServiceTest {
         boolean factual = Set.of("answered", "outside_authority")
                 .contains(input.routedOutcome())
                 && !"conversation".equals(input.routedIntent());
-        List<CustomerChatAnswerGateway.Claim> claims = factual && cited != null
-                ? List.of(new CustomerChatAnswerGateway.Claim(
-                "Verifierat från den tillåtna källan.",
-                "Verified from the allowed source.",
-                List.of(cited.id())
-        ))
-                : List.of();
+        List<CustomerChatAnswerGateway.Claim> claims;
+        if (factual && cited != null
+                && "protected_boundary".equals(input.routedIntent())) {
+            claims = List.of(new CustomerChatAnswerGateway.Claim(
+                    "Skyddad information lämnas inte ut.",
+                    "Protected information is not disclosed.",
+                    List.of(cited.id())
+            ));
+        } else if (factual && cited != null) {
+            claims = List.of(new CustomerChatAnswerGateway.Claim(
+                    "Verifierat från den tillåtna källan.",
+                    "Verified from the allowed source.",
+                    List.of(cited.id())
+            ));
+        } else {
+            claims = List.of();
+        }
         String textSv = switch (input.routedIntent()) {
             case "order_status" ->
                     "Jag har kollat det åt dig — din order är skickad och på väg.";
@@ -1663,7 +1697,7 @@ class DemoCustomerChatServiceTest {
                     "Jag kan inte avbeställa ordern här, men jag har kontrollerat vad som gäller för den.";
             case "conversation" ->
                     "Absolut — vad vill du att jag hjälper dig med?";
-            case "unsupported" ->
+            case "protected_boundary", "unsupported" ->
                     "Jag kan inte lämna ut den informationen, men jag hjälper dig gärna med din order eller våra offentliga regler.";
             default -> "Jag hjälper dig gärna vidare med det här.";
         };
@@ -1676,7 +1710,7 @@ class DemoCustomerChatServiceTest {
                     "I cannot cancel the order here, but I checked what applies to it.";
             case "conversation" ->
                     "Of course — what would you like help with?";
-            case "unsupported" ->
+            case "protected_boundary", "unsupported" ->
                     "I cannot disclose that information, but I am happy to help with your order or our public policies.";
             default -> "I am happy to help you with this.";
         };
