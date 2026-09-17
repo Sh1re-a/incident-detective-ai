@@ -14,3 +14,9 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: vi.fn(),
   })),
 });
+
+Object.defineProperty(Element.prototype, "scrollIntoView", {
+  configurable: true,
+  writable: true,
+  value: vi.fn(),
+});
