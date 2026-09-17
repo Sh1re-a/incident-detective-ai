@@ -1907,36 +1907,22 @@ public final class DemoCustomerChatService {
     private List<DemoCustomerChatTurnResponse.VerifiedClaim> orderClaims(
             DemoOrderSnapshot order
     ) {
-        String itemsSv = order.itemCount() == 1
-                ? "1 vara"
-                : order.itemCount() + " varor";
-        String itemsEn = order.itemCount() == 1
-                ? "1 item"
-                : order.itemCount() + " items";
         return List.of(
                 new DemoCustomerChatTurnResponse.VerifiedClaim(
-                        "Din order " + order.orderId() + " har statusen "
-                                + order.statusSv() + ".",
-                        "Your order " + order.orderId() + " has status "
-                                + order.statusEn() + ".",
+                        "Du har beställt " + order.itemSummarySv() + ".",
+                        "You ordered " + order.itemSummaryEn() + ".",
                         List.of(order.evidenceId())
                 ),
                 new DemoCustomerChatTurnResponse.VerifiedClaim(
-                        "Den beräknas komma " + dateRangeSv(
+                        "Paketet är skickat och beräknas komma " + dateRangeSv(
                                 order.estimatedDeliveryFrom(),
                                 order.estimatedDeliveryThrough()
                         ) + ".",
-                        "It is expected to arrive " + dateRangeEn(
+                        "Your parcel has shipped and is expected to arrive "
+                                + dateRangeEn(
                                 order.estimatedDeliveryFrom(),
                                 order.estimatedDeliveryThrough()
                         ) + ".",
-                        List.of(order.evidenceId())
-                ),
-                new DemoCustomerChatTurnResponse.VerifiedClaim(
-                        "Ordern innehåller " + itemsSv + ": "
-                                + order.itemSummarySv() + ".",
-                        "The order contains " + itemsEn + ": "
-                                + order.itemSummaryEn() + ".",
                         List.of(order.evidenceId())
                 )
         );

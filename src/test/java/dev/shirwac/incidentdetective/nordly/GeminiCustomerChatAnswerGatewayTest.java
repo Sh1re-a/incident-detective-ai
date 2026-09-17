@@ -69,7 +69,7 @@ class GeminiCustomerChatAnswerGatewayTest {
         assertTrue(prompt.contains("Jag har inte tillgång till"));
         assertTrue(prompt.contains("I don't have access to"));
         assertTrue(prompt.contains("do not invent or suggest a contact route"));
-        assertTrue(prompt.contains("Every factual sentence in text_sv and text_en"));
+        assertTrue(prompt.contains("Build text_sv by joining only the selected"));
         assertTrue(prompt.contains("Never add a tracking link"));
     }
 
@@ -128,7 +128,8 @@ class GeminiCustomerChatAnswerGatewayTest {
                 87
         );
 
-        assertTrue(result.answer().textSv().startsWith("Hej!"));
+        assertEquals("Order NORD-2051 är skickad.",
+                result.answer().textSv());
         assertEquals(1, result.answer().claims().size());
         assertEquals(
                 List.of(ORDER_EVIDENCE),
@@ -225,8 +226,8 @@ class GeminiCustomerChatAnswerGatewayTest {
     }
 
     @Test
-    void rejectsFactualAnswerSentenceMissingFromCitedClaims() {
-        assertMalformed("""
+    void projectsAwayFactualTextOutsideTheSelectedCanonicalClaim() {
+        CustomerChatAnswerGateway.Result result = decode("""
                 {
                   "text_sv": "Order NORD-2051 är skickad. Du kan följa paketet via spårningslänken i din leveransbekräftelse.",
                   "text_en": "Order NORD-2051 has shipped. You can follow the package through the tracking link in your shipping confirmation.",
@@ -237,11 +238,14 @@ class GeminiCustomerChatAnswerGatewayTest {
                   }]
                 }
                 """, answeredInput());
+
+        assertEquals("Order NORD-2051 är skickad.",
+                result.answer().textSv());
     }
 
     @Test
-    void rejectsOneUnsupportedFactAppendedToAnOtherwiseCoveredSentence() {
-        assertMalformed("""
+    void projectsCanonicalClaimInsteadOfARephrasedFactualSentence() {
+        CustomerChatAnswerGateway.Result result = decode("""
                 {
                   "text_sv": "Order NORD-2051 är skickad med DHL.",
                   "text_en": "Order NORD-2051 has shipped with DHL.",
@@ -252,10 +256,13 @@ class GeminiCustomerChatAnswerGatewayTest {
                   }]
                 }
                 """, answeredInput());
+
+        assertEquals("Order NORD-2051 är skickad.",
+                result.answer().textSv());
     }
 
     @Test
-    void rejectsAClaimWhoseRangePunctuationWasChanged() {
+    void restoresCanonicalRangePunctuationFromTheSelectedClaim() {
         CustomerChatAnswerGateway.Claim deliveryClaim =
                 new CustomerChatAnswerGateway.Claim(
                         "Den beräknas komma 18–21 september.",
@@ -273,7 +280,7 @@ class GeminiCustomerChatAnswerGatewayTest {
                         List.of(deliveryClaim)
                 );
 
-        assertMalformed("""
+        CustomerChatAnswerGateway.Result result = decode("""
                 {
                   "text_sv": "Den beräknas komma 18, 21 september.",
                   "text_en": "It is expected to arrive September 18, 21.",
@@ -284,11 +291,14 @@ class GeminiCustomerChatAnswerGatewayTest {
                   }]
                 }
                 """, input);
+
+        assertEquals("Den beräknas komma 18–21 september.",
+                result.answer().textSv());
     }
 
     @Test
-    void rejectsAPhantomClaimThatDoesNotAppearInTheAnswer() {
-        assertMalformed("""
+    void projectsASelectedClaimEvenWhenModelProseOmittedIt() {
+        CustomerChatAnswerGateway.Result result = decode("""
                 {
                   "text_sv": "Hej!",
                   "text_en": "Hi!",
@@ -299,11 +309,14 @@ class GeminiCustomerChatAnswerGatewayTest {
                   }]
                 }
                 """, answeredInput());
+
+        assertEquals("Order NORD-2051 är skickad.",
+                result.answer().textSv());
     }
 
     @Test
-    void rejectsAFactualTailAfterANonFactualBridge() {
-        assertMalformed("""
+    void dropsAnUnsupportedFactualTailAndReleasesOnlyTheCanonicalClaim() {
+        CustomerChatAnswerGateway.Result result = decode("""
                 {
                   "text_sv": "Jag hjälper dig gärna vidare, och spårningslänken finns i leveransbekräftelsen.",
                   "text_en": "I am happy to help further, and the tracking link is in the shipping confirmation.",
@@ -314,6 +327,9 @@ class GeminiCustomerChatAnswerGatewayTest {
                   }]
                 }
                 """, answeredInput());
+
+        assertEquals("Order NORD-2051 är skickad.",
+                result.answer().textSv());
     }
 
     @Test
@@ -336,10 +352,8 @@ class GeminiCustomerChatAnswerGatewayTest {
                 3
         );
 
-        assertEquals(
-                "Hej! Order NORD-2051 är skickad.",
-                result.answer().textSv()
-        );
+        assertEquals("Order NORD-2051 är skickad.",
+                result.answer().textSv());
     }
 
     @Test
@@ -362,7 +376,53 @@ class GeminiCustomerChatAnswerGatewayTest {
                 3
         );
 
-        assertTrue(result.answer().textSv().contains("väntan"));
+        assertEquals("Order NORD-2051 är skickad.",
+                result.answer().textSv());
+    }
+
+    @Test
+    void joinsCanonicalClaimsInTheModelsSelectedOrder() {
+        CustomerChatAnswerGateway.Claim deliveryClaim =
+                new CustomerChatAnswerGateway.Claim(
+                        "Den beräknas komma 18–21 september.",
+                        "It is expected to arrive September 18–21.",
+                        List.of(ORDER_EVIDENCE)
+                );
+        CustomerChatAnswerGateway.Input input =
+                new CustomerChatAnswerGateway.Input(
+                        "Vad beställde jag och när kommer det?",
+                        "sv",
+                        "order_status",
+                        "answered",
+                        List.of(),
+                        List.of(evidence()),
+                        List.of(orderStatusClaim(), deliveryClaim)
+                );
+
+        CustomerChatAnswerGateway.Result result = decode("""
+                {
+                  "text_sv": "Ett ungefärligt svar.",
+                  "text_en": "An approximate answer.",
+                  "claims": [{
+                    "text_sv": "Den beräknas komma 18–21 september.",
+                    "text_en": "It is expected to arrive September 18–21.",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }, {
+                    "text_sv": "Order NORD-2051 är skickad.",
+                    "text_en": "Order NORD-2051 has shipped.",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }]
+                }
+                """, input);
+
+        assertEquals(
+                "Den beräknas komma 18–21 september. Order NORD-2051 är skickad.",
+                result.answer().textSv()
+        );
+        assertEquals(
+                "It is expected to arrive September 18–21. Order NORD-2051 has shipped.",
+                result.answer().textEn()
+        );
     }
 
     @Test
@@ -661,7 +721,7 @@ class GeminiCustomerChatAnswerGatewayTest {
                 1
         );
 
-        assertEquals("Hej! Order NORD-2051 är skickad.",
+        assertEquals("Order NORD-2051 är skickad.",
                 result.answer().textSv());
     }
 
@@ -759,6 +819,17 @@ class GeminiCustomerChatAnswerGatewayTest {
         assertEquals(
                 ModelProviderFailure.MALFORMED_RESPONSE,
                 exception.failure()
+        );
+    }
+
+    private CustomerChatAnswerGateway.Result decode(
+            String body,
+            CustomerChatAnswerGateway.Input input
+    ) {
+        return gateway(properties("test-only-key")).decodeResponse(
+                response(body, FinishReason.Known.STOP),
+                input,
+                1
         );
     }
 

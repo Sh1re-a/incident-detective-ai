@@ -166,13 +166,10 @@ class DemoCustomerChatServiceTest {
         assertEquals("answered", response.outcome());
         assertEquals("NORD-2051", response.order().orderId());
         assertTrue(response.assistantMessage().textSv().contains(
-                "Din order NORD-2051 har statusen Skickad."
+                "Du har beställt Aster bordslampa i sandbeige."
         ));
         assertTrue(response.assistantMessage().textSv().contains(
-                "Den beräknas komma 18–21 september."
-        ));
-        assertTrue(response.assistantMessage().textSv().contains(
-                "Aster bordslampa i sandbeige"
+                "Paketet är skickat och beräknas komma 18–21 september."
         ));
         assertTrue(response.toolEvents().stream()
                 .anyMatch(event -> event.modelSelected()
@@ -182,7 +179,7 @@ class DemoCustomerChatServiceTest {
                         event.name()
                 ) && "completed".equals(event.status())));
         assertEquals(
-                "Din order NORD-2051 har statusen Skickad.",
+                "Du har beställt Aster bordslampa i sandbeige.",
                 response.verifiedClaims().getFirst().textSv()
         );
         assertEquals(List.of(ORDER_EVIDENCE),

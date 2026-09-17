@@ -67,7 +67,7 @@ public final class LiveInvestigationService {
     static final Duration SYNTHESIS_RESERVE = Duration.ofSeconds(15);
     static final Duration DEADLINE_SAFETY_MARGIN = Duration.ofSeconds(1);
     static final Duration MIN_SECOND_COLLECTION_TIMEOUT = Duration.ofSeconds(8);
-    static final int DAILY_LIVE_RUN_LIMIT = 60;
+    static final int DAILY_LIVE_RUN_LIMIT = 240;
 
     private final GeminiAiProperties properties;
     private final InvestigationScenarioCatalog scenarios;

@@ -129,7 +129,7 @@ final class CustomerChatAnswerClaimCoverage {
                 .strip();
     }
 
-    private static boolean equivalent(
+    static boolean equivalent(
             CustomerChatAnswerGateway.Claim generated,
             CustomerChatAnswerGateway.Claim verified
     ) {

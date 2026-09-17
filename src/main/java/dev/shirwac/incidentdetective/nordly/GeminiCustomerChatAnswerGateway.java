@@ -231,7 +231,11 @@ public final class GeminiCustomerChatAnswerGateway
     ) {
         rejectMissingOrTruncated(response);
         try {
-            Answer answer = jsonMapper.readValue(response.text(), Answer.class);
+            Answer modelAnswer = jsonMapper.readValue(
+                    response.text(),
+                    Answer.class
+            );
+            Answer answer = projectCanonicalFactualAnswer(modelAnswer, input);
             verifyAnswer(answer, input);
             String modelVersion = response.modelVersion()
                     .filter(value -> !value.isBlank())
@@ -265,6 +269,40 @@ public final class GeminiCustomerChatAnswerGateway
                     exception
             );
         }
+    }
+
+    private Answer projectCanonicalFactualAnswer(
+            Answer modelAnswer,
+            Input input
+    ) {
+        if (PROTECTED_BOUNDARY_INTENT.equals(input.routedIntent())
+                || "conversation".equals(input.routedIntent())
+                || !requiresEvidenceClaim(
+                input.routedIntent(),
+                input.routedOutcome()
+        ) || modelAnswer.claims().isEmpty()) {
+            return modelAnswer;
+        }
+        List<Claim> canonicalClaims = modelAnswer.claims().stream()
+                .map(selected -> input.verifiedClaims().stream()
+                        .filter(verified ->
+                                CustomerChatAnswerClaimCoverage.equivalent(
+                                        selected,
+                                        verified
+                                ))
+                        .findFirst()
+                        .orElse(selected))
+                .distinct()
+                .toList();
+        return new Answer(
+                canonicalClaims.stream()
+                        .map(Claim::textSv)
+                        .collect(java.util.stream.Collectors.joining(" ")),
+                canonicalClaims.stream()
+                        .map(Claim::textEn)
+                        .collect(java.util.stream.Collectors.joining(" ")),
+                canonicalClaims
+        );
     }
 
     private void verifyAnswer(Answer answer, Input input) {

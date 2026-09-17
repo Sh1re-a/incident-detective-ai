@@ -243,7 +243,7 @@ class CapabilitiesServiceTest {
         assertEquals(3, response.liveAi().budget().maxToolCallsPerRound());
         assertEquals(45_000, response.liveAi().budget().hardDeadlineMs());
         assertEquals(28_000, response.liveAi().budget().providerCallCapMs());
-        assertEquals(60, response.liveAi().budget().dailyLiveRunLimit());
+        assertEquals(240, response.liveAi().budget().dailyLiveRunLimit());
         assertEquals(
                 GlobalDailyLiveQuota.Scope.PROCESS_LOCAL,
                 response.liveAi().budget().dailyQuotaScope()
