@@ -543,7 +543,9 @@ public final class DemoCustomerChatService {
                         request.locale(),
                         routedIntent,
                         response.outcome(),
-                        recentConversation,
+                        "conversation".equals(routedIntent)
+                                ? recentConversation
+                                : List.of(),
                         evidence,
                         verifiedClaims
                 )

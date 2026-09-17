@@ -352,6 +352,39 @@ class DemoCustomerChatServiceTest {
     }
 
     @Test
+    void factualAnswerUsesHistoryForRoutingButNotAsAnswerEvidence() {
+        CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
+        when(router.route(any())).thenReturn(modelRoute(
+                CustomerChatModelRouter.Tool.GET_CURRENT_ORDER,
+                null
+        ));
+        DemoCustomerChatTurnRequest.ConversationTurn history =
+                new DemoCustomerChatTurnRequest.ConversationTurn(
+                        "Vad beställde jag?",
+                        "Du har beställt Aster bordslampa i sandbeige."
+                );
+
+        aiService(router).run(new DemoCustomerChatTurnRequest(
+                "Och när kommer den?",
+                "sv",
+                true,
+                List.of(history)
+        ));
+
+        ArgumentCaptor<CustomerChatModelRouter.RoutingRequest> routeInput =
+                ArgumentCaptor.forClass(
+                        CustomerChatModelRouter.RoutingRequest.class
+                );
+        verify(router).route(routeInput.capture());
+        assertEquals(List.of(history),
+                routeInput.getValue().recentConversation());
+        ArgumentCaptor<CustomerChatAnswerGateway.Input> answerInput =
+                ArgumentCaptor.forClass(CustomerChatAnswerGateway.Input.class);
+        verify(answerGateway).generate(eq(true), answerInput.capture());
+        assertTrue(answerInput.getValue().recentConversation().isEmpty());
+    }
+
+    @Test
     void modelPreservesThanksAsANaturalBoundedReply() {
         CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
         when(router.route(any())).thenReturn(modelConversationRoute(

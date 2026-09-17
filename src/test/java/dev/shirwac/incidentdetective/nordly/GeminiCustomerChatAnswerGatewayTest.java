@@ -66,9 +66,15 @@ class GeminiCustomerChatAnswerGatewayTest {
 
         assertTrue(prompt.contains("routed_intent is \"protected_boundary\""));
         assertTrue(prompt.contains("Return no claims"));
-        assertTrue(prompt.contains("Jag har inte tillgång till"));
-        assertTrue(prompt.contains("I don't have access to"));
-        assertTrue(prompt.contains("do not invent or suggest a contact route"));
+        assertTrue(prompt.contains(
+                "Jag har inte tillgång till privat information, men jag "
+                        + "hjälper dig gärna med en annan vanlig orderfråga."
+        ));
+        assertTrue(prompt.contains(
+                "I don't have access to private information, but I am happy "
+                        + "to help with another ordinary order question."
+        ));
+        assertTrue(prompt.contains("Do not invent or suggest a contact route"));
         assertTrue(prompt.contains("Build text_sv by joining only the selected"));
         assertTrue(prompt.contains("Never add a tracking link"));
     }

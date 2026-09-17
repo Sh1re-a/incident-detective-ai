@@ -41,7 +41,8 @@ final class CustomerChatAnswerClaimCoverage {
                     + "individuella loneuppgifter|den privata informationen|"
                     + "den informationen)(?: men jag (?:hjalper dig garna|"
                     + "kan hjalpa)(?: med)? (?:din order|en orderfraga|"
-                    + "en annan fraga))?$"
+                    + "en annan fraga|en vanlig orderfraga|"
+                    + "en annan vanlig orderfraga))?$"
     );
     private static final Pattern ENGLISH_PROTECTED_BOUNDARY = Pattern.compile(
             "^i (?:cannot disclose|don't have access to|"
@@ -49,7 +50,9 @@ final class CustomerChatAnswerClaimCoverage {
                     + "private salary data|individual compensation data|"
                     + "that private information|that information)"
                     + "(?: but i (?:am happy to help|can help)(?: you)? with "
-                    + "(?:your order|an order question|another question))?$"
+                    + "(?:your order|an order question|another question|"
+                    + "an ordinary order question|"
+                    + "another ordinary order question))?$"
     );
 
     private CustomerChatAnswerClaimCoverage() {
