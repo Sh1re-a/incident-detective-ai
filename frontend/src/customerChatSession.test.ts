@@ -1,11 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { DemoCustomerChatTurnResponse } from "./api/generated";
 import {
   buildCustomerChatConversation,
-  clearCustomerChatSession,
-  customerChatSessionConfig,
-  loadCustomerChatSession,
-  saveCustomerChatSession,
 } from "./customerChatSession";
 import type { CustomerChatTurn } from "./customerChatSession";
 
@@ -52,66 +48,7 @@ function turn(text = "Var är min order?"): CustomerChatTurn {
   };
 }
 
-afterEach(() => clearCustomerChatSession());
-
 describe("customer chat session", () => {
-  it("restores only a completed backend-verified public turn", () => {
-    saveCustomerChatSession([turn()]);
-
-    expect(loadCustomerChatSession()).toEqual([turn()]);
-  });
-
-  it("stores the backend-redacted message instead of the raw question", () => {
-    const redacted = "[STOPPAD OCH MASKERAD AV SÄKERHETSGRINDEN]";
-    const protectedTurn = turn("en rå lönefråga");
-    protectedTurn.response = response(redacted, {
-      submitted_message: { text: redacted, locale: "sv", redacted: true },
-    });
-
-    saveCustomerChatSession([protectedTurn]);
-
-    const stored = window.sessionStorage.getItem(customerChatSessionConfig.storageKey) ?? "";
-    expect(stored).toContain(redacted);
-    expect(stored).not.toContain("en rå lönefråga");
-    expect(loadCustomerChatSession()[0]?.question).toBe(redacted);
-  });
-
-  it("does not persist pending or failed turns", () => {
-    saveCustomerChatSession([
-      { ...turn(), response: null },
-      { ...turn(), clientId: "turn-2", response: null, errorCode: "HTTP_503" },
-    ]);
-
-    expect(window.sessionStorage.getItem(customerChatSessionConfig.storageKey)).toBeNull();
-  });
-
-  it("fails closed for stale or write-enabled snapshots", () => {
-    const unsafe = turn();
-    unsafe.response = response(unsafe.question, {
-      receipt: {
-        business_write_operations: 1,
-        business_write_tools_available: true,
-        business_action_executed: true,
-        persistent_memory_used: false,
-      },
-    });
-    window.sessionStorage.setItem(customerChatSessionConfig.storageKey, JSON.stringify({
-      version: 1,
-      savedAt: new Date().toISOString(),
-      turns: [unsafe],
-    }));
-
-    expect(loadCustomerChatSession()).toEqual([]);
-    expect(window.sessionStorage.getItem(customerChatSessionConfig.storageKey)).toBeNull();
-  });
-
-  it("expires the local transcript after two hours", () => {
-    saveCustomerChatSession([turn()]);
-    const future = Date.now() + customerChatSessionConfig.maxAgeMs + 1;
-
-    expect(loadCustomerChatSession(future)).toEqual([]);
-  });
-
   it("builds at most six safe context turns without using blocked input", () => {
     const allowed = Array.from({ length: 7 }, (_, index) => ({
       ...turn(`Fråga ${index}`),

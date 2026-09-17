@@ -13,27 +13,33 @@ import {
   motion,
 } from "motion/react";
 import {
+  getDemoOrder,
   getKnowledgeDocuments,
+  getLiveAiStatus,
   IncidentApiError,
   runDemoCustomerChatTurn,
   runIncidentLabFollowUp,
   runIncidentLabReplay,
+  runKnowledgeReplay,
 } from "../api/client";
 import type {
   DemoCustomerChatSource,
   DemoCustomerChatTurnResponse,
+  DemoOrder,
+  IncidentLabFollowUpCitation,
   IncidentLabFollowUpResponse,
   IncidentLabFollowUpSuggestionId,
   IncidentLabReplayResponse,
   KnowledgeDocumentLibraryDocument,
   KnowledgeDocumentLibraryResponse,
   KnowledgeRagLocale,
+  KnowledgeReplayResponse,
+  LiveAiStatusResponse,
   LogEvidence,
+  RunbookEvidence,
 } from "../api/generated";
 import {
   buildCustomerChatConversation,
-  loadCustomerChatSession,
-  saveCustomerChatSession,
 } from "../customerChatSession";
 import type { CustomerChatTurn } from "../customerChatSession";
 import {
@@ -66,8 +72,23 @@ type SelectedDocument = {
 
 type EvidenceState =
   | { kind: "support"; response: DemoCustomerChatTurnResponse }
-  | { kind: "drift"; replay: IncidentLabReplayResponse }
+  | {
+    kind: "drift";
+    replay: IncidentLabReplayResponse;
+    focus?: Pick<IncidentLabFollowUpCitation, "target_scene" | "target_id">;
+  }
   | null;
+
+type AgentBadge = {
+  label: string;
+  tone: "online" | "paused" | "offline" | "replay";
+};
+
+type SupportReplayBundle = {
+  policy: KnowledgeReplayResponse;
+  boundary: KnowledgeReplayResponse;
+  order: DemoOrder;
+};
 
 type DriftTurn = {
   id: string;
@@ -83,15 +104,15 @@ type LocalDriftSuggestion = "when" | "what_unknown_receipt" | "customer_impact_r
 const COPY = {
   sv: {
     modes: { drift: "Driftagent", support: "Supportagent", documents: "Dokumentarkiv" },
-    footer: "Verifierade källor · Endast läsning · 0 ändringar",
-    synthetic: "Fiktiv Nordly-miljö · verklig backend",
+    footer: "Verifierade källor · Endast läsning · Interaktiv AI-demo",
+    synthetic: "All data är syntetisk",
     supportIdentity: "Hjälper Nordlys kunder",
     driftIdentity: "Bevakar Nordlys köpflöde",
-    greeting: "Hej! Vad kan jag hjälpa dig med?",
+    greeting: "Hej Shirre! Vad kan jag hjälpa dig med?",
     supportPlaceholder: "Skriv till Nordly…",
-    driftPlaceholder: "Välj en verifierad följdfråga ovan",
+    driftPlaceholder: "Fråga om rapporten…",
     send: "Skicka",
-    supportSuggestions: ["Var är min order?", "Kan jag avbryta den?", "Hur fungerar retur?"],
+    supportSuggestions: ["Vad beställde jag?", "När har kundservice öppet?", "Kan jag få pengarna tillbaka?"],
     waiting: "Nordly undersöker…",
     slow: "Det tar lite längre än vanligt. Vi väntar fortfarande på backendens kompletta kvitto.",
     retry: "Försök igen",
@@ -109,22 +130,27 @@ const COPY = {
     verifiedNoChange: "Verifierat svar · ingen ändring",
     readOnly: "Endast läst · inget ändrat",
     newConversation: "Ny konversation",
-    replayPill: "Inspelad replay",
-    driftIdleTitle: "Driftagenten håller vakt.",
-    driftIdleBody: "Starta ett registrerat syntetiskt fall för att se hur agenten rapporterar ett larm.",
-    startReplay: "Starta replay",
-    replayTruth: "0 nya AI-anrop i uppspelningen",
+    endConversation: "Avsluta samtal",
+    replayPill: "Verifierad replay",
+    driftIdleTitle: "Driftagenten håller koll.",
+    driftIdleBody: "Ett AI-genererat syntetiskt fall. Replayen spelar upp en registrerad backendkörning så du kan följa hur agenten analyserade och rapporterade.",
+    startReplay: "Spela verifierad replay",
+    liveAvailable: "Live-AI tillgänglig",
+    livePaused: "Live-AI pausad · se replay",
+    liveOffline: "AI offline · se replay",
+    liveUnknown: "AI-status okänd · se replay",
+    replayTruth: "Registrerad backendkörning · inga nya AI-anrop",
+    replayNotAvailable: "Replay är inte tillgänglig",
     receiptWaiting: "Väntar på backendens kompletta kvitto…",
     receiptReady: "Kvitto mottaget · spelar upp registrerade händelser",
     showNow: "Visa resultat nu",
     replayUnavailable: "Replayen kunde inte laddas.",
-    incidentHello: (count: number) => `Hej. Jag har upptäckt ${count} felhändelser i betalningsflödet.`,
-    incidentBody: (count: number, status: string) => `I den inspelade utredningen påverkades betalningar i kassan samtidigt som ${count} logghändelser med ${status} registrerades. Nu spelas kvittot upp utan att något körs om.`,
+    incidentHello: "Hej, jag har en driftrapport.",
     whenQuestion: "När hände det?",
     whyQuestion: "Vet du varför?",
     timeAnswer: (times: string, service: string) => `${times}. Händelserna registrerades i ${service}, som är larmets signalkälla.`,
     withheldTitle: "Jag kan se problemet – men inte bevisa orsaken än.",
-    withheldBody: "Java-kontrollen frisläppte ingen rotorsak eller felplats. Jag rapporterar därför påverkan utan att gissa.",
+    withheldBody: "Underlaget räcker inte för en säker rotorsak. Jag rapporterar därför vad som är känt utan att gissa.",
     noRunReference: "Körningen saknar ett giltigt följdfrågekvitto. Källorna går fortfarande att granska.",
     driftSuggestions: {
       how_conclusion: "Hur kom du fram till det?",
@@ -160,21 +186,21 @@ const COPY = {
     technicalReceipt: "Tekniskt kvitto",
     close: "Stäng",
     safetyReceipt: "Säkerhetskvitto",
-    stoppedBeforeAi: "Stoppad före AI",
-    safetyWon: "Företagets åtkomstregler vann.",
+    stoppedBeforeAi: "Så skyddades frågan",
+    safetyWon: "Skyddsreglerna följdes · inget privat lästes",
     changesZero: "0 ändringar",
   },
   en: {
     modes: { drift: "Operations agent", support: "Support agent", documents: "Document archive" },
-    footer: "Verified sources · Read only · 0 changes",
-    synthetic: "Fictional Nordly environment · real backend",
+    footer: "Verified sources · Read only · Interactive AI demo",
+    synthetic: "All data is synthetic",
     supportIdentity: "Helps Nordly customers",
     driftIdentity: "Watches Nordly's checkout flow",
-    greeting: "Hi! How can I help?",
+    greeting: "Hi Shirre! How can I help?",
     supportPlaceholder: "Message Nordly…",
-    driftPlaceholder: "Choose a verified follow-up above",
+    driftPlaceholder: "Ask about the report…",
     send: "Send",
-    supportSuggestions: ["Where is my order?", "Can I cancel it?", "How do returns work?"],
+    supportSuggestions: ["What did I order?", "When is customer service open?", "Can I get my money back?"],
     waiting: "Nordly is checking…",
     slow: "This is taking a little longer. We are still waiting for the backend's complete receipt.",
     retry: "Try again",
@@ -192,22 +218,27 @@ const COPY = {
     verifiedNoChange: "Verified answer · no change",
     readOnly: "Read only · nothing changed",
     newConversation: "New conversation",
-    replayPill: "Recorded replay",
+    endConversation: "End conversation",
+    replayPill: "Verified replay",
     driftIdleTitle: "The Operations agent is watching.",
-    driftIdleBody: "Start a recorded synthetic case to see how the agent reports an alarm.",
-    startReplay: "Start replay",
-    replayTruth: "0 new AI calls in this playback",
+    driftIdleBody: "An AI-generated synthetic case. The replay plays back a registered backend run so you can follow how the agent analysed and reported it.",
+    startReplay: "Play verified replay",
+    liveAvailable: "Live AI available",
+    livePaused: "Live AI paused · view replay",
+    liveOffline: "AI offline · view replay",
+    liveUnknown: "AI status unknown · view replay",
+    replayTruth: "Registered backend run · no new AI calls",
+    replayNotAvailable: "Replay is unavailable",
     receiptWaiting: "Waiting for the backend's complete receipt…",
     receiptReady: "Receipt received · replaying registered events",
     showNow: "Show result now",
     replayUnavailable: "The replay could not be loaded.",
-    incidentHello: (count: number) => `Hi. I detected ${count} error events in the payment flow.`,
-    incidentBody: (count: number, status: string) => `In the recorded investigation, checkout payments were affected while ${count} log events with ${status} were registered. The receipt is now replayed without rerunning anything.`,
+    incidentHello: "Hi, I have an operations report.",
     whenQuestion: "When did it happen?",
     whyQuestion: "Do you know why?",
     timeAnswer: (times: string, service: string) => `${times}. The events were recorded in ${service}, which is the alarm's signal source.`,
     withheldTitle: "I can see the problem — but I cannot prove the cause yet.",
-    withheldBody: "The Java verification released neither a root cause nor a failure location. I report the impact without guessing.",
+    withheldBody: "The evidence is not enough for a safe root cause. I report what is known without guessing.",
     noRunReference: "This run has no valid follow-up receipt. Its sources can still be inspected.",
     driftSuggestions: {
       how_conclusion: "How did you reach that?",
@@ -243,11 +274,14 @@ const COPY = {
     technicalReceipt: "Technical receipt",
     close: "Close",
     safetyReceipt: "Safety receipt",
-    stoppedBeforeAi: "Stopped before AI",
-    safetyWon: "The company's access rules won.",
+    stoppedBeforeAi: "How the request was protected",
+    safetyWon: "Protection rules followed · no private data read",
     changesZero: "0 changes",
   },
 } as const;
+
+const REPLAY_STEP_DELAYS = [650, 1250, 1450, 1200, 1650] as const;
+const SUPPORT_REPLAY_STEP_DELAYS = [450, 750, 1250, 850, 750, 1350] as const;
 
 const FOLLOW_UP_IDS: IncidentLabFollowUpSuggestionId[] = [
   "how_conclusion",
@@ -359,7 +393,9 @@ export default function NordlyV2App() {
   const [selectedDocument, setSelectedDocument] = useState<SelectedDocument | null>(null);
   const [documents, setDocuments] = useState<KnowledgeDocumentLibraryResponse | null>(null);
   const [documentError, setDocumentError] = useState<string | null>(null);
-  const [supportTurns, setSupportTurns] = useState<CustomerChatTurn[]>(() => loadCustomerChatSession());
+  const [liveAiStatus, setLiveAiStatus] = useState<LiveAiStatusResponse | null>(null);
+  const [liveAiStatusResolved, setLiveAiStatusResolved] = useState(false);
+  const [supportTurns, setSupportTurns] = useState<CustomerChatTurn[]>([]);
   const [supportDraft, setSupportDraft] = useState("");
   const [supportPendingId, setSupportPendingId] = useState<string | null>(null);
   const [replay, setReplay] = useState<IncidentLabReplayResponse | null>(null);
@@ -367,6 +403,7 @@ export default function NordlyV2App() {
   const [playbackStage, setPlaybackStage] = useState(0);
   const [driftTurns, setDriftTurns] = useState<DriftTurn[]>([]);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const supportSessionVersionRef = useRef(0);
   const copy = COPY[locale];
 
   useEffect(() => {
@@ -379,9 +416,27 @@ export default function NordlyV2App() {
     return () => controller.abort();
   }, [locale]);
 
+  const refreshLiveAiStatus = useCallback(async (signal?: AbortSignal) => {
+    setLiveAiStatusResolved(false);
+    try {
+      const status = await getLiveAiStatus(signal);
+      if (!signal?.aborted) setLiveAiStatus(status);
+    } catch {
+      if (!signal?.aborted) setLiveAiStatus(null);
+    } finally {
+      if (!signal?.aborted) setLiveAiStatusResolved(true);
+    }
+  }, []);
+
   useEffect(() => {
-    saveCustomerChatSession(supportTurns);
-  }, [supportTurns]);
+    const controller = new AbortController();
+    void refreshLiveAiStatus(controller.signal);
+    return () => controller.abort();
+  }, [refreshLiveAiStatus]);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   useEffect(() => {
     const onHashChange = () => setModeState(modeFromHash());
@@ -395,7 +450,7 @@ export default function NordlyV2App() {
       setReplayState("ready");
       return;
     }
-    const delay = playbackStage === 0 ? 260 : 540;
+    const delay = REPLAY_STEP_DELAYS[playbackStage] ?? 1200;
     const timer = window.setTimeout(() => setPlaybackStage((current) => current + 1), delay);
     return () => window.clearTimeout(timer);
   }, [playbackStage, replayState]);
@@ -434,14 +489,23 @@ export default function NordlyV2App() {
     setSupportTurns((current) => current.filter((turn) => turn.clientId !== id));
   }, []);
 
+  const resetSupportConversation = useCallback(() => {
+    supportSessionVersionRef.current += 1;
+    setSupportTurns([]);
+    setSupportDraft("");
+    setSupportPendingId(null);
+    setEvidence(null);
+  }, []);
+
   const submitSupport = useCallback(async (
     rawMessage: string,
-    confirmLiveAi = false,
+    confirmLiveAi = true,
     existingId?: string,
   ) => {
     const message = rawMessage.trim();
     if (!message || supportPendingId) return;
     const id = existingId ?? clientId("support");
+    const sessionVersion = supportSessionVersionRef.current;
     const priorTurns = supportTurns.filter((turn) => turn.clientId !== id);
     if (!existingId) {
       setSupportTurns((current) => [...current, {
@@ -460,21 +524,23 @@ export default function NordlyV2App() {
         confirm_live_ai: confirmLiveAi,
         recent_conversation: buildCustomerChatConversation(priorTurns),
       });
+      if (supportSessionVersionRef.current !== sessionVersion) return;
       setSupportTurns((current) => current.map((turn) => turn.clientId === id
         ? {
           ...turn,
-          question: response.submitted_message.text,
+          question: turn.question,
           locale,
           response,
           errorCode: null,
         }
         : turn));
     } catch (error) {
+      if (supportSessionVersionRef.current !== sessionVersion) return;
       setSupportTurns((current) => current.map((turn) => turn.clientId === id
         ? { ...turn, errorCode: apiErrorText(error, locale) }
         : turn));
     } finally {
-      setSupportPendingId(null);
+      if (supportSessionVersionRef.current === sessionVersion) setSupportPendingId(null);
     }
   }, [locale, supportPendingId, supportTurns]);
 
@@ -591,26 +657,32 @@ export default function NordlyV2App() {
                 {mode === "support" ? (
                   <SupportAgentView
                     locale={locale}
+                    liveAiStatus={liveAiStatus}
+                    liveAiStatusResolved={liveAiStatusResolved}
                     turns={supportTurns}
                     draft={supportDraft}
                     pendingId={supportPendingId}
                     setDraft={setSupportDraft}
                     submit={submitSupport}
                     cancel={cancelSupportTurn}
+                    resetConversation={resetSupportConversation}
+                    refreshLiveAiStatus={() => refreshLiveAiStatus()}
                     openEvidence={(response) => openEvidence({ kind: "support", response })}
                     openDocument={openDocument}
                   />
                 ) : mode === "drift" ? (
                   <DriftAgentView
                     locale={locale}
+                    liveAiStatus={liveAiStatus}
                     replay={replay}
                     replayState={replayState}
                     playbackStage={playbackStage}
                     turns={driftTurns}
                     startReplay={startReplay}
+                    refreshLiveAiStatus={() => refreshLiveAiStatus()}
                     skipPlayback={skipPlayback}
                     submit={submitDrift}
-                    openEvidence={() => replay && openEvidence({ kind: "drift", replay })}
+                    openEvidence={(focus) => replay && openEvidence({ kind: "drift", replay, focus })}
                   />
                 ) : (
                   <DocumentArchiveView
@@ -723,48 +795,110 @@ function MobileNavigation({ mode, setMode, locale }: { mode: Mode; setMode: (mod
   );
 }
 
-function AgentIdentity({ kind, locale, badge }: { kind: "drift" | "support"; locale: Locale; badge?: string }) {
+function AgentIdentity({
+  kind,
+  locale,
+  badge,
+  onBadgeClick,
+}: {
+  kind: "drift" | "support";
+  locale: Locale;
+  badge?: AgentBadge;
+  onBadgeClick?: () => void;
+}) {
   const copy = COPY[locale];
   return (
     <div className="agent-identity">
       <span className="agent-identity__mark"><NordlySignal /></span>
       <span className="agent-identity__text">
         <h1>{copy.modes[kind]}</h1>
-        <small><i />{kind === "drift" ? copy.driftIdentity : copy.supportIdentity}</small>
+        <small>{kind === "drift" ? copy.driftIdentity : copy.supportIdentity}</small>
       </span>
-      {badge ? <span className="agent-identity__badge"><i />{badge}</span> : null}
+      {badge ? onBadgeClick ? (
+        <button type="button" className={`agent-identity__badge agent-identity__badge--${badge.tone}`} onClick={onBadgeClick}>
+          <i />{badge.label}<ChevronRightIcon />
+        </button>
+      ) : (
+        <span className={`agent-identity__badge agent-identity__badge--${badge.tone}`}><i />{badge.label}</span>
+      ) : null}
     </div>
+  );
+}
+
+function AgentIdleState({
+  title,
+  body,
+  actions,
+  footnote,
+}: {
+  title: string;
+  body: string;
+  actions: ReactNode;
+  footnote: string;
+}) {
+  return (
+    <motion.div className="agent-idle-state" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <span className="agent-idle-state__signal"><NordlySignal /></span>
+      <h2>{title}</h2>
+      <p>{body}</p>
+      <div className="agent-idle-state__actions">{actions}</div>
+      <small><CheckIcon />{footnote}</small>
+    </motion.div>
   );
 }
 
 function SupportAgentView({
   locale,
+  liveAiStatus,
+  liveAiStatusResolved,
   turns,
   draft,
   pendingId,
   setDraft,
   submit,
   cancel,
+  resetConversation,
+  refreshLiveAiStatus,
   openEvidence,
   openDocument,
 }: {
   locale: Locale;
+  liveAiStatus: LiveAiStatusResponse | null;
+  liveAiStatusResolved: boolean;
   turns: CustomerChatTurn[];
   draft: string;
   pendingId: string | null;
   setDraft: (value: string) => void;
   submit: (message: string, confirm?: boolean, existingId?: string) => Promise<void>;
   cancel: (id: string) => void;
+  resetConversation: () => void;
+  refreshLiveAiStatus: () => Promise<void>;
   openEvidence: (response: DemoCustomerChatTurnResponse) => void;
   openDocument: (source: DemoCustomerChatSource, returnMode?: Mode) => void;
 }) {
   const copy = COPY[locale];
   const bottomRef = useRef<HTMLDivElement>(null);
   const [slow, setSlow] = useState(false);
+  const [offlineReplay, setOfflineReplay] = useState<SupportReplayBundle | null>(null);
+  const [offlineReplayState, setOfflineReplayState] = useState<"idle" | "requesting" | "playing" | "ready" | "error">("idle");
+  const [offlineReplayStage, setOfflineReplayStage] = useState(0);
+  const offlineReplayRequestRef = useRef(0);
+  const liveAvailable = liveAiStatusResolved && liveAiStatus?.live_state === "available";
+  const offline = liveAiStatusResolved && !liveAvailable;
+  const replayAvailable = liveAiStatus?.replay_available === true;
+  const statusBadge: AgentBadge = !liveAiStatusResolved
+    ? { label: localized(locale, "Kontrollerar AI…", "Checking AI…"), tone: "replay" }
+    : liveAiStatus?.live_state === "available"
+    ? { label: copy.liveAvailable, tone: "online" }
+    : liveAiStatus?.live_state === "daily_budget_exhausted"
+      ? { label: replayAvailable ? copy.livePaused : localized(locale, "Live-AI pausad", "Live AI paused"), tone: "paused" }
+      : liveAiStatus
+        ? { label: replayAvailable ? copy.liveOffline : localized(locale, "AI offline", "AI offline"), tone: "offline" }
+        : { label: localized(locale, "AI-status okänd", "AI status unknown"), tone: "offline" };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [turns.length, pendingId]);
+  }, [turns.length, pendingId, offlineReplayStage, offlineReplayState]);
 
   useEffect(() => {
     if (!pendingId) {
@@ -775,6 +909,66 @@ function SupportAgentView({
     return () => window.clearTimeout(timer);
   }, [pendingId]);
 
+  useEffect(() => {
+    if (offlineReplayState !== "playing") return;
+    if (offlineReplayStage >= 6) {
+      setOfflineReplayState("ready");
+      return;
+    }
+    const delay = SUPPORT_REPLAY_STEP_DELAYS[offlineReplayStage] ?? 1100;
+    const timer = window.setTimeout(() => setOfflineReplayStage((current) => current + 1), delay);
+    return () => window.clearTimeout(timer);
+  }, [offlineReplayStage, offlineReplayState]);
+
+  const startOfflineReplay = useCallback(async () => {
+    if (offlineReplayState === "requesting") return;
+    const requestVersion = offlineReplayRequestRef.current + 1;
+    offlineReplayRequestRef.current = requestVersion;
+    setOfflineReplay(null);
+    setOfflineReplayStage(0);
+    setOfflineReplayState("requesting");
+    try {
+      const [policy, boundary, orderLookup] = await Promise.all([
+        runKnowledgeReplay("refund-timing"),
+        runKnowledgeReplay("refund-customer-action"),
+        getDemoOrder("NORD-2051"),
+      ]);
+      if (offlineReplayRequestRef.current !== requestVersion) return;
+      setOfflineReplay({ policy, boundary, order: orderLookup.order });
+      setOfflineReplayStage(1);
+      setOfflineReplayState("playing");
+    } catch {
+      if (offlineReplayRequestRef.current !== requestVersion) return;
+      setOfflineReplayState("error");
+    }
+  }, [offlineReplayState]);
+
+  const endConversation = useCallback(() => {
+    offlineReplayRequestRef.current += 1;
+    setOfflineReplay(null);
+    setOfflineReplayStage(0);
+    setOfflineReplayState("idle");
+    setSlow(false);
+    resetConversation();
+  }, [resetConversation]);
+
+  const replaySources = useMemo<DemoCustomerChatSource[]>(() => (
+    offlineReplay?.policy.retrieval.ranked_matches.map((match) => ({
+      kind: "company_policy",
+      document_id: match.document_id,
+      chunk_id: match.chunk_id,
+      document_version: match.document_version,
+      title: match.title,
+      section_heading: match.section_heading,
+      source_ref: match.source_ref,
+      evidence_id: match.evidence_id,
+      lifecycle: match.status,
+      similarity: match.similarity,
+      display_summary_sv: match.display_summary_sv,
+      display_summary_en: match.display_summary_en,
+    })) ?? []
+  ), [offlineReplay]);
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!draft.trim() || pendingId) return;
@@ -783,16 +977,36 @@ function SupportAgentView({
     void submit(message);
   };
 
+  const replayActive = ["playing", "ready"].includes(offlineReplayState);
+  const conversationActive = (liveAvailable && turns.length > 0) || replayActive;
+  const showOfflineStart = offline && ["idle", "error"].includes(offlineReplayState);
+  const showConversation = liveAvailable || (offline && ["playing", "ready"].includes(offlineReplayState));
+  const replayExplicitlyUnavailable = liveAiStatus?.replay_available === false;
+  const supportReplayLabel = replayExplicitlyUnavailable
+    ? copy.replayNotAvailable
+    : offlineReplayState === "error"
+      ? localized(locale, "Försök med replay igen", "Try replay again")
+      : copy.startReplay;
+
   return (
     <section className="chat-stage" aria-label={copy.modes.support}>
       <div className="chat-column">
-        <AgentIdentity kind="support" locale={locale} />
-        <div className="chat-thread" role="log" aria-live="polite" aria-relevant="additions text" aria-busy={Boolean(pendingId)}>
-          <MessageBubble side="assistant" timestamp="14:30">
+        <AgentIdentity
+          kind="support"
+          locale={locale}
+          badge={liveAvailable ? statusBadge : undefined}
+        />
+        {conversationActive ? (
+          <button type="button" className="support-end-conversation" onClick={endConversation}>
+            <CloseIcon />{copy.endConversation}
+          </button>
+        ) : null}
+        <div className={`chat-thread${!showConversation ? " chat-thread--offline" : ""}`} role="log" aria-live="polite" aria-relevant="additions text" aria-busy={Boolean(pendingId) || !liveAiStatusResolved || offlineReplayState === "requesting" || offlineReplayState === "playing"}>
+          {liveAvailable ? <MessageBubble side="assistant">
             <p>{copy.greeting}</p>
-          </MessageBubble>
+          </MessageBubble> : null}
 
-          {turns.map((turn) => (
+          {liveAvailable ? turns.map((turn) => (
             <SupportTurn
               key={turn.clientId}
               turn={turn}
@@ -803,11 +1017,91 @@ function SupportAgentView({
               openEvidence={openEvidence}
               openDocument={openDocument}
             />
-          ))}
+          )) : null}
+
+          {!liveAiStatusResolved ? (
+            <div className="offline-replay-loading" role="status">
+              <TypingIndicator label={localized(locale, "Kontrollerar Live-AI…", "Checking Live AI…")} />
+            </div>
+          ) : null}
+
+          {showOfflineStart ? (
+            <AgentIdleState
+              title={localized(locale, "AI:n är offline just nu.", "AI is offline right now.")}
+              body={localized(
+                locale,
+                replayExplicitlyUnavailable
+                  ? "Varken Live-AI eller replay är tillgänglig just nu. Kontrollera igen om en stund."
+                  : offlineReplayState === "error"
+                  ? "Replayen kunde inte hämtas. Du kan försöka igen eller kontrollera om AI:n är tillbaka."
+                  : "Ett verifierat syntetiskt supportfall från backend. Replayen gör inga nya AI-anrop.",
+                replayExplicitlyUnavailable
+                  ? "Neither Live AI nor replay is available right now. Check again shortly."
+                  : offlineReplayState === "error"
+                  ? "The replay could not be loaded. Try again or check whether AI is back."
+                  : "A verified synthetic support case from the backend. The replay makes no new AI calls.",
+              )}
+              actions={<>
+                <button type="button" className="button-primary" onClick={() => void startOfflineReplay()} disabled={!replayAvailable}>
+                  <NordlySignal />{supportReplayLabel}
+                </button>
+                <button type="button" className="button-secondary" onClick={() => void refreshLiveAiStatus()}>
+                  <RefreshIcon />{localized(locale, "Kontrollera AI igen", "Check AI again")}
+                </button>
+              </>}
+              footnote={replayExplicitlyUnavailable
+                ? localized(locale, "Backend rapporterar att replay saknas", "Backend reports that replay is unavailable")
+                : localized(locale, "Verifierad syntetisk supportreplay · inga nya AI-anrop", "Verified synthetic support replay · no new AI calls")}
+            />
+          ) : null}
+
+          {offline && offlineReplayState === "requesting" ? (
+            <div className="offline-replay-loading" role="status">
+              <TypingIndicator label={localized(locale, "Hämtar verifierad replay från backend…", "Loading verified replay from the backend…")} />
+            </div>
+          ) : null}
+
+          {offline && offlineReplay ? (
+            <AnimatePresence initial={false}>
+              {offlineReplayStage >= 1 ? (
+                <MessageBubble key="offline-policy-question" side="user">
+                  <p>{locale === "sv" ? offlineReplay.policy.question.prompt_sv : offlineReplay.policy.question.prompt_en}</p>
+                </MessageBubble>
+              ) : null}
+              {offlineReplayStage === 2 ? (
+                <MessageBubble key="offline-policy-typing" side="assistant" tone="pending"><TypingIndicator label={copy.waiting} /></MessageBubble>
+              ) : null}
+              {offlineReplayStage >= 3 ? (
+                <MessageBubble key="offline-policy-answer" side="assistant">
+                  <p>{locale === "sv" ? offlineReplay.policy.answer.summary_sv : offlineReplay.policy.answer.summary_en}</p>
+                  <ReplayOrderStrip order={offlineReplay.order} locale={locale} />
+                  <SourceChips sources={replaySources} locale={locale} onOpen={openDocument} />
+                  <div className="verified-row"><CheckIcon />{localized(locale, "Verifierad inspelning · inga nya AI-anrop", "Verified recording · no new AI calls")}</div>
+                </MessageBubble>
+              ) : null}
+              {offlineReplayStage >= 4 ? (
+                <MessageBubble key="offline-boundary-question" side="user">
+                  <p>{locale === "sv" ? offlineReplay.boundary.question.prompt_sv : offlineReplay.boundary.question.prompt_en}</p>
+                </MessageBubble>
+              ) : null}
+              {offlineReplayStage === 5 ? (
+                <MessageBubble key="offline-boundary-typing" side="assistant" tone="pending"><TypingIndicator label={copy.waiting} /></MessageBubble>
+              ) : null}
+              {offlineReplayStage >= 6 ? (
+                <MessageBubble key="offline-boundary-answer" side="assistant">
+                  <p>{locale === "sv" ? offlineReplay.boundary.answer.summary_sv : offlineReplay.boundary.answer.summary_en}</p>
+                  <div className="protected-inline"><ShieldIcon /><span>{localized(locale, "Read-only · agenten gjorde ingen ändring", "Read only · the agent made no change")}</span></div>
+                  <div className="offline-replay-actions">
+                    <button type="button" className="button-secondary" onClick={() => void startOfflineReplay()}><RefreshIcon />{localized(locale, "Spela igen", "Play again")}</button>
+                  </div>
+                </MessageBubble>
+              ) : null}
+            </AnimatePresence>
+          ) : null}
           <div ref={bottomRef} />
         </div>
 
-        <div className="chat-composer-wrap">
+        {liveAvailable ? <div className="chat-composer-wrap">
           {turns.length === 0 ? (
             <div className="suggestion-row" aria-label={localized(locale, "Exempelfrågor", "Example questions")}>
               {copy.supportSuggestions.map((suggestion) => (
@@ -827,7 +1121,7 @@ function SupportAgentView({
             />
             <button type="submit" disabled={!draft.trim() || Boolean(pendingId)} aria-label={copy.send}><SendIcon /></button>
           </form>
-        </div>
+        </div> : null}
       </div>
     </section>
   );
@@ -882,14 +1176,14 @@ function SupportTurn({
           </div>
         </MessageBubble>
       ) : (
-        <MessageBubble side="assistant" tone={response.outcome === "refused" ? "protected" : "default"}>
-          <p className="message-emphasis">{text}</p>
+        <MessageBubble side="assistant">
+          <p>{text}</p>
           {response.order ? <OrderStrip response={response} locale={locale} /> : null}
           {response.sources.length > 0 ? (
             <SourceChips sources={response.sources} locale={locale} onOpen={openDocument} />
           ) : null}
           {response.outcome === "refused" ? (
-            <div className="protected-inline"><LockIcon /><span>{localized(locale, "Stoppad innan dokument eller AI användes", "Stopped before documents or AI were used")}</span></div>
+            <div className="protected-inline"><LockIcon /><span>{localized(locale, "Privat innehåll öppnades inte", "Private content was not opened")}</span></div>
           ) : null}
           <button type="button" className="disclosure-row" onClick={() => openEvidence(response)}>
             <span>{copy.behindAnswer}</span><ChevronRightIcon />
@@ -907,11 +1201,28 @@ function OrderStrip({ response, locale }: { response: DemoCustomerChatTurnRespon
   return (
     <div className="order-strip">
       <BoxIcon />
-      <strong>{order.order_id}</strong>
-      <span>·</span>
-      <em>{locale === "sv" ? order.status_sv : order.status_en}</em>
-      <span>·</span>
-      <span>{shortDate(order.estimated_delivery_from, locale)}–{shortDate(order.estimated_delivery_through, locale)}</span>
+      <span className="order-strip__copy">
+        <strong>{locale === "sv" ? order.item_summary_sv : order.item_summary_en}</strong>
+        <small>
+          {order.order_id} · {locale === "sv" ? order.status_sv : order.status_en} · {shortDate(order.estimated_delivery_from, locale)}–{shortDate(order.estimated_delivery_through, locale)}
+        </small>
+      </span>
+      <em>{order.item_count} {localized(locale, order.item_count === 1 ? "vara" : "varor", order.item_count === 1 ? "item" : "items")}</em>
+    </div>
+  );
+}
+
+function ReplayOrderStrip({ order, locale }: { order: DemoOrder; locale: Locale }) {
+  return (
+    <div className="order-strip">
+      <BoxIcon />
+      <span className="order-strip__copy">
+        <strong>{locale === "sv" ? order.item_summary_sv : order.item_summary_en}</strong>
+        <small>
+          {order.order_id} · {locale === "sv" ? order.status_sv : order.status_en} · {shortDate(order.estimated_delivery_from, locale)}–{shortDate(order.estimated_delivery_through, locale)}
+        </small>
+      </span>
+      <em>{order.item_count} {localized(locale, order.item_count === 1 ? "vara" : "varor", order.item_count === 1 ? "item" : "items")}</em>
     </div>
   );
 }
@@ -937,50 +1248,91 @@ function SourceChips({ sources, locale, onOpen }: { sources: DemoCustomerChatSou
 
 function DriftAgentView({
   locale,
+  liveAiStatus,
   replay,
   replayState,
   playbackStage,
   turns,
   startReplay,
+  refreshLiveAiStatus,
   skipPlayback,
   submit,
   openEvidence,
 }: {
   locale: Locale;
+  liveAiStatus: LiveAiStatusResponse | null;
   replay: IncidentLabReplayResponse | null;
   replayState: "idle" | "requesting" | "playing" | "ready" | "error";
   playbackStage: number;
   turns: DriftTurn[];
   startReplay: () => Promise<void>;
+  refreshLiveAiStatus: () => Promise<void>;
   skipPlayback: () => void;
   submit: (question: string, suggestionId?: IncidentLabFollowUpSuggestionId | LocalDriftSuggestion) => Promise<void>;
-  openEvidence: () => void;
+  openEvidence: (focus?: Pick<IncidentLabFollowUpCitation, "target_scene" | "target_id">) => void;
 }) {
   const copy = COPY[locale];
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [draft, setDraft] = useState("");
   const logs = alarmLogs(replay);
   const alarm = replay?.recorded_run.alarm_receipt;
   const count = Number(alarm?.signal.observed_value ?? logs.length);
   const service = alarm?.service ?? logs[0]?.content.service ?? "backend";
   const status = statusLabel(logs);
   const times = logs.map((log) => clock(log.observed_at));
+  const presentation = replay?.recorded_run.localized_presentations[locale].business_response;
   const ready = replayState === "ready";
+  const pending = turns.some((turn) => turn.pending);
+  const canChat = ready && Boolean(replay?.run_reference) && !pending;
+  const runbooks = replay?.recorded_run.agent_turn?.tool_events
+    .flatMap((event) => event.evidence)
+    .filter((item): item is RunbookEvidence => item.evidence_type === "runbook") ?? [];
+  const replayAvailable = liveAiStatus?.replay_available === true;
+  const replayExplicitlyUnavailable = liveAiStatus?.replay_available === false;
+  const statusBadge: AgentBadge = liveAiStatus?.live_state === "available"
+    ? { label: copy.liveAvailable, tone: "online" }
+    : liveAiStatus?.live_state === "daily_budget_exhausted"
+      ? { label: replayAvailable ? copy.livePaused : localized(locale, "Live-AI pausad", "Live AI paused"), tone: "paused" }
+      : liveAiStatus
+        ? { label: replayAvailable ? copy.liveOffline : localized(locale, "AI offline", "AI offline"), tone: "offline" }
+        : { label: localized(locale, "AI-status okänd", "AI status unknown"), tone: "offline" };
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [playbackStage, replayState, turns.length]);
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!canChat || !draft.trim()) return;
+    const question = draft;
+    setDraft("");
+    void submit(question);
+  };
   return (
     <section className="chat-stage" aria-label={copy.modes.drift}>
       <div className="chat-column">
-        <AgentIdentity kind="drift" locale={locale} badge={replay ? copy.replayPill : undefined} />
+        <AgentIdentity
+          kind="drift"
+          locale={locale}
+          badge={replayState === "idle" && liveAiStatus?.live_state !== "available" ? undefined : statusBadge}
+        />
         <div className="chat-thread chat-thread--drift" role="log" aria-live="polite" aria-relevant="additions text" aria-busy={replayState === "requesting"}>
           {replayState === "idle" ? (
-            <motion.div className="drift-idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <span className="drift-idle__signal"><NordlySignal /></span>
-              <h2>{copy.driftIdleTitle}</h2>
-              <p>{copy.driftIdleBody}</p>
-              <button type="button" className="button-primary" onClick={() => void startReplay()}>{copy.startReplay}</button>
-              <small><DocumentIcon />{copy.replayTruth}</small>
-            </motion.div>
+            <AgentIdleState
+              title={copy.driftIdleTitle}
+              body={replayExplicitlyUnavailable
+                ? localized(locale, "Varken Live-AI eller replay är tillgänglig just nu. Kontrollera igen om en stund.", "Neither Live AI nor replay is available right now. Check again shortly.")
+                : copy.driftIdleBody}
+              actions={<>
+                <button type="button" className="button-primary" onClick={() => void startReplay()} disabled={!replayAvailable}>
+                  {replayExplicitlyUnavailable ? copy.replayNotAvailable : copy.startReplay}
+                </button>
+                <button type="button" className="button-secondary" onClick={() => void refreshLiveAiStatus()}>
+                  <RefreshIcon />{localized(locale, "Kontrollera AI igen", "Check AI again")}
+                </button>
+              </>}
+              footnote={replayExplicitlyUnavailable
+                ? localized(locale, "Backend rapporterar att replay saknas", "Backend reports that replay is unavailable")
+                : copy.replayTruth}
+            />
           ) : replayState === "requesting" ? (
             <div className="drift-requesting" role="status">
               <span className="drift-requesting__signal"><NordlySignal /></span>
@@ -988,11 +1340,19 @@ function DriftAgentView({
               <TypingIndicator label="" />
             </div>
           ) : replayState === "error" ? (
-            <div className="drift-idle drift-idle--error">
-              <AlertIcon />
-              <h2>{copy.replayUnavailable}</h2>
-              <button type="button" className="button-primary" onClick={() => void startReplay()}><RefreshIcon />{copy.retry}</button>
-            </div>
+            <AgentIdleState
+              title={copy.replayUnavailable}
+              body={localized(locale, "Försök igen eller kontrollera om AI:n är tillbaka.", "Try again or check whether AI is back.")}
+              actions={<>
+                <button type="button" className="button-primary" onClick={() => void startReplay()} disabled={!replayAvailable}>
+                  <RefreshIcon />{replayExplicitlyUnavailable ? copy.replayNotAvailable : copy.retry}
+                </button>
+                <button type="button" className="button-secondary" onClick={() => void refreshLiveAiStatus()}>
+                  <RefreshIcon />{localized(locale, "Kontrollera AI igen", "Check AI again")}
+                </button>
+              </>}
+              footnote={copy.replayTruth}
+            />
           ) : replay ? (
             <>
               {replayState === "playing" ? (
@@ -1004,9 +1364,10 @@ function DriftAgentView({
               <AnimatePresence initial={false}>
                 {playbackStage >= 1 ? (
                   <MessageBubble key="alarm" side="assistant" tone="alert" timestamp={times.at(-1)}>
-                    <p className="message-emphasis">{copy.incidentHello(count)}</p>
-                    <p>{copy.incidentBody(count, status)}</p>
-                    <div className="incident-strip"><AlertIcon /><strong>{count} × {status}</strong><span>·</span><span>{times[0]}–{times.at(-1)}</span><span>·</span><span>{localized(locale, "Betalningsflödet", "Payment flow")}</span></div>
+                    <p className="message-emphasis">{copy.incidentHello}</p>
+                    <p>{presentation?.what_happened}</p>
+                    <p>{presentation?.impact}</p>
+                    <div className="incident-strip"><AlertIcon /><strong>{count} × {status}</strong><span>·</span><span>{times[0]}–{times.at(-1)}</span><span>·</span><span>{service.replaceAll("_", " ")}</span></div>
                   </MessageBubble>
                 ) : null}
                 {playbackStage >= 2 ? (
@@ -1016,7 +1377,11 @@ function DriftAgentView({
                   <MessageBubble key="when-answer" side="assistant">
                     <p>{copy.timeAnswer(times.join(", "), service)}</p>
                     <div className="source-chips source-chips--times">
-                      {logs.map((log) => <span key={log.evidence_id}><DocumentIcon />{clock(log.observed_at)}</span>)}
+                      {logs.map((log) => (
+                        <button key={log.evidence_id} type="button" onClick={() => openEvidence({ target_scene: "logs", target_id: log.evidence_id })}>
+                          <DocumentIcon />{clock(log.observed_at)}<ChevronRightIcon />
+                        </button>
+                      ))}
                     </div>
                     <div className="verified-row"><CheckIcon />{localized(locale, "Från larmkvittot · inget nytt AI-anrop", "From the alarm receipt · no new AI call")}</div>
                   </MessageBubble>
@@ -1027,12 +1392,12 @@ function DriftAgentView({
                 {playbackStage >= 5 ? (
                   <MessageBubble key="why-answer" side="assistant" tone="withheld">
                     <p className="message-emphasis">{copy.withheldTitle}</p>
-                    <p>{copy.withheldBody}</p>
+                    <p>{presentation?.what_remains_unknown.join(" ") || copy.withheldBody}</p>
                     <div className="source-chips">
-                      <span><DocumentIcon />{count} {localized(locale, "logghändelser", "log events")}</span>
-                      <span><DocumentIcon />{replay.recorded_run.agent_turn?.tool_events.flatMap((event) => event.evidence).filter((item) => item.evidence_type === "runbook").length ?? 0} {localized(locale, "runbookpassager", "runbook passages")}</span>
+                      <button type="button" onClick={() => openEvidence({ target_scene: "logs", target_id: logs[0]?.evidence_id ?? alarm?.alarm_id ?? "logs" })}><DocumentIcon />{logs.length} {localized(locale, "visade loggar", "shown logs")}<ChevronRightIcon /></button>
+                      <button type="button" onClick={() => openEvidence({ target_scene: "agent_rag", target_id: runbooks[0]?.evidence_id ?? "runbooks" })}><DocumentIcon />{runbooks.length} {localized(locale, "runbookpassager", "runbook passages")}<ChevronRightIcon /></button>
                     </div>
-                    <button type="button" className="disclosure-row" onClick={openEvidence}><span>{copy.behindReport}</span><ChevronRightIcon /></button>
+                    <button type="button" className="disclosure-row" onClick={() => openEvidence()}><span>{copy.behindReport}</span><ChevronRightIcon /></button>
                     <div className="verified-row"><CheckIcon />{copy.readOnly}</div>
                   </MessageBubble>
                 ) : null}
@@ -1050,7 +1415,11 @@ function DriftAgentView({
                         <p>{turn.response.answer.text}</p>
                         {turn.response.citations.length > 0 ? (
                           <div className="source-chips">
-                            {turn.response.citations.slice(0, 3).map((citation) => <span key={citation.evidence_id}><DocumentIcon />{citation.label}</span>)}
+                            {turn.response.citations.slice(0, 3).map((citation) => (
+                              <button key={citation.evidence_id} type="button" onClick={() => openEvidence(citation)}>
+                                <DocumentIcon />{citation.label}<ChevronRightIcon />
+                              </button>
+                            ))}
                           </div>
                         ) : null}
                       </>
@@ -1064,27 +1433,34 @@ function DriftAgentView({
           ) : null}
         </div>
 
-        <div className="chat-composer-wrap">
-          {ready && replay ? (
+        {ready && replay ? (
+          <div className="chat-composer-wrap">
             <div className="suggestion-row suggestion-row--drift">
-              <button type="button" onClick={() => void submit(copy.whenQuestion, "when")}>{copy.whenQuestion}</button>
+              <button type="button" onClick={() => void submit(copy.whenQuestion, "when")} disabled={pending}>{copy.whenQuestion}</button>
               {replay.run_reference ? FOLLOW_UP_IDS.slice(0, 3).map((id) => (
-                <button key={id} type="button" onClick={() => void submit(copy.driftSuggestions[id], id)}>{copy.driftSuggestions[id]}</button>
+                <button key={id} type="button" onClick={() => void submit(copy.driftSuggestions[id], id)} disabled={pending}>{copy.driftSuggestions[id]}</button>
               )) : (
                 <>
-                  <button type="button" onClick={() => void submit(copy.driftSuggestions.what_unknown, "what_unknown_receipt")}>{copy.driftSuggestions.what_unknown}</button>
-                  <button type="button" onClick={() => void submit(copy.driftSuggestions.customer_impact, "customer_impact_receipt")}>{copy.driftSuggestions.customer_impact}</button>
-                  <button type="button" onClick={openEvidence}>{copy.driftSuggestions.show_sources}</button>
+                  <button type="button" onClick={() => void submit(copy.driftSuggestions.what_unknown, "what_unknown_receipt")} disabled={pending}>{copy.driftSuggestions.what_unknown}</button>
+                  <button type="button" onClick={() => void submit(copy.driftSuggestions.customer_impact, "customer_impact_receipt")} disabled={pending}>{copy.driftSuggestions.customer_impact}</button>
+                  <button type="button" onClick={() => openEvidence()}>{copy.driftSuggestions.show_sources}</button>
                 </>
               )}
             </div>
-          ) : null}
-          <div className="chat-composer chat-composer--locked" aria-label={localized(locale, "Replayens följdfrågor", "Replay follow-ups")}>
-            <label className="sr-only" htmlFor="drift-message">{copy.driftPlaceholder}</label>
-            <input id="drift-message" value="" placeholder={copy.driftPlaceholder} disabled readOnly />
-            <button type="button" disabled aria-label={copy.send}><SendIcon /></button>
+            <form className="chat-composer" onSubmit={onSubmit} aria-label={localized(locale, "Fråga Driftagenten", "Ask the Operations agent")}>
+              <label className="sr-only" htmlFor="drift-message">{copy.driftPlaceholder}</label>
+              <input
+                id="drift-message"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder={!replay.run_reference ? copy.noRunReference : copy.driftPlaceholder}
+                maxLength={500}
+                disabled={!canChat}
+              />
+              <button type="submit" disabled={!canChat || !draft.trim()} aria-label={copy.send}><SendIcon /></button>
+            </form>
           </div>
-        </div>
+        ) : null}
       </div>
     </section>
   );
@@ -1348,7 +1724,12 @@ function EvidenceSheet({
         {state.kind === "support" ? (
           <SupportEvidence response={state.response} locale={locale} openDocument={openDocument} />
         ) : (
-          <DriftEvidence replay={state.replay} locale={locale} />
+          <DriftEvidence
+            key={`${state.focus?.target_scene ?? "overview"}-${state.focus?.target_id ?? "all"}`}
+            replay={state.replay}
+            locale={locale}
+            focus={state.focus}
+          />
         )}
       </motion.aside>
     </>
@@ -1401,13 +1782,39 @@ function SupportEvidence({ response, locale, openDocument }: { response: DemoCus
   );
 }
 
-function DriftEvidence({ replay, locale }: { replay: IncidentLabReplayResponse; locale: Locale }) {
+function DriftEvidence({
+  replay,
+  locale,
+  focus,
+}: {
+  replay: IncidentLabReplayResponse;
+  locale: Locale;
+  focus?: Pick<IncidentLabFollowUpCitation, "target_scene" | "target_id">;
+}) {
   const copy = COPY[locale];
   const run = replay.recorded_run;
   const alarm = run.alarm_receipt;
   const agent = run.agent_turn;
   const evidence = agent?.tool_events.flatMap((event) => event.evidence) ?? [];
-  const runbooks = evidence.filter((item) => item.evidence_type === "runbook");
+  const runbooks = (agent?.tool_events ?? []).flatMap((event) => event.evidence
+    .filter((item): item is RunbookEvidence => item.evidence_type === "runbook")
+    .map((item) => ({
+      evidence: item,
+      match: event.runbook_retrieval?.matches.find((match) => match.evidence_id === item.evidence_id) ?? null,
+    })));
+  const logIndex = new Map<string, LogEvidence>();
+  run.backend_logs.forEach((log) => logIndex.set(log.evidence_id, log));
+  evidence
+    .filter((item): item is LogEvidence => item.evidence_type === "log")
+    .forEach((log) => logIndex.set(log.evidence_id, log));
+  const highlightedLogIds = new Set([
+    ...(alarm?.evidence_ids ?? []),
+    ...run.developer_response.highlighted_log_evidence_ids,
+  ]);
+  const focusedLogId = focus?.target_scene === "logs" ? focus.target_id : null;
+  if (focusedLogId) highlightedLogIds.add(focusedLogId);
+  const visibleLogs = [...logIndex.values()].filter((log) => highlightedLogIds.has(log.evidence_id));
+  const sourceLogs = visibleLogs.length > 0 ? visibleLogs : alarmLogs(replay);
   const released = agent?.verification_event?.answer_released ?? false;
   const failedCheckCount = agent?.verification_event
     ? [
@@ -1430,33 +1837,71 @@ function DriftEvidence({ replay, locale }: { replay: IncidentLabReplayResponse; 
         <EvidenceStep icon={<AlertIcon />} title={localized(locale, "Larmet upptäcktes", "The alarm was detected")} body={`${alarm?.signal.observed_value ?? 0} HTTP 5xx · ${alarm?.signal.lookback_seconds ?? 0} ${localized(locale, "sekunder", "seconds")}`} />
         <EvidenceStep icon={<ToolIcon />} title={localized(locale, "Bevis hämtades", "Evidence was retrieved")} body={`${evidence.length} ${localized(locale, "avgränsade bevis", "bounded evidence items")} · ${copy.readOnly}`} />
         <EvidenceStep icon={<DocumentIcon />} title={localized(locale, "Runbookpassager hämtades", "Runbook passages were retrieved")} body={`${runbooks.length} ${localized(locale, "runbookpassager", "runbook passages")}`} />
-        <EvidenceStep
-          tone="amber"
-          icon={<ShieldIcon />}
-          title={localized(locale, "Java undanhöll diagnosen", "Java withheld the diagnosis")}
-          body={localized(
-            locale,
-            failedCheckCount === 1
-              ? "1 verifieringskontroll blev inte godkänd. Diagnosen visades därför inte som verifierad."
-              : `${failedCheckCount || 1} verifieringskontroller blev inte godkända. Diagnosen visades därför inte som verifierad.`,
-            failedCheckCount === 1
-              ? "1 verification check failed. The diagnosis was therefore not released as verified."
-              : `${failedCheckCount || 1} verification checks failed. The diagnosis was therefore not released as verified.`,
-          )}
-        />
+        <div className={focus?.target_scene === "java" ? "evidence-focus" : ""}>
+          <EvidenceStep
+            tone="amber"
+            icon={<ShieldIcon />}
+            title={localized(locale, "Verifieringen höll tillbaka diagnosen", "Verification withheld the diagnosis")}
+            body={localized(
+              locale,
+              failedCheckCount === 1
+                ? "1 kontroll blev inte godkänd. Diagnosen visades därför inte som verifierad."
+                : `${failedCheckCount || 1} kontroller blev inte godkända. Diagnosen visades därför inte som verifierad.`,
+              failedCheckCount === 1
+                ? "1 check failed. The diagnosis was therefore not released as verified."
+                : `${failedCheckCount || 1} checks failed. The diagnosis was therefore not released as verified.`,
+            )}
+          />
+        </div>
       </div>
       <div className="evidence-result evidence-result--amber">
         <span className="eyebrow">{localized(locale, "Rapporterad slutsats", "Reported conclusion")}</span>
         <strong>{copy.withheldTitle}</strong>
         <p>{localized(locale, "Agenten rapporterade påverkan utan att gissa eller ändra något.", "The agent reported the impact without guessing or changing anything.")}</p>
       </div>
-      <details className="evidence-details">
-        <summary>{copy.sourcesAndEvidence}<ChevronRightIcon /></summary>
+      <details className="evidence-details" open={focus?.target_scene === "logs"}>
+        <summary>{localized(locale, "Markerade loggar", "Highlighted logs")}<ChevronRightIcon /></summary>
         <div className="evidence-log-list">
-          {alarmLogs(replay).map((log) => <div key={log.evidence_id}><span>{clock(log.observed_at)}</span><strong>{log.content.service}</strong><em>{log.content.attributes.http_status ? `HTTP ${log.content.attributes.http_status}` : log.content.level}</em></div>)}
+          {sourceLogs.map((log) => (
+            <div
+              key={log.evidence_id}
+              className={`${highlightedLogIds.has(log.evidence_id) ? "is-highlighted" : ""}${focusedLogId === log.evidence_id ? " is-focused" : ""}`}
+            >
+              <span>{clock(log.observed_at)}</span>
+              <strong>{log.content.service}</strong>
+              <em>{log.content.attributes.http_status ? `HTTP ${log.content.attributes.http_status}` : log.content.level}</em>
+              <code>{log.content.message}</code>
+            </div>
+          ))}
         </div>
       </details>
-      <details className="evidence-details">
+      <details className="evidence-details" open={focus?.target_scene === "agent_rag"}>
+        <summary>{localized(locale, "Hämtade runbookpassager", "Retrieved runbook passages")}<ChevronRightIcon /></summary>
+        <div className="evidence-runbook-list">
+          {runbooks.map(({ evidence: runbook, match }) => (
+            <article
+              key={runbook.evidence_id}
+              className={`evidence-runbook${focus?.target_scene === "agent_rag" && focus.target_id === runbook.evidence_id ? " is-focused" : ""}`}
+            >
+              <div className="evidence-runbook__meta">
+                <DocumentIcon />
+                <span>
+                  <strong>{runbook.content.document_id}</strong>
+                  <small>{runbook.content.chunk_id} · v{runbook.content.document_version}</small>
+                </span>
+              </div>
+              <p>{runbook.content.text}</p>
+              {match ? (
+                <small className="evidence-runbook__match">
+                  {localized(locale, "Semantisk träff", "Semantic match")} #{match.rank}
+                  {match.cosine_similarity === null ? "" : ` · ${match.cosine_similarity.toFixed(3)}`}
+                </small>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      </details>
+      <details className="evidence-details" open={focus?.target_scene === "java"}>
         <summary>{copy.technicalReceipt}<ChevronRightIcon /></summary>
         <ReceiptRows rows={[
           [localized(locale, "Nya AI-anrop i uppspelningen", "New AI calls in this playback"), String(replay.playback_receipt.model_calls)],
