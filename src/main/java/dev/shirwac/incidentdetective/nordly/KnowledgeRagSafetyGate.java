@@ -41,9 +41,11 @@ public final class KnowledgeRagSafetyGate {
             "(?:retur\\w*|return\\w*)";
 
     private static final List<Pattern> PII_REQUESTS = patterns(
-            "(?:\\b(?:visa\\w*|hamta|lista|skriv ut|beratta|show|give me|"
-                    + "fetch|list|print|tell me|provide)\\b|\\bge(?: mig)?\\b)"
-                    + ".{0,45}(?:personlig information|personuppgifter|kunddata|"
+            "(?:\\b(?:visa\\w*|hamta|hitta|lista|las upp|skriv ut|beratta|"
+                    + "show|give me|fetch|find|list|read out|print|tell me|provide)"
+                    + "\\b|\\bge(?: mig)?\\b)"
+                    + ".{0,45}(?:personlig information|privata uppgifter|"
+                    + "personuppgifter|kunddata|private information|"
                     + "namn|e-post|epost|mejl|mail|adress|telefon|personnummer|"
                     + "personal information|customer data|name|email|address|"
                     + "phone|ssn)",
@@ -57,6 +59,14 @@ public final class KnowledgeRagSafetyGate {
             "(?:vad ar min|vilken ar min|what is my|what'?s my).{0,25}"
                     + "(?:e-post|epost|mejl|mail|adress|telefon|personnummer|"
                     + "email|address|phone|ssn)",
+            "(?:vad ar|vilken ar)\\s+"
+                    + "(?!(?:min|din|nordlys|foretagets)\\b)"
+                    + "[a-z][a-z'-]{1,40}s\\s+"
+                    + "(?:e-post|epost|mejl|mail|adress|telefon|personnummer)",
+            "(?:what is|what'?s)\\s+"
+                    + "(?!(?:my|your|nordly'?s|the company'?s)\\b)"
+                    + "[a-z][a-z' -]{1,40}'s\\s+"
+                    + "(?:email|address|phone|ssn)",
             "(?:avsloja|visa|show|disclose).{0,35}"
                     + "(?:koparens identitet|buyer identity|hela kundposten|"
                     + "full customer record|customer record)"
@@ -84,6 +94,12 @@ public final class KnowledgeRagSafetyGate {
             "(?:vad|hur mycket|what|how much).{0,45}"
                     + "(?:tjanar|far|earns?|is paid).{0,45}"
                     + "(?:vd|ceo|chef|i manaden|per manad|per month)",
+            "(?:vad|hur mycket|what|how much).{0,20}"
+                    + "(?:far|gets?|receives?).{0,45}"
+                    + "(?:lon|lonen|ersattning|salary|compensation|pay)",
+            "(?:beratta|visa|show|tell me).{0,25}"
+                    + "(?:lon|lonen|ersattning|salary|compensation|pay)"
+                    + ".{0,25}(?:for|of)\\s+[a-z][a-z' -]{1,40}[?!.]*$",
             "(?:vad|hur mycket) tjanar\\s+[a-z][a-z' -]{1,40}[?!.]*$",
             "(?:what is|how much is)\\s+[a-z][a-z' -]{1,40}"
                     + "\\s+(?:paid|salary|compensation)[?!.]*$",

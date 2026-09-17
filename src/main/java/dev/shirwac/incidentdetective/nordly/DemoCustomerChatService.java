@@ -215,7 +215,8 @@ public final class DemoCustomerChatService {
                     started,
                     request,
                     intent,
-                    safety
+                    safety,
+                    route.conversationKind()
             );
         } catch (RuntimeException exception) {
             if (!recoverableRoutingFailure(exception)) {
@@ -243,6 +244,24 @@ public final class DemoCustomerChatService {
             DemoCustomerChatTurnRequest request,
             DemoCustomerIntentClassifier.Decision intent,
             KnowledgeRagSafetyGate.Decision safety
+    ) {
+        return dispatch(
+                turnId,
+                started,
+                request,
+                intent,
+                safety,
+                null
+        );
+    }
+
+    private DemoCustomerChatTurnResponse dispatch(
+            String turnId,
+            long started,
+            DemoCustomerChatTurnRequest request,
+            DemoCustomerIntentClassifier.Decision intent,
+            KnowledgeRagSafetyGate.Decision safety,
+            CustomerChatModelRouter.ConversationKind conversationKind
     ) {
         return switch (intent.intent()) {
             case ORDER_STATUS -> orderStatus(
@@ -279,7 +298,8 @@ public final class DemoCustomerChatService {
                     started,
                     request,
                     intent,
-                    safety
+                    safety,
+                    conversationKind
             );
             case CLARIFICATION_REQUIRED -> clarificationRequired(
                     turnId,
@@ -978,8 +998,19 @@ public final class DemoCustomerChatService {
             long started,
             DemoCustomerChatTurnRequest request,
             DemoCustomerIntentClassifier.Decision intent,
-            KnowledgeRagSafetyGate.Decision safety
+            KnowledgeRagSafetyGate.Decision safety,
+            CustomerChatModelRouter.ConversationKind conversationKind
     ) {
+        DemoCustomerChatTurnResponse.AssistantMessage assistantMessage =
+                conversationKind == CustomerChatModelRouter.ConversationKind.THANKS
+                        ? new DemoCustomerChatTurnResponse.AssistantMessage(
+                                "Varsågod! Om du vill kan jag också kontrollera din order eller förklara Nordlys godkända kundregler.",
+                                "You're welcome! If you'd like, I can also check your order or explain Nordly's approved customer policies."
+                        )
+                        : new DemoCustomerChatTurnResponse.AssistantMessage(
+                                "Hej! Jag kan hjälpa dig att kontrollera din order eller förklara Nordlys godkända kundregler.",
+                                "Hi! I can help check your order or explain Nordly's approved customer policies."
+                        );
         List<DemoCustomerChatTurnResponse.Source> sources = List.of(
                 contextSource(),
                 policySource(authorityPolicy, null)
@@ -1006,10 +1037,7 @@ public final class DemoCustomerChatService {
                 intent,
                 safety,
                 "answered",
-                new DemoCustomerChatTurnResponse.AssistantMessage(
-                        "Hej! Jag kan hjälpa dig att kontrollera din order eller förklara Nordlys godkända kundregler.",
-                        "Hi! I can help check your order or explain Nordly's approved customer policies."
-                ),
+                assistantMessage,
                 null,
                 events,
                 sources,

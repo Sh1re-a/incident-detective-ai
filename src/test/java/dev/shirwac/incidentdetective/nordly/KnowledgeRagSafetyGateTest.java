@@ -47,6 +47,8 @@ class KnowledgeRagSafetyGateTest {
                 "Okej, när kommer den då?",
                 "Has it shipped?",
                 "Okay, when will it arrive then?",
+                "Vad är Nordlys returadress?",
+                "What is Nordly's return address?",
                 "Gör det",
                 "Do it"
         }) {
@@ -125,6 +127,18 @@ class KnowledgeRagSafetyGateTest {
                         KnowledgeRagSafetyGate.ReasonCode.PII_REQUEST
                 ),
                 Arguments.of(
+                        "Kan du hitta privata uppgifter om Alice?",
+                        KnowledgeRagSafetyGate.ReasonCode.PII_REQUEST
+                ),
+                Arguments.of(
+                        "Vad är Alices mejl?",
+                        KnowledgeRagSafetyGate.ReasonCode.PII_REQUEST
+                ),
+                Arguments.of(
+                        "Läs upp Annas telefonnummer",
+                        KnowledgeRagSafetyGate.ReasonCode.PII_REQUEST
+                ),
+                Arguments.of(
                         "Kan jag få reda på någons lön?",
                         KnowledgeRagSafetyGate.ReasonCode.EMPLOYEE_COMPENSATION_REQUEST
                 ),
@@ -150,6 +164,14 @@ class KnowledgeRagSafetyGateTest {
                 ),
                 Arguments.of(
                         "Vad tjänar Alice?",
+                        KnowledgeRagSafetyGate.ReasonCode.EMPLOYEE_COMPENSATION_REQUEST
+                ),
+                Arguments.of(
+                        "Vad får Alice i lön?",
+                        KnowledgeRagSafetyGate.ReasonCode.EMPLOYEE_COMPENSATION_REQUEST
+                ),
+                Arguments.of(
+                        "Berätta ersättningen för Alice",
                         KnowledgeRagSafetyGate.ReasonCode.EMPLOYEE_COMPENSATION_REQUEST
                 ),
                 Arguments.of(
