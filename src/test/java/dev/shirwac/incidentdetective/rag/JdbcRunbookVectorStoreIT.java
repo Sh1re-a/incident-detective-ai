@@ -329,13 +329,13 @@ class JdbcRunbookVectorStoreIT {
                 PROFILE
         ).inspect();
 
-        assertEquals("nordly-knowledge-corpus-v2", first.corpusVersion());
+        assertEquals("nordly-knowledge-corpus-v3", first.corpusVersion());
         assertEquals("developer_api", first.providerTransport());
-        assertEquals(28, first.importedChunks());
+        assertEquals(32, first.importedChunks());
         assertEquals(0, second.importedChunks());
-        assertEquals(28, second.skippedChunks());
+        assertEquals(32, second.skippedChunks());
         assertTrue(status.ready());
-        assertEquals(28, store.count(corpus.version(), PROFILE));
+        assertEquals(32, store.count(corpus.version(), PROFILE));
         assertFalse(store.documentIds(corpus.version(), PROFILE)
                 .contains("kb-legacy-refund-playbook"));
         assertFalse(store.documentIds(corpus.version(), PROFILE)

@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 @Component
 public final class DemoCustomerIntentClassifier {
 
-    public static final String CLASSIFIER = "deterministic_rules_v3";
+    public static final String CLASSIFIER = "deterministic_rules_v4";
 
     private static final String CANCEL_TERM =
             "(?:avbestall\\w*|avbryt\\w*|avboka\\w*|annullera\\w*|cancel\\w*)";
@@ -21,9 +21,12 @@ public final class DemoCustomerIntentClassifier {
     private static final String REFUND_ACTION_TERM =
             "(?:aterbetala(?:r|t)?\\b|betala tillbak(?:a|s)|issue (?:a )?refund|"
                     + "process (?:a )?refund|refund (?:it|den|ordern|my order)|"
-                    + "give me (?:my )?money back)";
+                    + "give me (?:my )?money back|"
+                    + "betala ut (?:pengar(?:na)?|aterbetalningen)|"
+                    + "pay (?:it|the money|my refund) out)";
     private static final String REFUND_POLICY_TERM =
-            "(?:aterbetal\\w*|pengar(?:na)? tillbak(?:a|s)|refund\\w*)";
+            "(?:aterbetal\\w*|pengar(?:na)? tillbak(?:a|s)|refund\\w*|"
+                    + "utbetal\\w*|betalas ut|paid out|payout)";
     private static final String RETURN_ACTION_TERM =
             "(?:returnera(?:r|t)?\\b|return (?:it|my order|my item))";
     private static final String RETURN_POLICY_TERM =
@@ -170,6 +173,8 @@ public final class DemoCustomerIntentClassifier {
             RETURN_POLICY_TERM
     );
     private static final List<Pattern> ORDER_STATUS = patterns(
+            "(?:vad|vilka).{0,20}(?:bestallde jag|har jag bestallt)",
+            "(?:what|which).{0,20}(?:did i order|have i ordered)",
             "(?:var|vart) ar (?:mina|mitt) (?:varor|paket|bestallning)",
             "^(?:var ar|vart ar|nar kommer) den[.!?]*$",
             "^(?:(?:okej|ok|okay)[,!]?\\s*)?"
@@ -182,6 +187,18 @@ public final class DemoCustomerIntentClassifier {
             "^(?:where is|when will) it.{0,20}[.!?]*$",
             "(?:orderstatus|order status|leverans|delivery|forsandelse|shipment)",
             "(?:min|mitt|mina|my).{0,20}(?:order|bestallning|paket|varor|items)"
+    );
+    private static final List<Pattern> COMPANY_KNOWLEDGE = patterns(
+            "(?:vad|vem|vilka).{0,30}(?:ar )?(?:nordly|ni)",
+            "(?:what|who).{0,30}(?:is|are) (?:nordly|you)",
+            "(?:oppettider|oppet(?:tider)?|opening hours|support hours)",
+            "(?:nar|vilka tider|what time|when).{0,35}"
+                    + "(?:kundservice|support|customer service).{0,20}"
+                    + "(?:oppet|open|stanger|closes)?",
+            "(?:kundservice|customer service).{0,35}"
+                    + "(?:kontakt|contact|telefon|phone|ring|open|oppet)",
+            "(?:hur hanterar|hur hjalper|how do you handle|how can you help)"
+                    + ".{0,45}(?:kunder|kundarenden|customer|support)?"
     );
 
     public Decision classify(String message) {
@@ -215,6 +232,9 @@ public final class DemoCustomerIntentClassifier {
         }
         if (matches(ORDER_STATUS, normalized)) {
             return decision(Intent.ORDER_STATUS, false);
+        }
+        if (matches(COMPANY_KNOWLEDGE, normalized)) {
+            return decision(Intent.COMPANY_KNOWLEDGE, false);
         }
         return decision(Intent.UNSUPPORTED, false);
     }

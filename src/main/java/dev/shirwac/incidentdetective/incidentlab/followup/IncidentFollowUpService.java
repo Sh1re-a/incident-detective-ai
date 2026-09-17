@@ -7,6 +7,7 @@ import dev.shirwac.incidentdetective.nordly.KnowledgeRagSafetyGate;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -134,7 +135,7 @@ public final class IncidentFollowUpService {
         if (snapshot.mode() == IncidentFollowUpResponse.Mode.RECORDED_REPLAY) {
             List<IncidentFollowUpRouter.Section> sections =
                     request.suggestionId() == null
-                            ? null
+                            ? replaySections(request.question())
                             : REPLAY_SELECTIONS.get(request.suggestionId());
             if (sections == null) {
                 return response(
@@ -191,6 +192,45 @@ public final class IncidentFollowUpService {
                 routed.provider(),
                 true
         );
+    }
+
+    private List<IncidentFollowUpRouter.Section> replaySections(
+            String question
+    ) {
+        String value = Normalizer.normalize(
+                        question == null ? "" : question,
+                        Normalizer.Form.NFD
+                )
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("\\s+", " ")
+                .strip();
+        LinkedHashSet<IncidentFollowUpRouter.Section> sections =
+                new LinkedHashSet<>();
+        if (value.matches(".*(?:varfor|orsak|cause|why|hur kom|how did).*")) {
+            sections.add(IncidentFollowUpRouter.Section.CAUSE);
+            sections.add(IncidentFollowUpRouter.Section.KNOWN);
+        }
+        if (value.matches(".*(?:vet (?:du )?inte|osaker|unknown|dont know|do not know).*")) {
+            sections.add(IncidentFollowUpRouter.Section.UNKNOWN);
+        }
+        if (value.matches(".*(?:kund|customer|paverkan|impact|affar|business|kop).*")) {
+            sections.add(IncidentFollowUpRouter.Section.CUSTOMER_IMPACT);
+            sections.add(IncidentFollowUpRouter.Section.KNOWN);
+        }
+        if (value.matches(".*(?:befogen|atgard|andra|allowed|boundary|change|do).*")) {
+            sections.add(IncidentFollowUpRouter.Section.BOUNDARY);
+        }
+        if (value.matches(".*(?:vad hande|sammanfatta|rapport|status|what happened|summary).*")) {
+            sections.add(IncidentFollowUpRouter.Section.SUMMARY);
+            sections.add(IncidentFollowUpRouter.Section.CUSTOMER_IMPACT);
+            sections.add(IncidentFollowUpRouter.Section.KNOWN);
+            sections.add(IncidentFollowUpRouter.Section.UNKNOWN);
+        }
+        if (value.matches(".*(?:kall|source|bevis|evidence|logg|runbook).*")) {
+            sections.add(IncidentFollowUpRouter.Section.SOURCES);
+        }
+        return sections.isEmpty() ? null : List.copyOf(sections);
     }
 
     private IncidentFollowUpResponse response(

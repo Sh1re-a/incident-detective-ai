@@ -46,6 +46,10 @@ class DemoOrderCatalogTest {
         ));
 
         DemoOrderSnapshot order = catalog.findById("NORD-2048");
+        assertEquals(
+                "Lumi bordslampa och Fjord ullpläd",
+                order.itemSummarySv()
+        );
         assertEquals("packing", order.statusCode());
         assertEquals("Packas", order.statusSv());
         assertEquals("Packing", order.statusEn());

@@ -38,7 +38,7 @@ const documentLibrary: KnowledgeDocumentLibraryResponse = {
   mode: "read_only_corpus",
   truth_label: "SYNTHETISK KORPUS",
   manifest_version: "v1",
-  corpus_version: "nordly-knowledge-corpus-v2",
+  corpus_version: "nordly-knowledge-corpus-v3",
   corpus_content_sha256: "a".repeat(64),
   synthetic_only: true,
   current_vector_search: false,

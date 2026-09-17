@@ -140,6 +140,8 @@ public final class DemoOrderCatalog {
         if (order.itemCount() < 1 || order.itemCount() > 20) {
             throw invalid("invalid item count for " + order.orderId());
         }
+        requireNonBlank(order.itemSummarySv(), "Swedish item summary");
+        requireNonBlank(order.itemSummaryEn(), "English item summary");
         if (order.createdAt() == null
                 || order.updatedAt() == null
                 || order.updatedAt().isBefore(order.createdAt())) {

@@ -1215,6 +1215,8 @@ export interface DemoOrder {
   order_id: string;
   market: string;
   item_count: number;
+  item_summary_sv: string;
+  item_summary_en: string;
   created_at: string;
   updated_at: string;
   estimated_delivery_from: string;
@@ -1315,6 +1317,8 @@ export interface DemoCustomerChatSubmittedMessage {
 export interface DemoCustomerChatContextReceipt {
   context_version: string;
   context_id: string;
+  customer_display_name: string;
+  customer_preferred_name: string;
   current_order_id: string;
   context_source_ref: string;
   order_source_ref: string;

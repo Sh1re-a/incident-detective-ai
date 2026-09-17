@@ -188,10 +188,10 @@
   ],
   "featured_scenario_id": "checkout-orders-at-risk-v1",
   "corpus": {
-    "version": "nordly-knowledge-corpus-v2",
-    "document_count": 16,
-    "chunk_count": 31,
-    "approved_documents": 14,
+    "version": "nordly-knowledge-corpus-v3",
+    "document_count": 17,
+    "chunk_count": 35,
+    "approved_documents": 15,
     "deprecated_documents": 1,
     "untrusted_documents": 1
   }

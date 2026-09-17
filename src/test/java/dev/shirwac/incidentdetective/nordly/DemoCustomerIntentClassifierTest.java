@@ -59,6 +59,16 @@ class DemoCustomerIntentClassifierTest {
                         false
                 ),
                 Arguments.of(
+                        "Vad beställde jag?",
+                        DemoCustomerIntentClassifier.Intent.ORDER_STATUS,
+                        false
+                ),
+                Arguments.of(
+                        "What did I order?",
+                        DemoCustomerIntentClassifier.Intent.ORDER_STATUS,
+                        false
+                ),
+                Arguments.of(
                         "Har den skickats?",
                         DemoCustomerIntentClassifier.Intent.ORDER_STATUS,
                         false
@@ -87,6 +97,36 @@ class DemoCustomerIntentClassifierTest {
                         "Okay, when will it arrive then?",
                         DemoCustomerIntentClassifier.Intent.ORDER_STATUS,
                         false
+                ),
+                Arguments.of(
+                        "När har kundservice öppet?",
+                        DemoCustomerIntentClassifier.Intent.COMPANY_KNOWLEDGE,
+                        false
+                ),
+                Arguments.of(
+                        "Vad är Nordly för företag?",
+                        DemoCustomerIntentClassifier.Intent.COMPANY_KNOWLEDGE,
+                        false
+                ),
+                Arguments.of(
+                        "When is customer service open?",
+                        DemoCustomerIntentClassifier.Intent.COMPANY_KNOWLEDGE,
+                        false
+                ),
+                Arguments.of(
+                        "Kan jag få pengarna utbetalda?",
+                        DemoCustomerIntentClassifier.Intent.REFUND_POLICY,
+                        false
+                ),
+                Arguments.of(
+                        "Betala ut pengarna nu",
+                        DemoCustomerIntentClassifier.Intent.REFUND_ORDER,
+                        true
+                ),
+                Arguments.of(
+                        "Can you pay the money out?",
+                        DemoCustomerIntentClassifier.Intent.REFUND_ORDER,
+                        true
                 ),
                 Arguments.of(
                         "Jag vill ändra leveransadressen",

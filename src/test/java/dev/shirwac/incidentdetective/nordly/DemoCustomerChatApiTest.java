@@ -197,6 +197,8 @@ class DemoCustomerChatApiTest {
                 "NORD-2051",
                 "DK",
                 1,
+                "Aster bordslampa i sandbeige",
+                "Aster table lamp in sand beige",
                 java.time.Instant.parse("2026-09-11T13:06:00Z"),
                 java.time.Instant.parse("2026-09-14T06:31:00Z"),
                 java.time.LocalDate.parse("2026-09-18"),
@@ -228,6 +230,8 @@ class DemoCustomerChatApiTest {
                 new DemoCustomerChatTurnResponse.ContextReceipt(
                         "nordly-demo-customer-v1",
                         "public-demo-customer",
+                        "Shirwac \"Shirre\" Abib",
+                        "Shirre",
                         "NORD-2051",
                         "demo/nordly-demo-customer-v1#current-order",
                         order.sourceRef(),

@@ -1,6 +1,6 @@
 {
   "suite_version": "nordly-knowledge-retrieval-eval-v2",
-  "corpus_version": "nordly-knowledge-corpus-v2",
+  "corpus_version": "nordly-knowledge-corpus-v3",
   "measurement_status": "PENDING_PROVIDER_RUN",
   "retrieval_contract": {
     "required_lifecycle": "APPROVED",

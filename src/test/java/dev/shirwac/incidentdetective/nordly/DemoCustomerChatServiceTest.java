@@ -72,6 +72,10 @@ class DemoCustomerChatServiceTest {
         order = order();
         when(context.contextVersion()).thenReturn("nordly-demo-customer-v1");
         when(context.contextId()).thenReturn("public-demo-customer");
+        when(context.customerDisplayName()).thenReturn(
+                "Shirwac \"Shirre\" Abib"
+        );
+        when(context.customerPreferredName()).thenReturn("Shirre");
         when(context.sourceRef()).thenReturn(
                 "demo/nordly-demo-customer-v1#current-order"
         );
@@ -143,7 +147,7 @@ class DemoCustomerChatServiceTest {
         assertEquals("answered", response.outcome());
         assertEquals("NORD-2051", response.order().orderId());
         assertTrue(response.assistantMessage().textSv().startsWith(
-                "Hej! Jag har kontrollerat din order NORD-2051."
+                "Hej Shirre! Jag har kontrollerat din order NORD-2051."
         ));
         assertTrue(response.toolEvents().stream()
                 .anyMatch(event -> event.modelSelected()
@@ -422,7 +426,7 @@ class DemoCustomerChatServiceTest {
     }
 
     @Test
-    void answersFromTheFixedOrderWithoutAiOrInventedProductNames() {
+    void answersFromTheFixedOrderWithBackendOwnedProductSummary() {
         DemoCustomerChatTurnResponse response = service.run(request(
                 "Vilka varor finns i min beställning NORD-2057?",
                 false
@@ -435,7 +439,7 @@ class DemoCustomerChatServiceTest {
         assertEquals("shipped", response.order().statusCode());
         assertTrue(response.assistantMessage().textSv().contains("1 vara"));
         assertTrue(response.assistantMessage().textSv().contains(
-                "Produktnamnet finns inte"
+                "Aster bordslampa i sandbeige"
         ));
         assertFalse(response.assistantMessage().textSv().contains("NORD-2057"));
         assertHumanBubble(response);
@@ -525,6 +529,8 @@ class DemoCustomerChatServiceTest {
                 "NORD-3000",
                 "SE",
                 2,
+                "Lumi bordslampa och Fjord ullpläd",
+                "Lumi table lamp and Fjord wool throw",
                 Instant.parse("2026-09-15T08:00:00Z"),
                 Instant.parse("2026-09-15T09:00:00Z"),
                 LocalDate.parse("2026-09-22"),
@@ -1489,6 +1495,8 @@ class DemoCustomerChatServiceTest {
                 "NORD-2051",
                 "DK",
                 1,
+                "Aster bordslampa i sandbeige",
+                "Aster table lamp in sand beige",
                 Instant.parse("2026-09-11T13:06:00Z"),
                 Instant.parse("2026-09-14T06:31:00Z"),
                 LocalDate.parse("2026-09-18"),

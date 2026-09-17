@@ -1,7 +1,7 @@
 {
-  "manifest_version": "nordly-knowledge-manifest-v2",
+  "manifest_version": "nordly-knowledge-manifest-v3",
   "truth_label": "FIKTIV NORDLY-KUNSKAP · SYNTETISKA POLICYER OCH RUNBOOKS · INGEN KUNDDATA",
-  "corpus_version": "nordly-knowledge-corpus-v2",
+  "corpus_version": "nordly-knowledge-corpus-v3",
   "embedding_profile": {
     "provider": "google_genai",
     "model_id": "gemini-embedding-2",
@@ -60,6 +60,61 @@
           "display_summary_sv": "Kunskapsassistenten förklarar och driftagenten utreder, men ingen av dem får ändra systemen.",
           "display_summary_en": "The knowledge assistant explains and the incident agent investigates, but neither may change company systems.",
           "text": "Nordly has two bounded AI experiences in the demonstration. The knowledge assistant answers questions from approved synthetic documents. The incident agent examines approved synthetic metrics, logs, traces and runbooks. Both are read-only, expose their sources after the run and require a human for operational, financial or publishing actions."
+        }
+      ]
+    },
+    {
+      "id": "kb-company-customer-service",
+      "version": "1.0",
+      "display_filename": "NLY-COMP-002_company-profile-and-customer-service.md",
+      "document_type": "COMPANY_HANDBOOK",
+      "classification": "PUBLIC_DEMO",
+      "title": "Nordly company profile and customer service",
+      "title_sv": "Om Nordly och kundservice",
+      "summary_sv": "Företagets bakgrund, öppettider och arbetssätt för kundärenden.",
+      "summary_en": "The company's background, opening hours and approach to customer cases.",
+      "owner_team": "Customer Operations",
+      "lifecycle": "APPROVED",
+      "effective_from": "2026-09-01",
+      "effective_until": null,
+      "access_scopes": ["support_read", "public_demo"],
+      "related_document_ids": ["kb-order-status-cancellation", "kb-returns-refunds", "kb-shipping-delivery"],
+      "chunks": [
+        {
+          "id": "company-profile",
+          "section_heading": "Company profile",
+          "source_ref": "knowledge/kb-company-customer-service#company-profile",
+          "evidence_id": "nordly-evidence-customer-company-profile",
+          "display_summary_sv": "Nordly Market är en nordisk nätbutik för formgivna produkter till hemmet i Sverige, Danmark och Finland.",
+          "display_summary_en": "Nordly Market is a Nordic online store for designed home products in Sweden, Denmark and Finland.",
+          "text": "Nordly Commerce AB operates Nordly Market, an online store for designed home products in Sweden, Denmark and Finland. The company was established in Stockholm in 2021 and serves the three markets through one shared commerce platform. Its customer promise is clear product information, traceable orders and practical help when a delivery or payment needs attention."
+        },
+        {
+          "id": "customer-service-hours",
+          "section_heading": "Customer service opening hours",
+          "source_ref": "knowledge/kb-company-customer-service#customer-service-hours",
+          "evidence_id": "nordly-evidence-customer-service-hours",
+          "display_summary_sv": "Nätbutiken är öppen dygnet runt; bemannad support har öppet vardagar 09.00–17.00 CET.",
+          "display_summary_en": "The online store is open around the clock; staffed support is open weekdays 09:00–17:00 CET.",
+          "text": "Nordly Market is open for online shopping around the clock. Staffed customer service is open Monday to Friday from 09:00 to 17:00 CET and is closed on weekends and Swedish public holidays. The synthetic public-demo phone number is 123. The assistant must not imply that a person is available outside the staffed hours."
+        },
+        {
+          "id": "customer-case-handling",
+          "section_heading": "How customer cases are handled",
+          "source_ref": "knowledge/kb-company-customer-service#customer-case-handling",
+          "evidence_id": "nordly-evidence-customer-case-handling",
+          "display_summary_sv": "Support kontrollerar aktuell orderdata, följer godkända regler och lämnar ändringar till behörig personal.",
+          "display_summary_en": "Support checks current order data, follows approved rules and leaves changes to authorized staff.",
+          "text": "For an order question, Nordly support first checks the current order snapshot and then uses the approved policy that applies to the case. The assistant may explain status, delivery, cancellation, return and refund rules. It cannot cancel an order, create a return, issue a refund, redirect a payout or change customer data. For a request that requires an authenticated business action, the customer is directed to authorized staff through the approved support route."
+        },
+        {
+          "id": "customer-service-principles",
+          "section_heading": "Customer service principles",
+          "source_ref": "knowledge/kb-company-customer-service#customer-service-principles",
+          "evidence_id": "nordly-evidence-customer-service-principles",
+          "display_summary_sv": "Nordly svarar tydligt, skiljer fakta från osäkerhet och lovar aldrig en åtgärd som inte har genomförts.",
+          "display_summary_en": "Nordly answers clearly, separates facts from uncertainty and never promises an action that has not been completed.",
+          "text": "Nordly customer service should answer the customer's question first, explain the practical next step and keep the tone calm and helpful. It must distinguish a verified fact from an estimate or an unknown. It must never state that an order, refund, return or customer record was changed unless an authorized system has returned a completed action receipt."
         }
       ]
     },

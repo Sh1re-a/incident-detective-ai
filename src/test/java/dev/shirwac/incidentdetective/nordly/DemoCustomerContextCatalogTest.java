@@ -19,10 +19,12 @@ class DemoCustomerContextCatalogTest {
     private DemoCustomerContextCatalog context;
 
     @Test
-    void bindsEveryTurnToOneSyntheticShippedOrderWithoutPersonalData()
+    void bindsEveryTurnToOneNamedSyntheticCustomerAndShippedOrder()
             throws Exception {
         assertEquals("nordly-demo-customer-v1", context.contextVersion());
         assertEquals("public-demo-customer", context.contextId());
+        assertEquals("Shirwac \"Shirre\" Abib", context.customerDisplayName());
+        assertEquals("Shirre", context.customerPreferredName());
         assertEquals(
                 "demo/nordly-demo-customer-v1#current-order",
                 context.sourceRef()
@@ -38,7 +40,6 @@ class DemoCustomerContextCatalogTest {
         String resource = new ClassPathResource(
                 DemoCustomerContextCatalog.RESOURCE
         ).getContentAsString(StandardCharsets.UTF_8).toLowerCase(Locale.ROOT);
-        assertFalse(resource.contains("customer_name"));
         assertFalse(resource.contains("email"));
         assertFalse(resource.contains("address"));
         assertFalse(resource.contains("card_number"));

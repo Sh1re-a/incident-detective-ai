@@ -165,7 +165,11 @@ class IncidentFollowUpServiceTest {
                 )
         ));
 
-        IncidentFollowUpResponse response = service.answer(request(null, false));
+        IncidentFollowUpResponse response = service.answer(request(
+                "Kan du boka lunch åt mig?",
+                null,
+                false
+        ));
 
         assertEquals(
                 IncidentFollowUpResponse.AnswerState
@@ -179,6 +183,33 @@ class IncidentFollowUpServiceTest {
         assertEquals("blocked", response.steps().getFirst().status());
         assertEquals("skipped", response.steps().get(1).status());
         assertEquals("skipped", response.steps().get(2).status());
+        verify(router, never()).route(any());
+    }
+
+    @Test
+    void replayNaturalIncidentQuestionIsAnsweredFromFrozenReceipt() {
+        IncidentFollowUpSnapshot snapshot = snapshot(
+                IncidentFollowUpResponse.Mode.RECORDED_REPLAY
+        );
+        when(registry.find(any())).thenReturn(Optional.of(
+                new IncidentRunSnapshotRegistry.StoredSnapshot(
+                        "ilr_12345678901234567890123456789012",
+                        snapshot,
+                        "d".repeat(64)
+                )
+        ));
+
+        IncidentFollowUpResponse response = service.answer(request(
+                "Varför hände det och vilka källor använde du?",
+                null,
+                false
+        ));
+
+        assertEquals(IncidentFollowUpResponse.AnswerState.ANSWERED,
+                response.answerState());
+        assertTrue(response.answer().text().contains("Verifierad orsak"));
+        assertFalse(response.citations().isEmpty());
+        assertEquals(0, response.receipt().providerCalls());
         verify(router, never()).route(any());
     }
 
@@ -238,10 +269,22 @@ class IncidentFollowUpServiceTest {
             String suggestionId,
             boolean confirm
     ) {
+        return request(
+                "Hur kom du fram till slutsatsen?",
+                suggestionId,
+                confirm
+        );
+    }
+
+    private IncidentFollowUpRequest request(
+            String question,
+            String suggestionId,
+            boolean confirm
+    ) {
         return new IncidentFollowUpRequest(
                 "ilr_12345678901234567890123456789012",
                 "turn_12345678",
-                "Hur kom du fram till slutsatsen?",
+                question,
                 "sv",
                 suggestionId,
                 confirm

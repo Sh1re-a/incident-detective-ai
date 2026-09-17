@@ -48,6 +48,14 @@ public final class DemoCustomerContextCatalog {
         return manifest.sourceRef();
     }
 
+    public String customerDisplayName() {
+        return manifest.customerDisplayName();
+    }
+
+    public String customerPreferredName() {
+        return manifest.customerPreferredName();
+    }
+
     public String evidenceId() {
         return manifest.evidenceId();
     }
@@ -81,6 +89,16 @@ public final class DemoCustomerContextCatalog {
                 "context version"
         );
         requireEqual(CONTEXT_ID, manifest.contextId(), "context ID");
+        requireEqual(
+                "Shirwac \"Shirre\" Abib",
+                manifest.customerDisplayName(),
+                "customer display name"
+        );
+        requireEqual(
+                "Shirre",
+                manifest.customerPreferredName(),
+                "customer preferred name"
+        );
         requireEqual(SOURCE_REF, manifest.sourceRef(), "source reference");
         requireEqual(EVIDENCE_ID, manifest.evidenceId(), "evidence ID");
         requireEqual("NORD-2051", manifest.currentOrderId(), "current order ID");
@@ -109,6 +127,8 @@ public final class DemoCustomerContextCatalog {
 record DemoCustomerContextManifest(
         String contextVersion,
         String contextId,
+        String customerDisplayName,
+        String customerPreferredName,
         String currentOrderId,
         String sourceRef,
         String evidenceId,

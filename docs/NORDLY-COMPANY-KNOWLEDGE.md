@@ -13,9 +13,10 @@ allowed into RAG.
 
 ## One company, two bounded AI jobs
 
-- The **Nordly knowledge assistant** answers questions from approved synthetic
-  documents. It can explain a policy but cannot cancel an order, refund money,
-  contact a customer or reveal private data.
+- The **Nordly support agent** answers naturally from a synthetic customer
+  context, current order snapshots and approved company documents. It can
+  explain a policy but cannot cancel an order, refund money, change customer
+  data or reveal restricted material.
 - The **Nordly incident agent** investigates synthetic operational signals. It
   can inspect read-only metrics, logs, traces and runbooks, but it cannot deploy,
   roll back, purge a cache or modify production.
@@ -30,10 +31,10 @@ what deterministic Java verification accepted or rejected.
 Runtime source:
 `src/main/resources/knowledge/nordly-knowledge-corpus-v2.json`
 
-- Manifest: `nordly-knowledge-manifest-v2`
-- Corpus: `nordly-knowledge-corpus-v2`
-- 16 documents and 30 chunks
-- 13 approved public-demo documents and 27 eligible chunks
+- Manifest: `nordly-knowledge-manifest-v3`
+- Corpus: `nordly-knowledge-corpus-v3`
+- 17 documents and 35 chunks
+- 14 approved public-demo documents and 32 eligible chunks
 - 1 approved but restricted synthetic document
 - 1 deprecated safety fixture
 - 1 untrusted prompt-injection fixture
@@ -48,6 +49,7 @@ improving the current RAG proof.
 | File | Owner | Type | RAG status |
 | --- | --- | --- | --- |
 | `NLY-COMP-001_service-map-and-ownership.md` | Platform Operations | Service catalog | Eligible |
+| `NLY-COMP-002_company-profile-and-customer-service.md` | Customer Operations | Company handbook | Eligible |
 | `NLY-CX-101_order-lifecycle-and-cancellation.md` | Customer Operations | Policy | Eligible |
 | `NLY-CX-102_returns-and-card-refunds.md` | Customer Operations | Policy | Eligible |
 | `NLY-PAY-201_card-authorisation-capture-and-retry.md` | Payments Operations | Procedure | Eligible |

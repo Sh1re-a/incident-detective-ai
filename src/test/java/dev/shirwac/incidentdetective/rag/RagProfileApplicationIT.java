@@ -76,17 +76,17 @@ class RagProfileApplicationIT {
         assertEquals("0.8.6", jdbc.sql("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
                 .query(String.class)
                 .single());
-        assertEquals("7", flyway.info().current().getVersion().getVersion());
+        assertEquals("8", flyway.info().current().getVersion().getVersion());
         assertEquals(0L, jdbc.sql("SELECT COUNT(*) FROM runbook_embeddings")
                 .query(Long.class)
                 .single());
-        assertEquals(13, nordlyKnowledgeCorpus.eligibleDocumentCount());
-        assertEquals(28, nordlyKnowledgeCorpus.eligibleChunkCount());
+        assertEquals(14, nordlyKnowledgeCorpus.eligibleDocumentCount());
+        assertEquals(32, nordlyKnowledgeCorpus.eligibleChunkCount());
         RunbookIndexStatus nordlyIndex = nordlyKnowledgeIndexReadiness.inspect();
         assertFalse(nordlyIndex.ready());
         assertEquals(0, nordlyIndex.indexedChunks());
         assertEquals(0, nordlyIndex.currentChunks());
-        assertEquals(28, nordlyIndex.expectedChunks());
+        assertEquals(32, nordlyIndex.expectedChunks());
         CapabilitiesResponse.VectorIndexCapability index = capabilities
                 .describe()
                 .retrieval()

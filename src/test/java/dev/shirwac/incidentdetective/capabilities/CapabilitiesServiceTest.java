@@ -85,11 +85,11 @@ class CapabilitiesServiceTest {
         assertNull(response.deployment().revision());
         assertNull(response.deployment().buildGitSha());
         assertEquals(
-                "nordly-knowledge-manifest-v2",
+                "nordly-knowledge-manifest-v3",
                 response.knowledgeCorpus().manifestVersion()
         );
         assertEquals(
-                "nordly-knowledge-corpus-v2",
+                "nordly-knowledge-corpus-v3",
                 response.knowledgeCorpus().corpusVersion()
         );
         assertEquals(
@@ -97,8 +97,8 @@ class CapabilitiesServiceTest {
                         + "0123456789abcdef0123456789abcdef",
                 response.knowledgeCorpus().corpusContentSha256()
         );
-        assertEquals(13, response.knowledgeCorpus().eligibleDocumentCount());
-        assertEquals(28, response.knowledgeCorpus().eligibleChunkCount());
+        assertEquals(14, response.knowledgeCorpus().eligibleDocumentCount());
+        assertEquals(32, response.knowledgeCorpus().eligibleChunkCount());
         assertEquals(List.of(
                 new ModeCapability(
                         RunMode.RECORDED_REPLAY,
@@ -441,14 +441,14 @@ class CapabilitiesServiceTest {
 
     private NordlyKnowledgeCorpus knowledgeCorpus() {
         NordlyKnowledgeCorpus corpus = mock(NordlyKnowledgeCorpus.class);
-        when(corpus.manifestVersion()).thenReturn("nordly-knowledge-manifest-v2");
-        when(corpus.version()).thenReturn("nordly-knowledge-corpus-v2");
+        when(corpus.manifestVersion()).thenReturn("nordly-knowledge-manifest-v3");
+        when(corpus.version()).thenReturn("nordly-knowledge-corpus-v3");
         when(corpus.corpusContentSha256()).thenReturn(
                 "0123456789abcdef0123456789abcdef"
                         + "0123456789abcdef0123456789abcdef"
         );
-        when(corpus.eligibleDocumentCount()).thenReturn(13);
-        when(corpus.eligibleChunkCount()).thenReturn(28);
+        when(corpus.eligibleDocumentCount()).thenReturn(14);
+        when(corpus.eligibleChunkCount()).thenReturn(32);
         return corpus;
     }
 

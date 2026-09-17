@@ -10,6 +10,8 @@ public record DemoOrderSnapshot(
         String orderId,
         String market,
         int itemCount,
+        String itemSummarySv,
+        String itemSummaryEn,
         Instant createdAt,
         Instant updatedAt,
         LocalDate estimatedDeliveryFrom,

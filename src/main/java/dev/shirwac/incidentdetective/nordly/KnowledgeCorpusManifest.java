@@ -9,7 +9,7 @@ record KnowledgeCorpusManifest(
         CorpusEmbeddingProfile embeddingProfile,
         List<KnowledgeDocument> documents
 ) {
-    static final String MANIFEST_VERSION = "nordly-knowledge-manifest-v2";
+    static final String MANIFEST_VERSION = "nordly-knowledge-manifest-v3";
 
     KnowledgeCorpusManifest {
         documents = documents == null ? null : List.copyOf(documents);

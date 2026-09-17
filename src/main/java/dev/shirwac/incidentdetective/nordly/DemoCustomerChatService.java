@@ -1398,6 +1398,8 @@ public final class DemoCustomerChatService {
         return new DemoCustomerChatTurnResponse.ContextReceipt(
                 contextCatalog.contextVersion(),
                 contextCatalog.contextId(),
+                contextCatalog.customerDisplayName(),
+                contextCatalog.customerPreferredName(),
                 order.orderId(),
                 contextCatalog.sourceRef(),
                 order.sourceRef(),
@@ -1417,24 +1419,24 @@ public final class DemoCustomerChatService {
                 ? "1 item"
                 : order.itemCount() + " items";
         return new DemoCustomerChatTurnResponse.AssistantMessage(
-                "Hej! Jag har kontrollerat din order " + order.orderId()
+                "Hej " + contextCatalog.customerPreferredName()
+                        + "! Jag har kontrollerat din order " + order.orderId()
                         + ". Orderstatus: " + order.statusSv()
                         + ". Den beräknas komma "
                         + dateRangeSv(
                         order.estimatedDeliveryFrom(),
                         order.estimatedDeliveryThrough()
-                ) + ". Ordern innehåller " + itemsSv + ". "
-                        + "Produktnamnet finns inte i den orderinformation "
-                        + "jag har tillgång till. " + order.nextStepSv(),
-                "Hi! I checked your order " + order.orderId()
+                ) + ". Ordern innehåller " + itemsSv + ": "
+                        + order.itemSummarySv() + ". " + order.nextStepSv(),
+                "Hi " + contextCatalog.customerPreferredName()
+                        + "! I checked your order " + order.orderId()
                         + ". Order status: " + order.statusEn()
                         + ". It is expected to arrive "
                         + dateRangeEn(
                         order.estimatedDeliveryFrom(),
                         order.estimatedDeliveryThrough()
-                ) + ". The order contains " + itemsEn + ". "
-                        + "The product name is not included in the order "
-                        + "information I can access. " + order.nextStepEn()
+                ) + ". The order contains " + itemsEn + ": "
+                        + order.itemSummaryEn() + ". " + order.nextStepEn()
         );
     }
 

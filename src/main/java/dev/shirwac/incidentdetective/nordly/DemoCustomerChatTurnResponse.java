@@ -59,6 +59,8 @@ public record DemoCustomerChatTurnResponse(
     public record ContextReceipt(
             String contextVersion,
             String contextId,
+            String customerDisplayName,
+            String customerPreferredName,
             String currentOrderId,
             String contextSourceRef,
             String orderSourceRef,

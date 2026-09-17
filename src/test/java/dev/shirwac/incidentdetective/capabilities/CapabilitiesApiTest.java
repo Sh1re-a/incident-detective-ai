@@ -57,19 +57,19 @@ class CapabilitiesApiTest {
                 .andExpect(jsonPath("$.deployment.build_git_sha")
                         .value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.knowledge_corpus.manifest_version")
-                        .value("nordly-knowledge-manifest-v2"))
+                        .value("nordly-knowledge-manifest-v3"))
                 .andExpect(jsonPath("$.knowledge_corpus.corpus_version")
-                        .value("nordly-knowledge-corpus-v2"))
+                        .value("nordly-knowledge-corpus-v3"))
                 .andExpect(jsonPath("$.knowledge_corpus.corpus_content_sha256")
                         .value(org.hamcrest.Matchers.matchesPattern(
                                 "[0-9a-f]{64}"
                         )))
                 .andExpect(jsonPath(
                         "$.knowledge_corpus.eligible_document_count"
-                ).value(13))
+                ).value(14))
                 .andExpect(jsonPath(
                         "$.knowledge_corpus.eligible_chunk_count"
-                ).value(28))
+                ).value(32))
                 .andExpect(jsonPath("$.modes[*].mode").value(contains(
                         "recorded_replay",
                         "live_ai"

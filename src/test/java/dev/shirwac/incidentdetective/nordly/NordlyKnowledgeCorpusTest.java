@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class NordlyKnowledgeCorpusTest {
 
     private static final String EXPECTED_CORPUS_CONTENT_SHA256 =
-            "6ec834d8aa784e433961a798e32edb96c6ed179ef853a1e557da8021c84f466d";
+            "f5c92e8f7996ae45d253ba35d9afe6ec20426a7c0a1f95e264defdef24e27386";
     private static final RagProperties PROFILE = new RagProperties(
             "gemini-embedding-2",
             768,
@@ -44,10 +44,10 @@ class NordlyKnowledgeCorpusTest {
     @Test
     void exposesOnlyApprovedPublicDemoDocuments() {
         assertEquals(
-                "nordly-knowledge-manifest-v2",
+                "nordly-knowledge-manifest-v3",
                 corpus.manifestVersion()
         );
-        assertEquals("nordly-knowledge-corpus-v2", corpus.version());
+        assertEquals("nordly-knowledge-corpus-v3", corpus.version());
         assertEquals(
                 EXPECTED_CORPUS_CONTENT_SHA256,
                 corpus.corpusContentSha256()
@@ -56,8 +56,8 @@ class NordlyKnowledgeCorpusTest {
                 CorpusFingerprint.sha256(corpus.entries()),
                 corpus.corpusContentSha256()
         );
-        assertEquals(13, corpus.eligibleDocumentCount());
-        assertEquals(28, corpus.eligibleChunkCount());
+        assertEquals(14, corpus.eligibleDocumentCount());
+        assertEquals(32, corpus.eligibleChunkCount());
         assertTrue(corpus.entries().stream()
                 .allMatch(entry -> corpus.metadata(entry.evidenceId())
                         .status().equals("APPROVED")));
@@ -77,6 +77,11 @@ class NordlyKnowledgeCorpusTest {
                 support.sourceRef()
         );
         assertTrue(support.text().contains("synthetic support number 123"));
+        NordlyKnowledgeCorpus.EntryMetadata hours = corpus.metadata(
+                "nordly-evidence-customer-service-hours"
+        );
+        assertEquals("kb-company-customer-service", hours.documentId());
+        assertTrue(hours.text().contains("09:00 to 17:00 CET"));
     }
 
     @Test
@@ -98,14 +103,14 @@ class NordlyKnowledgeCorpusTest {
         RunbookImportReport first = importer.importMissingOrChanged();
         RunbookImportReport second = importer.importMissingOrChanged();
 
-        assertEquals(28, first.importedChunks());
+        assertEquals(32, first.importedChunks());
         assertEquals("developer_api", first.providerTransport());
         assertEquals(0, first.skippedChunks());
         assertEquals(0, second.importedChunks());
-        assertEquals(28, second.skippedChunks());
-        assertEquals(28, embeddings.inputs.size());
-        assertEquals(28, store.upserted.size());
-        assertEquals(28, store.synchronizedMetadata.size());
+        assertEquals(32, second.skippedChunks());
+        assertEquals(32, embeddings.inputs.size());
+        assertEquals(32, store.upserted.size());
+        assertEquals(32, store.synchronizedMetadata.size());
         assertFalse(store.upserted.contains("nordly-evidence-legacy-refund-window"));
         assertFalse(store.upserted.contains("nordly-evidence-untrusted-instruction"));
         assertFalse(store.upserted.contains(
