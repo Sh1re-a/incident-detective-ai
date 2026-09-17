@@ -49,19 +49,13 @@ public final class DemoCustomerChatService {
     private static final String LIVE_AI_TRUTH_EN =
             "SYNTHETIC CUSTOMER · FIXED BACKEND CONTEXT · CONTROLLED LIVE AI · "
                     + "BUSINESS DATA READ-ONLY · NO PERSISTENT MEMORY";
-    private static final String FALLBACK_TRUTH_SV =
-            "SYNTETISK KUND · SÄKERT RESERVLÄGE · AI-ROUTERN KUNDE INTE ANVÄNDAS · "
-                    + "AFFÄRSDATA READ-ONLY · INGET PERMANENT MINNE";
-    private static final String FALLBACK_TRUTH_EN =
-            "SYNTHETIC CUSTOMER · SAFE FALLBACK · AI ROUTER UNAVAILABLE · "
-                    + "BUSINESS DATA READ-ONLY · NO PERSISTENT MEMORY";
     private static final List<String> LIMITATIONS = List.of(
             "The customer, order, company documents and phone number are synthetic.",
             "The browser may send up to six recent turns for continuity; the backend stores no persistent conversation memory and never treats that transcript as factual evidence.",
             "Every turn resolves the same fixed synthetic customer and one backend-owned current order.",
             "The assistant can read and explain but has no create, cancel, refund, contact or update tool.",
             "Zero business writes covers customer, order and refund state; live quota accounting and observability may write technical records.",
-            "Gemini may route free text, but order facts and authority boundaries are released only from Java's canonical evidence projection.",
+            "Gemini may route and phrase a live reply, but order facts and authority boundaries come only from Java's canonical evidence projection.",
             "Refund eligibility is never decided because the demo order has no product-condition or authenticated return data.",
             "Semantic similarity ranks approved text; it is not factual confidence or complete semantic verification."
     );
@@ -72,6 +66,7 @@ public final class DemoCustomerChatService {
     private final KnowledgeRagService knowledgeRagService;
     private final NordlyKnowledgeCorpus corpus;
     private final CustomerChatModelRouter modelRouter;
+    private final CustomerChatAnswerGateway answerGateway;
     private final GeminiAiProperties aiProperties;
     private final NordlyKnowledgeCorpus.EntryMetadata cancellationPolicy;
     private final NordlyKnowledgeCorpus.EntryMetadata returnPolicy;
@@ -93,6 +88,7 @@ public final class DemoCustomerChatService {
                 knowledgeRagService,
                 corpus,
                 null,
+                null,
                 null
         );
     }
@@ -105,6 +101,7 @@ public final class DemoCustomerChatService {
             KnowledgeRagService knowledgeRagService,
             NordlyKnowledgeCorpus corpus,
             CustomerChatModelRouter modelRouter,
+            CustomerChatAnswerGateway answerGateway,
             GeminiAiProperties aiProperties
     ) {
         this.contextCatalog = contextCatalog;
@@ -113,6 +110,7 @@ public final class DemoCustomerChatService {
         this.knowledgeRagService = knowledgeRagService;
         this.corpus = corpus;
         this.modelRouter = modelRouter;
+        this.answerGateway = answerGateway;
         this.aiProperties = aiProperties;
         cancellationPolicy = approved(
                 corpus.metadata(CANCELLATION_EVIDENCE),
@@ -195,16 +193,13 @@ public final class DemoCustomerChatService {
             if (!recoverableRoutingFailure(exception)) {
                 throw exception;
             }
-            DemoCustomerIntentClassifier.Decision fallback =
-                    fallbackDecision(request.message(), exception);
-            DemoCustomerChatTurnResponse response = dispatch(
+            return routingUnavailable(
                     turnId,
                     started,
                     request,
-                    fallback,
-                    safety
+                    safety,
+                    exception
             );
-            return attachRoutingFailure(response, exception);
         }
 
         DemoCustomerIntentClassifier.Decision intent = decision(route);
@@ -232,9 +227,20 @@ public final class DemoCustomerChatService {
             );
             return attachRoute(response, route);
         }
-        // The model may interpret free text, but it does not get a second,
-        // unguarded opportunity to rewrite factual order or authority claims.
-        // RAG answers have their own evidence-bound release path.
+        if (shouldCompose(response)) {
+            try {
+                response = composeCustomerAnswer(
+                        response,
+                        request,
+                        recentConversation
+                );
+            } catch (RuntimeException exception) {
+                if (!recoverableRoutingFailure(exception)) {
+                    throw exception;
+                }
+                response = compositionUnavailable(response, exception);
+            }
+        }
         return attachRoute(response, route);
     }
 
@@ -368,21 +374,6 @@ public final class DemoCustomerChatService {
         );
     }
 
-    private DemoCustomerIntentClassifier.Decision fallbackDecision(
-            String message,
-            RuntimeException exception
-    ) {
-        DemoCustomerIntentClassifier.Decision deterministic =
-                classifier.classify(message);
-        return new DemoCustomerIntentClassifier.Decision(
-                deterministic.intent(),
-                DemoCustomerIntentClassifier.CLASSIFIER
-                        + "_fallback_"
-                        + routingFailureCode(exception).toLowerCase(Locale.ROOT),
-                deterministic.actionRequested()
-        );
-    }
-
     private boolean recoverableRoutingFailure(RuntimeException exception) {
         if (exception instanceof ModelProviderException
                 || exception instanceof LiveInvestigationException
@@ -467,46 +458,291 @@ public final class DemoCustomerChatService {
                 .toList();
     }
 
-    private DemoCustomerChatTurnResponse attachRoutingFailure(
+    private boolean shouldCompose(DemoCustomerChatTurnResponse response) {
+        return Set.of("answered", "outside_authority")
+                .contains(response.outcome())
+                && !response.sources().isEmpty()
+                && !response.verifiedClaims().isEmpty();
+    }
+
+    private DemoCustomerChatTurnResponse composeCustomerAnswer(
+            DemoCustomerChatTurnResponse response,
+            DemoCustomerChatTurnRequest request,
+            List<DemoCustomerChatTurnRequest.ConversationTurn> recentConversation
+    ) {
+        if (answerGateway == null) {
+            throw new LiveInvestigationException(
+                    dev.shirwac.incidentdetective.live.LiveInvestigationFailure
+                            .LIVE_AI_DISABLED,
+                    "Customer answer gateway is unavailable"
+            );
+        }
+        List<CustomerChatAnswerGateway.Evidence> evidence = response.sources()
+                .stream()
+                .limit(CustomerChatAnswerGateway.MAX_EVIDENCE_ITEMS)
+                .map(source -> answerEvidence(response, source))
+                .toList();
+        CustomerChatAnswerGateway.Result generated = answerGateway.generate(
+                request.confirmLiveAi(),
+                new CustomerChatAnswerGateway.Input(
+                        request.message(),
+                        request.locale(),
+                        response.intent().name(),
+                        response.outcome(),
+                        recentConversation,
+                        evidence
+                )
+        );
+        List<DemoCustomerChatTurnResponse.VerifiedClaim> claims =
+                generated.answer().claims().stream()
+                        .map(claim -> new DemoCustomerChatTurnResponse.VerifiedClaim(
+                                claim.textSv(),
+                                claim.textEn(),
+                                claim.citationIds()
+                        ))
+                        .toList();
+        List<String> citedEvidence = claims.stream()
+                .flatMap(claim -> claim.citationIds().stream())
+                .distinct()
+                .toList();
+        List<DemoCustomerChatTurnResponse.ToolEvent> events =
+                new ArrayList<>(response.toolEvents());
+        events.add(new DemoCustomerChatTurnResponse.ToolEvent(
+                0,
+                "generation",
+                "gemini_customer_answer",
+                false,
+                "compose_customer_answer",
+                "completed",
+                true,
+                "Gemini formulerade kundsvaret från exakt den verifierade evidens som Java tillät.",
+                "Gemini composed the customer reply from exactly the verified evidence Java allowed.",
+                null,
+                citedEvidence,
+                generated.provider().latencyMs()
+        ));
+        DemoCustomerChatTurnResponse.Verification prior =
+                response.verification();
+        DemoCustomerChatTurnResponse.Verification verification =
+                new DemoCustomerChatTurnResponse.Verification(
+                        "completed",
+                        prior.fixedCustomerScope(),
+                        prior.orderSourceVerified(),
+                        prior.approvedPoliciesOnly(),
+                        true,
+                        prior.semanticClaimSupportEvaluated(),
+                        true,
+                        false,
+                        "released_model_composed_from_bounded_evidence"
+                );
+        DemoCustomerChatTurnResponse.Receipt receipt = addModelCall(
+                response.receipt(),
+                generated.costEstimate(),
+                aiProperties == null
+                        ? generated.provider().modelVersion()
+                        : aiProperties.modelId(),
+                generated.provider().latencyMs()
+        );
+        return copyResponse(
+                response,
+                LIVE_AI_TRUTH_SV,
+                LIVE_AI_TRUTH_EN,
+                new DemoCustomerChatTurnResponse.AssistantMessage(
+                        generated.answer().textSv(),
+                        generated.answer().textEn()
+                ),
+                resequence(events),
+                claims,
+                verification,
+                receipt,
+                response.error()
+        );
+    }
+
+    private CustomerChatAnswerGateway.Evidence answerEvidence(
+            DemoCustomerChatTurnResponse response,
+            DemoCustomerChatTurnResponse.Source source
+    ) {
+        String text;
+        if ("customer_context".equals(source.kind())) {
+            text = "Customer display name: "
+                    + response.context().customerDisplayName()
+                    + ". Preferred name: "
+                    + response.context().customerPreferredName()
+                    + ". Current order ID: "
+                    + response.context().currentOrderId()
+                    + ". Swedish source summary: "
+                    + source.displaySummarySv()
+                    + " English source summary: "
+                    + source.displaySummaryEn();
+        } else if ("order_snapshot".equals(source.kind())
+                && response.order() != null) {
+            DemoOrderSnapshot order = response.order();
+            text = "Order ID: " + order.orderId()
+                    + ". Market: " + order.market()
+                    + ". Item count: " + order.itemCount()
+                    + ". Items (sv): " + order.itemSummarySv()
+                    + ". Items (en): " + order.itemSummaryEn()
+                    + ". Status code: " + order.statusCode()
+                    + ". Status (sv): " + order.statusSv()
+                    + ". Status (en): " + order.statusEn()
+                    + ". Delivery from: " + order.estimatedDeliveryFrom()
+                    + ". Delivery through: "
+                    + order.estimatedDeliveryThrough()
+                    + ". Payment state: " + order.paymentState()
+                    + ". Fulfilment state: " + order.fulfilmentState()
+                    + ". Summary (sv): " + order.summarySv()
+                    + ". Summary (en): " + order.summaryEn()
+                    + ". Next step (sv): " + order.nextStepSv()
+                    + ". Next step (en): " + order.nextStepEn();
+        } else if ("company_policy".equals(source.kind())) {
+            NordlyKnowledgeCorpus.EntryMetadata metadata = approved(
+                    corpus.metadata(source.evidenceId()),
+                    source.evidenceId()
+            );
+            text = "Approved source text: " + metadata.text()
+                    + " Swedish source summary: "
+                    + source.displaySummarySv()
+                    + " English source summary: "
+                    + source.displaySummaryEn();
+        } else {
+            text = "Swedish source summary: " + source.displaySummarySv()
+                    + " English source summary: "
+                    + source.displaySummaryEn();
+        }
+        return new CustomerChatAnswerGateway.Evidence(
+                source.evidenceId(),
+                source.title(),
+                text
+        );
+    }
+
+    private DemoCustomerChatTurnResponse compositionUnavailable(
             DemoCustomerChatTurnResponse response,
             RuntimeException exception
     ) {
         String failureCode = routingFailureCode(exception);
+        List<DemoCustomerChatTurnResponse.ToolEvent> events =
+                new ArrayList<>(response.toolEvents());
+        events.add(new DemoCustomerChatTurnResponse.ToolEvent(
+                0,
+                "generation",
+                "gemini_customer_answer",
+                false,
+                "compose_customer_answer",
+                "failed",
+                exception instanceof ModelProviderException,
+                "Det naturliga kundsvaret kunde inte verifieras. Det förskrivna underlaget släpptes inte som ersättning.",
+                "The natural customer reply could not be verified. The pre-composed projection was not released as a substitute.",
+                null,
+                List.of(),
+                null
+        ));
+        DemoCustomerChatTurnResponse.Receipt receipt = response.receipt();
+        if (exception instanceof ModelProviderException) {
+            receipt = addUnknownModelCall(
+                    receipt,
+                    aiProperties == null ? null : aiProperties.modelId()
+            );
+        }
+        return copyResponseWithOutcome(
+                response,
+                "unavailable",
+                new DemoCustomerChatTurnResponse.AssistantMessage(
+                        "Jag kunde inte skapa ett verifierat svar just nu och vill inte ersätta det med ett standardsvar. Försök gärna igen om en stund.",
+                        "I could not create a verified reply right now and will not replace it with a canned answer. Please try again in a moment."
+                ),
+                resequence(events),
+                List.of(),
+                new DemoCustomerChatTurnResponse.Verification(
+                        "not_run",
+                        response.verification().fixedCustomerScope(),
+                        response.verification().orderSourceVerified(),
+                        response.verification().approvedPoliciesOnly(),
+                        false,
+                        false,
+                        true,
+                        false,
+                        "not_released_customer_answer_composition_failed"
+                ),
+                receipt,
+                new DemoCustomerChatTurnResponse.ErrorDetail(
+                        "CUSTOMER_CHAT_ANSWER_" + failureCode,
+                        "Det naturliga live-svaret kunde inte verifieras och inget reservsvar släpptes.",
+                        "The natural live reply could not be verified and no fallback answer was released."
+                )
+        );
+    }
+
+    private DemoCustomerChatTurnResponse routingUnavailable(
+            String turnId,
+            long started,
+            DemoCustomerChatTurnRequest request,
+            KnowledgeRagSafetyGate.Decision safety,
+            RuntimeException exception
+    ) {
+        String failureCode = routingFailureCode(exception);
+        DemoCustomerIntentClassifier.Decision unavailableIntent =
+                new DemoCustomerIntentClassifier.Decision(
+                        DemoCustomerIntentClassifier.Intent.UNSUPPORTED,
+                        CustomerChatModelRouter.CLASSIFIER + "_unavailable",
+                        false
+                );
         DemoCustomerChatTurnResponse.ToolEvent failureEvent =
                 new DemoCustomerChatTurnResponse.ToolEvent(
-                        0,
+                        2,
                         "model_routing",
                         "gemini_customer_router",
                         true,
                         "route_customer_message",
                         "failed",
                         exception instanceof ModelProviderException,
-                        "AI-routern kunde inte användas. Java växlade tydligt till det säkra reservläget.",
-                        "The AI router was unavailable. Java explicitly switched to the safe fallback.",
+                        "AI-routern kunde inte användas. Ingen mall eller gissning visades som svar.",
+                        "The AI router was unavailable. No template or guess was shown as an answer.",
                         null,
                         List.of(),
                         null
                 );
-        DemoCustomerChatTurnResponse.Receipt receipt =
+        DemoCustomerChatTurnResponse.Receipt resultReceipt =
+                receipt(0, 0, 0, 0, 0, started, null);
+        resultReceipt =
                 exception instanceof ModelProviderException
                         ? addUnknownModelCall(
-                        response.receipt(),
+                        resultReceipt,
                         aiProperties == null ? null : aiProperties.modelId()
                 )
-                        : response.receipt();
-        return copyResponse(
-                response,
-                FALLBACK_TRUTH_SV,
-                FALLBACK_TRUTH_EN,
-                response.assistantMessage(),
-                insertAfterSafety(response.toolEvents(), failureEvent),
-                response.verifiedClaims(),
-                response.verification(),
-                receipt,
+                        : resultReceipt;
+        return response(
+                turnId,
+                request,
+                unavailableIntent,
+                safety,
+                "unavailable",
+                new DemoCustomerChatTurnResponse.AssistantMessage(
+                        "Jag kunde inte tolka frågan säkert just nu och vill inte gissa. Försök gärna igen om en stund.",
+                        "I could not interpret the question safely right now and will not guess. Please try again in a moment."
+                ),
+                null,
+                List.of(safetyEvent(1, safety), failureEvent),
+                List.of(),
+                List.of(),
+                noRag(),
+                new DemoCustomerChatTurnResponse.Verification(
+                        "not_run",
+                        true,
+                        false,
+                        false,
+                        false,
+                        false,
+                        true,
+                        false,
+                        "not_released_router_failed"
+                ),
+                resultReceipt,
                 new DemoCustomerChatTurnResponse.ErrorDetail(
                         "CUSTOMER_CHAT_ROUTER_" + failureCode,
-                        "Live-AI kunde inte tolka frågan just nu. Svaret kommer från det märkta reservläget och ingen ändring gjordes.",
-                        "Live AI could not route the question right now. The answer came from the labelled fallback and no change was made."
+                        "Live-AI kunde inte tolka frågan och inget kundsvar släpptes.",
+                        "Live AI could not route the question and no customer answer was released."
                 )
         );
     }
@@ -737,6 +973,40 @@ public final class DemoCustomerChatService {
                 truthLabel,
                 truthLabelEn,
                 response.outcome(),
+                response.submittedMessage(),
+                response.context(),
+                response.intent(),
+                response.safety(),
+                assistant,
+                response.order(),
+                events,
+                response.sources(),
+                claims,
+                response.rag(),
+                verification,
+                receipt,
+                error,
+                response.limitations()
+        );
+    }
+
+    private DemoCustomerChatTurnResponse copyResponseWithOutcome(
+            DemoCustomerChatTurnResponse response,
+            String outcome,
+            DemoCustomerChatTurnResponse.AssistantMessage assistant,
+            List<DemoCustomerChatTurnResponse.ToolEvent> events,
+            List<DemoCustomerChatTurnResponse.VerifiedClaim> claims,
+            DemoCustomerChatTurnResponse.Verification verification,
+            DemoCustomerChatTurnResponse.Receipt receipt,
+            DemoCustomerChatTurnResponse.ErrorDetail error
+    ) {
+        return new DemoCustomerChatTurnResponse(
+                response.contractVersion(),
+                response.turnId(),
+                response.mode(),
+                response.truthLabel(),
+                response.truthLabelEn(),
+                outcome,
                 response.submittedMessage(),
                 response.context(),
                 response.intent(),

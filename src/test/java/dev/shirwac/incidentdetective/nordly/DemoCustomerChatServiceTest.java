@@ -29,7 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -62,6 +65,9 @@ class DemoCustomerChatServiceTest {
     );
     private final NordlyKnowledgeCorpus corpus = mock(
             NordlyKnowledgeCorpus.class
+    );
+    private final CustomerChatAnswerGateway answerGateway = mock(
+            CustomerChatAnswerGateway.class
     );
 
     private DemoOrderSnapshot order;
@@ -116,6 +122,9 @@ class DemoCustomerChatServiceTest {
                         CONTACT_EVIDENCE
                 )
         );
+        when(answerGateway.generate(anyBoolean(), any())).thenAnswer(
+                invocation -> composedAnswer(invocation.getArgument(1))
+        );
         service = new DemoCustomerChatService(
                 context,
                 new DemoCustomerIntentClassifier(),
@@ -126,7 +135,7 @@ class DemoCustomerChatServiceTest {
     }
 
     @Test
-    void modelRoutesAnOrderQuestionButJavaReleasesTheCanonicalEvidenceProjection() {
+    void modelRoutesReadsAndComposesTheAnswerFromBoundedBackendEvidence() {
         CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
         when(router.route(any())).thenReturn(modelRoute(
                 CustomerChatModelRouter.Tool.GET_CURRENT_ORDER,
@@ -146,31 +155,39 @@ class DemoCustomerChatServiceTest {
         assertEquals("order_status", response.intent().name());
         assertEquals("answered", response.outcome());
         assertEquals("NORD-2051", response.order().orderId());
-        assertTrue(response.assistantMessage().textSv().startsWith(
-                "Hej Shirre! Jag har kontrollerat din order NORD-2051."
-        ));
+        assertEquals(
+                "Jag har kollat det åt dig — din order är skickad och på väg.",
+                response.assistantMessage().textSv()
+        );
         assertTrue(response.toolEvents().stream()
                 .anyMatch(event -> event.modelSelected()
                         && "get_current_order".equals(event.name())));
-        assertFalse(response.toolEvents().stream()
+        assertTrue(response.toolEvents().stream()
                 .anyMatch(event -> "compose_customer_answer".equals(
                         event.name()
-                )));
+                ) && "completed".equals(event.status())));
         assertEquals(
-                "Ordern är Skickad och har ett registrerat leveransfönster.",
+                "Verifierat från den tillåtna källan.",
                 response.verifiedClaims().getFirst().textSv()
         );
-        assertFalse(response.verifiedClaims().getFirst().textSv().startsWith(
-                "Hej!"
-        ));
+        assertEquals(List.of(ORDER_EVIDENCE),
+                response.verifiedClaims().getFirst().citationIds());
         assertEquals(
-                "released_exact_order_snapshot",
+                "released_model_composed_from_bounded_evidence",
                 response.verification().overallOutcome()
         );
         assertTrue(response.verification().citationsWithinReturnedSources());
         assertFalse(response.verification().semanticClaimSupportEvaluated());
-        assertEquals(1, response.receipt().providerCalls());
-        assertEquals(1, response.receipt().generationCalls());
+        assertEquals(2, response.receipt().providerCalls());
+        assertEquals(2, response.receipt().generationCalls());
+        ArgumentCaptor<CustomerChatAnswerGateway.Input> answerInput =
+                ArgumentCaptor.forClass(CustomerChatAnswerGateway.Input.class);
+        verify(answerGateway).generate(eq(true), answerInput.capture());
+        assertTrue(answerInput.getValue().evidence().stream()
+                .filter(evidence -> ORDER_EVIDENCE.equals(evidence.id()))
+                .anyMatch(evidence -> evidence.text().contains(
+                        "Aster bordslampa i sandbeige"
+                )));
         verifyNoInteractions(ragService);
         assertControlledAiInvariant(response);
     }
@@ -210,8 +227,8 @@ class DemoCustomerChatServiceTest {
         assertEquals("gemini-embedding-2", response.rag().embeddingModelId());
         assertEquals(List.of(AUTHORITY_EVIDENCE),
                 response.verifiedClaims().getFirst().citationIds());
-        assertEquals(3, response.receipt().providerCalls());
-        assertEquals(2, response.receipt().generationCalls());
+        assertEquals(4, response.receipt().providerCalls());
+        assertEquals(3, response.receipt().generationCalls());
         assertControlledAiInvariant(response);
     }
 
@@ -256,7 +273,7 @@ class DemoCustomerChatServiceTest {
     }
 
     @Test
-    void modelRoutesConversationButJavaKeepsTheBoundedReply() {
+    void modelComposesConversationFromOnlySafeRecentContext() {
         CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
         when(router.route(any())).thenReturn(modelConversationRoute(
                 CustomerChatModelRouter.ConversationKind.GREETING
@@ -295,25 +312,28 @@ class DemoCustomerChatServiceTest {
                 List.of(safeHistory),
                 routeInput.getValue().recentConversation()
         );
+        ArgumentCaptor<CustomerChatAnswerGateway.Input> answerInput =
+                ArgumentCaptor.forClass(CustomerChatAnswerGateway.Input.class);
+        verify(answerGateway).generate(eq(true), answerInput.capture());
+        assertEquals(List.of(safeHistory),
+                answerInput.getValue().recentConversation());
         assertEquals("conversation", response.intent().name());
-        assertEquals("Hej! Jag kan hjälpa dig att kontrollera din order eller förklara Nordlys godkända kundregler.",
+        assertEquals("Absolut — vad vill du att jag hjälper dig med?",
                 response.assistantMessage().textSv());
-        assertEquals(1, response.verifiedClaims().size());
-        assertEquals(List.of(AUTHORITY_EVIDENCE),
-                response.verifiedClaims().getFirst().citationIds());
-        assertFalse(response.verifiedClaims().getFirst().textSv().contains(
-                "Vad vill du"
-        ));
+        assertTrue(response.verifiedClaims().isEmpty());
         assertEquals(
-                "released_bounded_conversation",
+                "released_model_composed_from_bounded_evidence",
                 response.verification().overallOutcome()
         );
-        assertEquals(1, response.receipt().providerCalls());
+        assertEquals(2, response.receipt().providerCalls());
         assertFalse(response.receipt().costBasis().contains(
                 "No provider call was made."
         ));
         assertTrue(response.receipt().costBasis().contains(
                 "Synthetic router test estimate."
+        ));
+        assertTrue(response.receipt().costBasis().contains(
+                "Synthetic answer test estimate."
         ));
         verifyNoInteractions(ragService);
         assertControlledAiInvariant(response);
@@ -331,16 +351,100 @@ class DemoCustomerChatServiceTest {
 
         assertEquals("conversation", response.intent().name());
         assertEquals(
-                "Varsågod! Om du vill kan jag också kontrollera din order eller förklara Nordlys godkända kundregler.",
+                "Absolut — vad vill du att jag hjälper dig med?",
                 response.assistantMessage().textSv()
         );
         assertFalse(response.assistantMessage().textSv().startsWith("Hej"));
         assertEquals(
-                "released_bounded_conversation",
+                "released_model_composed_from_bounded_evidence",
                 response.verification().overallOutcome()
         );
-        assertEquals(1, response.receipt().providerCalls());
+        assertEquals(2, response.receipt().providerCalls());
         verifyNoInteractions(ragService);
+        assertControlledAiInvariant(response);
+    }
+
+    @Test
+    void keepsClarificationAsDeterministicBoundaryText() {
+        CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
+        when(router.route(any())).thenReturn(modelConversationRoute(
+                CustomerChatModelRouter.ConversationKind.CLARIFICATION
+        ));
+
+        DemoCustomerChatTurnResponse response = aiService(router)
+                .run(request("Kan du kolla den?", true));
+
+        assertEquals("clarification_required", response.outcome());
+        assertTrue(response.assistantMessage().textSv().contains(
+                "Jag vill inte gissa vad du menar"
+        ));
+        assertTrue(response.toolEvents().stream().noneMatch(event ->
+                "compose_customer_answer".equals(event.name())));
+        verifyNoInteractions(answerGateway, ragService);
+        assertControlledAiInvariant(response);
+    }
+
+    @Test
+    void keepsUnsupportedScopeAsDeterministicBoundaryText() {
+        CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
+        when(router.route(any())).thenReturn(modelConversationRoute(
+                CustomerChatModelRouter.ConversationKind.OUT_OF_SCOPE
+        ));
+
+        DemoCustomerChatTurnResponse response = aiService(router)
+                .run(request("Vilken färg har ert kontor?", true));
+
+        assertEquals("unsupported", response.outcome());
+        assertTrue(response.assistantMessage().textSv().contains(
+                "Jag vill inte gissa utanför det området"
+        ));
+        assertTrue(response.toolEvents().stream().noneMatch(event ->
+                "compose_customer_answer".equals(event.name())));
+        verifyNoInteractions(answerGateway, ragService);
+        assertControlledAiInvariant(response);
+    }
+
+    @Test
+    void keepsInsufficientEvidenceAsDeterministicBoundaryText() {
+        CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
+        when(router.route(any())).thenReturn(modelRoute(
+                CustomerChatModelRouter.Tool.SEARCH_APPROVED_COMPANY_KNOWLEDGE,
+                null
+        ));
+        when(ragService.ask(any())).thenReturn(insufficientEvidence());
+
+        DemoCustomerChatTurnResponse response = aiService(router)
+                .run(request("Har ni en fysisk butik i Malmö?", true));
+
+        assertEquals("insufficient_evidence", response.outcome());
+        assertTrue(response.assistantMessage().textSv().contains(
+                "vill därför inte gissa"
+        ));
+        assertTrue(response.toolEvents().stream().noneMatch(event ->
+                "compose_customer_answer".equals(event.name())));
+        verifyNoInteractions(answerGateway);
+        assertControlledAiInvariant(response);
+    }
+
+    @Test
+    void keepsConfirmationRequiredAsDeterministicBoundaryText() {
+        CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
+        when(router.route(any())).thenReturn(modelRoute(
+                CustomerChatModelRouter.Tool.SEARCH_APPROVED_COMPANY_KNOWLEDGE,
+                null
+        ));
+        when(ragService.ask(any())).thenReturn(confirmationRequired());
+
+        DemoCustomerChatTurnResponse response = aiService(router)
+                .run(request("Vad säger företagets dokument?", true));
+
+        assertEquals("confirmation_required", response.outcome());
+        assertTrue(response.assistantMessage().textSv().contains(
+                "Vill du fortsätta?"
+        ));
+        assertTrue(response.toolEvents().stream().noneMatch(event ->
+                "compose_customer_answer".equals(event.name())));
+        verifyNoInteractions(answerGateway);
         assertControlledAiInvariant(response);
     }
 
@@ -363,7 +467,7 @@ class DemoCustomerChatServiceTest {
         assertEquals(0, response.receipt().readOperations());
         assertEquals(0, response.receipt().providerCalls());
         assertEquals(0, response.receipt().generationCalls());
-        verifyNoInteractions(router, ragService);
+        verifyNoInteractions(router, answerGateway, ragService);
         assertControlledAiInvariant(response);
     }
 
@@ -397,7 +501,7 @@ class DemoCustomerChatServiceTest {
     }
 
     @Test
-    void labelsAndReturnsTheDeterministicFallbackWhenTheRouterTimesOut() {
+    void returnsUnavailableWithoutADeterministicFallbackWhenRouterTimesOut() {
         CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
         when(router.route(any())).thenThrow(new ModelProviderException(
                 ModelProviderFailure.TIMEOUT,
@@ -407,20 +511,63 @@ class DemoCustomerChatServiceTest {
         DemoCustomerChatTurnResponse response = aiService(router)
                 .run(request("Var är min order?", true));
 
-        assertEquals("answered", response.outcome());
-        assertEquals("order_status", response.intent().name());
-        assertTrue(response.intent().classifier().contains(
-                "_fallback_model_timeout"
-        ));
-        assertTrue(response.truthLabel().contains("SÄKERT RESERVLÄGE"));
+        assertEquals("unavailable", response.outcome());
+        assertEquals("unsupported", response.intent().name());
+        assertTrue(response.intent().classifier().endsWith("_unavailable"));
         assertEquals("CUSTOMER_CHAT_ROUTER_MODEL_TIMEOUT",
                 response.error().code());
-        assertEquals("NORD-2051", response.order().orderId());
+        assertNull(response.order());
+        assertTrue(response.sources().isEmpty());
+        assertTrue(response.verifiedClaims().isEmpty());
+        assertTrue(response.assistantMessage().textSv().contains(
+                "vill inte gissa"
+        ));
         assertEquals(1, response.receipt().providerCalls());
         assertEquals(1, response.receipt().generationCalls());
         assertTrue(response.toolEvents().stream()
                 .anyMatch(event -> "model_routing".equals(event.type())
                         && "failed".equals(event.status())));
+        verifyNoInteractions(answerGateway, ragService);
+        assertControlledAiInvariant(response);
+    }
+
+    @Test
+    void withholdsTheCanonicalProjectionWhenAnswerCompositionFails() {
+        CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
+        when(router.route(any())).thenReturn(modelRoute(
+                CustomerChatModelRouter.Tool.GET_CURRENT_ORDER,
+                null
+        ));
+        doThrow(new ModelProviderException(
+                ModelProviderFailure.MALFORMED_RESPONSE,
+                "synthetic invalid customer answer"
+        )).when(answerGateway).generate(eq(true), any());
+
+        DemoCustomerChatTurnResponse response = aiService(router)
+                .run(request("Var är min order?", true));
+
+        assertEquals("unavailable", response.outcome());
+        assertEquals(
+                "CUSTOMER_CHAT_ANSWER_MODEL_RESPONSE_REJECTED",
+                response.error().code()
+        );
+        assertTrue(response.assistantMessage().textSv().contains(
+                "inte ersätta det med ett standardsvar"
+        ));
+        assertFalse(response.assistantMessage().textSv().contains(
+                "Orderstatus: Skickad"
+        ));
+        assertTrue(response.verifiedClaims().isEmpty());
+        assertEquals(
+                "not_released_customer_answer_composition_failed",
+                response.verification().overallOutcome()
+        );
+        assertEquals(2, response.receipt().providerCalls());
+        assertEquals(2, response.receipt().generationCalls());
+        assertTrue(response.toolEvents().stream()
+                .anyMatch(event -> "compose_customer_answer".equals(
+                        event.name()
+                ) && "failed".equals(event.status())));
         verifyNoInteractions(ragService);
         assertControlledAiInvariant(response);
     }
@@ -994,6 +1141,8 @@ class DemoCustomerChatServiceTest {
         assertTrue(response.assistantMessage().textSv().contains(
                 "inte gissa"
         ));
+        assertFalse(response.assistantMessage().textSv().contains("123"));
+        assertFalse(response.assistantMessage().textEn().contains("123"));
         assertInvariant(response);
     }
 
@@ -1444,7 +1593,70 @@ class DemoCustomerChatServiceTest {
                 ragService,
                 corpus,
                 router,
+                answerGateway,
                 properties
+        );
+    }
+
+    private CustomerChatAnswerGateway.Result composedAnswer(
+            CustomerChatAnswerGateway.Input input
+    ) {
+        CustomerChatAnswerGateway.Evidence cited = input.evidence().stream()
+                .filter(evidence -> !CONTEXT_EVIDENCE.equals(evidence.id()))
+                .findFirst()
+                .orElse(input.evidence().isEmpty()
+                        ? null
+                        : input.evidence().getFirst());
+        boolean factual = Set.of("answered", "outside_authority")
+                .contains(input.routedOutcome())
+                && !"conversation".equals(input.routedIntent());
+        List<CustomerChatAnswerGateway.Claim> claims = factual && cited != null
+                ? List.of(new CustomerChatAnswerGateway.Claim(
+                "Verifierat från den tillåtna källan.",
+                "Verified from the allowed source.",
+                List.of(cited.id())
+        ))
+                : List.of();
+        String textSv = switch (input.routedIntent()) {
+            case "order_status" ->
+                    "Jag har kollat det åt dig — din order är skickad och på väg.";
+            case "company_knowledge" ->
+                    "Nordlys kundservice använder den godkända företagsinformationen för att hjälpa dig.";
+            case "cancel_order" ->
+                    "Jag kan inte avbeställa ordern här, men jag har kontrollerat vad som gäller för den.";
+            case "conversation" ->
+                    "Absolut — vad vill du att jag hjälper dig med?";
+            default -> "Jag hjälper dig gärna vidare med det här.";
+        };
+        String textEn = switch (input.routedIntent()) {
+            case "order_status" ->
+                    "I checked it for you — your order has shipped and is on its way.";
+            case "company_knowledge" ->
+                    "Nordly customer service uses the approved company information to help you.";
+            case "cancel_order" ->
+                    "I cannot cancel the order here, but I checked what applies to it.";
+            case "conversation" ->
+                    "Of course — what would you like help with?";
+            default -> "I am happy to help you with this.";
+        };
+        return new CustomerChatAnswerGateway.Result(
+                new CustomerChatAnswerGateway.Answer(textSv, textEn, claims),
+                new CustomerChatAnswerGateway.ProviderMetadata(
+                        new GoogleGenAiProviderRoute(
+                                "developer_api",
+                                "api_key",
+                                null
+                        ),
+                        "answer-response-test",
+                        "gemini-provider-test",
+                        new ModelTokenUsage(30, 5, 35),
+                        7
+                ),
+                new ModelCostEstimate(
+                        new BigDecimal("0.00001700"),
+                        null,
+                        "Synthetic answer test estimate."
+                )
         );
     }
 

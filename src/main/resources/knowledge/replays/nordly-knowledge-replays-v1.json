@@ -138,8 +138,8 @@
       "ranked_matches": [],
       "answer": {
         "status": "refused",
-        "summary_sv": "Nej. Den här AI:n har inga skrivverktyg och får inte genomföra återbetalningar. En behörig människa måste kontrollera ärendet och använda Nordlys autentiserade supportsystem.",
-        "summary_en": "No. This AI has no write tools and cannot issue refunds. An authorized human must review the case and use Nordly's authenticated support system.",
+        "summary_sv": "Jag kan inte genomföra återbetalningen här. För din säkerhet behöver en behörig medarbetare granska ärendet i Nordlys supportsystem. Jag kan däremot förklara vad som gäller och visa den information jag har om din order.",
+        "summary_en": "I cannot issue the refund here. For your protection, an authorized colleague needs to review the case in Nordly's support system. I can still explain the policy and show the information available for your order.",
         "claims": []
       },
       "verification": {

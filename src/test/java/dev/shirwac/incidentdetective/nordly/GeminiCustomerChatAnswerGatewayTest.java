@@ -6,29 +6,43 @@ import com.google.genai.types.FinishReason;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
+import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.GeminiPromptContracts;
 import dev.shirwac.incidentdetective.ai.GeminiThinkingLevel;
 import dev.shirwac.incidentdetective.ai.GoogleGenAiClientFactory;
 import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProviderRoute;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
+import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
+import dev.shirwac.incidentdetective.live.LiveAiOperation;
+import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 
 class GeminiCustomerChatAnswerGatewayTest {
 
     private static final String ORDER_EVIDENCE =
             "nordly-demo-order-2051-snapshot";
+    private static final String CONTACT_EVIDENCE =
+            "nordly-evidence-manual-support-contact";
 
     private final GoogleGenAiClientFactory clientFactory = mock(
             GoogleGenAiClientFactory.class
@@ -36,6 +50,51 @@ class GeminiCustomerChatAnswerGatewayTest {
     private final JsonMapper jsonMapper = JsonMapper.builder()
             .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
             .build();
+
+    @Test
+    void usesTheSharedConfirmedAnswerBudgetBoundary() {
+        LiveAiRunGuard guard = mock(LiveAiRunGuard.class);
+        CustomerChatAnswerGateway.Result expected = new CustomerChatAnswerGateway.Result(
+                new CustomerChatAnswerGateway.Answer(
+                        "Jag hjälper dig gärna.",
+                        "I am happy to help.",
+                        List.of()
+                ),
+                new CustomerChatAnswerGateway.ProviderMetadata(
+                        GoogleGenAiProviderRoute.from(properties("test-only-key")),
+                        "response-1",
+                        "gemini-3.1-flash-lite",
+                        null,
+                        4
+                ),
+                new ModelCostEstimate(null, null, "test estimate")
+        );
+        when(guard.runConfirmed(
+                eq(true),
+                eq(LiveAiOperation.CUSTOMER_CHAT_ANSWER),
+                any()
+        )).thenReturn(expected);
+        GeminiCustomerChatAnswerGateway gateway = gateway(
+                properties("test-only-key"),
+                guard
+        );
+
+        CustomerChatAnswerGateway.Result actual = gateway.generate(
+                true,
+                answeredInput()
+        );
+
+        assertEquals(expected, actual);
+        verify(guard).runConfirmed(
+                eq(true),
+                eq(LiveAiOperation.CUSTOMER_CHAT_ANSWER),
+                any()
+        );
+        assertEquals(
+                5_000,
+                LiveAiOperation.CUSTOMER_CHAT_ANSWER.allowanceMicroUsd()
+        );
+    }
 
     @Test
     void decodesANaturalAnswerWithBoundedEvidenceAndProviderMetadata() {
@@ -159,6 +218,109 @@ class GeminiCustomerChatAnswerGatewayTest {
     }
 
     @Test
+    void rejectsPrivateOrSecretOutputEvenWithAnAllowedCitation() {
+        assertMalformed("""
+                {
+                  "text_sv": "Skriv till person@example.com.",
+                  "text_en": "Email person@example.com.",
+                  "claims": [{
+                    "text_sv": "E-postadressen är person@example.com.",
+                    "text_en": "The email address is person@example.com.",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }]
+                }
+                """, answeredInput());
+        assertMalformed("""
+                {
+                  "text_sv": "API key: sk-1234567890abcdefghij",
+                  "text_en": "API key: sk-1234567890abcdefghij",
+                  "claims": [{
+                    "text_sv": "API key: sk-1234567890abcdefghij",
+                    "text_en": "API key: sk-1234567890abcdefghij",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }]
+                }
+                """, answeredInput());
+    }
+
+    @Test
+    void rejectsAnUnsupportedContactRouteWithZeroClaims() {
+        CustomerChatAnswerGateway.Input conversationInput =
+                new CustomerChatAnswerGateway.Input(
+                        "Hur når jag er?",
+                        "sv",
+                        "conversation",
+                        "answered",
+                        List.of()
+                );
+
+        assertMalformed("""
+                {
+                  "text_sv": "Ring 123 så hjälper vi dig.",
+                  "text_en": "Call 123 and we will help you.",
+                  "claims": []
+                }
+                """, conversationInput);
+    }
+
+    @Test
+    void rejectsAContactRouteCitedOnlyToUnrelatedEvidence() {
+        CustomerChatAnswerGateway.Input input =
+                new CustomerChatAnswerGateway.Input(
+                        "Kan någon avbeställa min order?",
+                        "sv",
+                        "cancel_order",
+                        "outside_authority",
+                        List.of(evidence(), contactEvidence())
+                );
+
+        assertMalformed("""
+                {
+                  "text_sv": "Jag kan inte avbeställa ordern här. Ring 123.",
+                  "text_en": "I cannot cancel the order here. Call 123.",
+                  "claims": [{
+                    "text_sv": "Du kan ringa 123.",
+                    "text_en": "You can call 123.",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }]
+                }
+                """, input);
+    }
+
+    @Test
+    void allowsAContactRouteOnlyWhenItsRelevantClaimCitesContactEvidence() {
+        CustomerChatAnswerGateway.Input input =
+                new CustomerChatAnswerGateway.Input(
+                        "Kan någon avbeställa min order?",
+                        "sv",
+                        "cancel_order",
+                        "outside_authority",
+                        List.of(contactEvidence())
+                );
+
+        CustomerChatAnswerGateway.Result result = gateway(properties(
+                "test-only-key"
+        )).decodeResponse(
+                response("""
+                        {
+                          "text_sv": "Jag kan inte avbeställa ordern här. Ring 123.",
+                          "text_en": "I cannot cancel the order here. Call 123.",
+                          "claims": [{
+                            "text_sv": "Du kan ringa 123.",
+                            "text_en": "You can call 123.",
+                            "citation_ids": ["nordly-evidence-manual-support-contact"]
+                          }]
+                        }
+                        """, FinishReason.Known.STOP),
+                input,
+                3
+        );
+
+        assertEquals("Jag kan inte avbeställa ordern här. Ring 123.",
+                result.answer().textSv());
+    }
+
+    @Test
     void doesNotConfuseAReadOnlyShippingStatusWithAnExecutedAction() {
         CustomerChatAnswerGateway.Result result = gateway(properties(
                 "test-only-key"
@@ -217,7 +379,7 @@ class GeminiCustomerChatAnswerGatewayTest {
 
         ModelProviderException exception = assertThrows(
                 ModelProviderException.class,
-                () -> gateway.generate(answeredInput())
+                () -> gateway.generate(true, answeredInput())
         );
 
         assertEquals(ModelProviderFailure.UPSTREAM, exception.failure());
@@ -296,6 +458,15 @@ class GeminiCustomerChatAnswerGatewayTest {
         );
     }
 
+    private CustomerChatAnswerGateway.Evidence contactEvidence() {
+        return new CustomerChatAnswerGateway.Evidence(
+                CONTACT_EVIDENCE,
+                "Godkänd supportväg",
+                "För ett legitimt orderärende kan kunden ringa det syntetiska "
+                        + "supportnumret 123."
+        );
+    }
+
     private String validAnswer() {
         return """
                 {
@@ -328,9 +499,32 @@ class GeminiCustomerChatAnswerGatewayTest {
     private GeminiCustomerChatAnswerGateway gateway(
             GeminiAiProperties properties
     ) {
+        LiveAiRunGuard guard = mock(LiveAiRunGuard.class);
+        when(guard.runConfirmed(anyBoolean(), any(), any())).thenAnswer(invocation -> {
+            Supplier<?> action = invocation.getArgument(2);
+            return action.get();
+        });
+        return gateway(properties, guard);
+    }
+
+    private GeminiCustomerChatAnswerGateway gateway(
+            GeminiAiProperties properties,
+            LiveAiRunGuard guard
+    ) {
+        GeminiCostEstimator costEstimator = mock(GeminiCostEstimator.class);
+        when(costEstimator.estimate(
+                eq(properties.modelId()),
+                nullable(dev.shirwac.incidentdetective.replay.ModelTokenUsage.class)
+        )).thenReturn(new ModelCostEstimate(
+                null,
+                null,
+                "Synthetic customer-answer test estimate."
+        ));
         return new GeminiCustomerChatAnswerGateway(
                 properties,
                 clientFactory,
+                costEstimator,
+                guard,
                 jsonMapper
         );
     }

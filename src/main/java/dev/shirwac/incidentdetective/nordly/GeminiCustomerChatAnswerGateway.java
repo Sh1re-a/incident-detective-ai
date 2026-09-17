@@ -14,10 +14,13 @@ import com.google.genai.types.Part;
 import com.google.genai.types.ThinkingConfig;
 import com.google.genai.types.ThinkingLevel;
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
+import dev.shirwac.incidentdetective.ai.GeminiCostEstimator;
 import dev.shirwac.incidentdetective.ai.GoogleGenAiClientFactory;
 import dev.shirwac.incidentdetective.ai.GoogleGenAiProviderRoute;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
+import dev.shirwac.incidentdetective.live.LiveAiOperation;
+import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
 import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -54,6 +57,8 @@ public final class GeminiCustomerChatAnswerGateway
     static final String SCHEMA_RESOURCE =
             "ai/customer-chat-answer-schema-v1.json";
     static final int TIMEOUT_MS = 15_000;
+    private static final String APPROVED_CONTACT_EVIDENCE =
+            "nordly-evidence-manual-support-contact";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(
             GeminiCustomerChatAnswerGateway.class
@@ -72,9 +77,40 @@ public final class GeminiCustomerChatAnswerGateway
                     + "approved|processed|issued))",
             Pattern.CASE_INSENSITIVE
     );
+    private static final Pattern EMAIL = Pattern.compile(
+            "(?i)\\b[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}\\b"
+    );
+    private static final Pattern SWEDISH_PERSONAL_NUMBER = Pattern.compile(
+            "\\b(?:19|20)?\\d{6}[-+ ]?\\d{4}\\b"
+    );
+    private static final Pattern CARD_LIKE_NUMBER = Pattern.compile(
+            "\\b(?:\\d[ -]*?){13,19}\\b"
+    );
+    private static final Pattern PHONE_LIKE_NUMBER = Pattern.compile(
+            "(?<![A-Z0-9])(?:\\+46|0)7[0236][ -]?(?:\\d[ -]?){6,8}(?!\\d)"
+    );
+    private static final Pattern CONTACT_ROUTE = Pattern.compile(
+            "(?:\\b(?:ring(?:a)?|call)\\s+(?:till\\s+|pa\\s+|at\\s+)?"
+                    + "(?:kundtjanst(?:en)?|support(?:en)?|customer service|"
+                    + "us|oss|\\+?\\d)|"
+                    + "\\b(?:kontakta|contact)\\s+(?:kundtjanst(?:en)?|"
+                    + "support(?:en)?|customer service|us|oss)|"
+                    + "\\b(?:telefon(?:nummer|numret)?|phone number)\\s*"
+                    + "(?:ar|is|:)?\\s*\\+?\\d)"
+    );
+    private static final Pattern CONTACT_NUMBER = Pattern.compile(
+            "(?<![\\p{L}\\d-])\\+?\\d(?:[\\d ()-]*\\d)?"
+                    + "(?![\\p{L}\\d])"
+    );
+    private static final Pattern SECRET_VALUE = Pattern.compile(
+            "(?i)(?:\\bAIza[0-9a-z_-]{20,}\\b|\\bsk-[0-9a-z_-]{16,}\\b|"
+                    + "\\b(?:api[-_ ]?key|password|secret|token)\\s*[:=]\\s*\\S+)"
+    );
 
     private final GeminiAiProperties properties;
     private final GoogleGenAiClientFactory clientFactory;
+    private final GeminiCostEstimator costEstimator;
+    private final LiveAiRunGuard liveAiRunGuard;
     private final JsonMapper jsonMapper;
     private final String instructions;
     private final Map<String, Object> schema;
@@ -83,17 +119,29 @@ public final class GeminiCustomerChatAnswerGateway
     public GeminiCustomerChatAnswerGateway(
             GeminiAiProperties properties,
             GoogleGenAiClientFactory clientFactory,
+            GeminiCostEstimator costEstimator,
+            LiveAiRunGuard liveAiRunGuard,
             JsonMapper jsonMapper
     ) {
         this.properties = properties;
         this.clientFactory = clientFactory;
+        this.costEstimator = costEstimator;
+        this.liveAiRunGuard = liveAiRunGuard;
         this.jsonMapper = jsonMapper;
         instructions = loadText(PROMPT_RESOURCE);
         schema = loadSchema(SCHEMA_RESOURCE);
     }
 
     @Override
-    public Result generate(Input input) {
+    public Result generate(boolean confirmLiveAi, Input input) {
+        return liveAiRunGuard.runConfirmed(
+                confirmLiveAi,
+                LiveAiOperation.CUSTOMER_CHAT_ANSWER,
+                () -> generateAdmitted(input)
+        );
+    }
+
+    private Result generateAdmitted(Input input) {
         if (input == null) {
             throw new IllegalArgumentException("input must not be null");
         }
@@ -185,15 +233,19 @@ public final class GeminiCustomerChatAnswerGateway
             String modelVersion = response.modelVersion()
                     .filter(value -> !value.isBlank())
                     .orElse(properties.modelId());
+            ModelTokenUsage usage = decodeUsage(
+                    response.usageMetadata().orElse(null)
+            );
             return new Result(
                     answer,
                     new ProviderMetadata(
                             GoogleGenAiProviderRoute.from(properties),
                             response.responseId().orElse(null),
                             modelVersion,
-                            decodeUsage(response.usageMetadata().orElse(null)),
+                            usage,
                             latencyMs
-                    )
+                    ),
+                    costEstimator.estimate(properties.modelId(), usage)
             );
         } catch (ModelProviderException exception) {
             throw exception;
@@ -251,6 +303,92 @@ public final class GeminiCustomerChatAnswerGateway
                     null
             );
         }
+        verifyContactOutput(answer, input);
+        if (EMAIL.matcher(combined).find()
+                || SWEDISH_PERSONAL_NUMBER.matcher(combined).find()
+                || CARD_LIKE_NUMBER.matcher(combined).find()
+                || SECRET_VALUE.matcher(combined).find()) {
+            throw failure(
+                    ModelProviderFailure.MALFORMED_RESPONSE,
+                    "Gemini customer chat answer contained private or secret output",
+                    null
+            );
+        }
+    }
+
+    private void verifyContactOutput(Answer answer, Input input) {
+        boolean approvedContactEvidenceSupplied = input.evidence().stream()
+                .anyMatch(evidence -> APPROVED_CONTACT_EVIDENCE.equals(
+                        evidence.id()
+                ));
+        for (Claim claim : answer.claims()) {
+            boolean contactClaim = containsContactRoute(claim.textSv())
+                    || containsContactRoute(claim.textEn());
+            if (contactClaim && (!approvedContactEvidenceSupplied
+                    || !claim.citationIds().contains(
+                    APPROVED_CONTACT_EVIDENCE
+            ))) {
+                throw unsupportedContactOutput();
+            }
+        }
+        if (containsContactRoute(answer.textSv())
+                && (!approvedContactEvidenceSupplied
+                || !contactClaimSupports(
+                answer.textSv(),
+                true,
+                answer.claims()
+        ))) {
+            throw unsupportedContactOutput();
+        }
+        if (containsContactRoute(answer.textEn())
+                && (!approvedContactEvidenceSupplied
+                || !contactClaimSupports(
+                answer.textEn(),
+                false,
+                answer.claims()
+        ))) {
+            throw unsupportedContactOutput();
+        }
+    }
+
+    private boolean contactClaimSupports(
+            String answerText,
+            boolean swedish,
+            List<Claim> claims
+    ) {
+        Set<String> answerNumbers = contactNumbers(answerText);
+        return claims.stream()
+                .filter(claim -> claim.citationIds().contains(
+                        APPROVED_CONTACT_EVIDENCE
+                ))
+                .map(claim -> swedish ? claim.textSv() : claim.textEn())
+                .filter(this::containsContactRoute)
+                .anyMatch(claimText -> contactNumbers(claimText)
+                        .containsAll(answerNumbers));
+    }
+
+    private boolean containsContactRoute(String text) {
+        return CONTACT_ROUTE.matcher(normalize(text)).find()
+                || PHONE_LIKE_NUMBER.matcher(text).find();
+    }
+
+    private Set<String> contactNumbers(String text) {
+        Set<String> numbers = new HashSet<>();
+        Pattern.compile("[.!?\\n]+").splitAsStream(text)
+                .filter(this::containsContactRoute)
+                .flatMap(segment -> CONTACT_NUMBER.matcher(segment).results())
+                .map(result -> result.group().replaceAll("\\D", ""))
+                .filter(value -> value.length() >= 3)
+                .forEach(numbers::add);
+        return Set.copyOf(numbers);
+    }
+
+    private ModelProviderException unsupportedContactOutput() {
+        return failure(
+                ModelProviderFailure.MALFORMED_RESPONSE,
+                "Gemini customer chat answer contained an unsupported contact route",
+                null
+        );
     }
 
     private boolean requiresEvidenceClaim(

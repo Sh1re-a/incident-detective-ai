@@ -21,8 +21,9 @@ public record DemoCustomerChatTurnRequest(
         String locale,
         @Schema(
                 description = "Explicit opt-in for Gemini to interpret the free-text "
-                        + "message and select one allowlisted read or boundary tool. "
-                        + "Hard safety refusals still stop before any provider call."
+                        + "message, select one allowlisted read or boundary tool, and compose "
+                        + "the final reply only from the backend's bounded evidence. Hard "
+                        + "safety refusals still stop before any provider call."
         )
         boolean confirmLiveAi,
         @Size(max = 6)

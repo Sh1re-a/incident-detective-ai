@@ -1,6 +1,7 @@
 package dev.shirwac.incidentdetective.nordly;
 
 import dev.shirwac.incidentdetective.ai.GoogleGenAiProviderRoute;
+import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
 
 import java.util.HashSet;
@@ -17,7 +18,7 @@ public interface CustomerChatAnswerGateway {
 
     int MAX_EVIDENCE_ITEMS = 8;
 
-    Result generate(Input input);
+    Result generate(boolean confirmLiveAi, Input input);
 
     record Input(
             String customerMessage,
@@ -140,12 +141,13 @@ public interface CustomerChatAnswerGateway {
 
     record Result(
             Answer answer,
-            ProviderMetadata provider
+            ProviderMetadata provider,
+            ModelCostEstimate costEstimate
     ) {
         public Result {
-            if (answer == null || provider == null) {
+            if (answer == null || provider == null || costEstimate == null) {
                 throw new IllegalArgumentException(
-                        "answer and provider metadata are required"
+                        "answer, provider metadata and cost estimate are required"
                 );
             }
         }
