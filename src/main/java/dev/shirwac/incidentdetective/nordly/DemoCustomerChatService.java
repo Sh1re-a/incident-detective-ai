@@ -5,6 +5,8 @@ import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
 import dev.shirwac.incidentdetective.live.LiveAiBudgetStoreUnavailableException;
 import dev.shirwac.incidentdetective.live.LiveInvestigationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,10 @@ import java.util.UUID;
 @Service
 @Profile("rag")
 public final class DemoCustomerChatService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(
+            DemoCustomerChatService.class
+    );
 
     private static final String CANCELLATION_EVIDENCE =
             "nordly-evidence-cancellation-window";
@@ -772,6 +778,12 @@ public final class DemoCustomerChatService {
             RuntimeException exception
     ) {
         String failureCode = routingFailureCode(exception);
+        LOGGER.warn(
+                "Customer chat answer withheld: failureCode={}, type={}, detail={}",
+                failureCode,
+                exception.getClass().getSimpleName(),
+                exception.getMessage()
+        );
         List<DemoCustomerChatTurnResponse.ToolEvent> events =
                 new ArrayList<>(response.toolEvents());
         events.add(new DemoCustomerChatTurnResponse.ToolEvent(
