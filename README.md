@@ -53,6 +53,10 @@ den gjorde projektet svårare att förstå utan att förbättra själva demon.
 7. API:t returnerar ett färdigt, synkront post-run-kvitto. Frontend får spela upp
    det i efterhand, men inte kalla uppspelningen streaming eller hitta på steg
    medan requesten pågår.
+8. Ett färdigt run får en serverägd 24-timmarsreferens. Följdfrågor kan bara
+   förklara det frysta kvittot: Gemini väljer frågans fokus i live-läge medan
+   Java bygger faktasvaret, binder källorna och förbjuder alla ändringar. Replay
+   använder fasta frågor och gör inga nya provideranrop.
 
 Detta är en observerbar evidence chain, inte modellens privata chain-of-thought.
 
@@ -70,6 +74,7 @@ Backendens publika demo-API omfattar:
 | `POST` | `/api/v1/knowledge/questions/{questionId}/runs/recorded-replay` | Providerfri kunskapsreplay. |
 | `POST` | `/api/v1/incident-lab/plans` | Säkerhetsgrindad AI-plan som Java avgränsar till ett syntetiskt incidentförslag. |
 | `POST` | `/api/v1/incident-lab/runs` | Genererar syntetisk telemetri, avgör larm och kör det kontrollerade ADK-flödet när larmet löser ut. |
+| `POST` | `/api/v1/incident-lab/follow-ups` | Förklarar ett fryst incidentkvitto med mänsklig rapport, källbundna påståenden och observerbara backendsteg. Live använder Gemini endast för frågefokus; replay är providerfri. |
 | `GET` | `/api/v1/incident-lab/recorded-replay` | Visar om den checksummeverifierade historiska Driftlabb-körningen är tillgänglig. |
 | `POST` | `/api/v1/incident-lab/runs/recorded-replay` | Spelar upp en verklig historisk plan→ADK→RAG-körning utan nya provider-, embedding- eller databas-anrop. |
 | `POST` | `/api/v1/agent/turns` | Lägre teknisk bevisyta för det kontrollerade tvåagentsflödet med Google ADK och post-run-kvitto. |

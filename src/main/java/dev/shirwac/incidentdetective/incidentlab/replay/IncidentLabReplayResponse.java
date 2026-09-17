@@ -13,6 +13,8 @@ public record IncidentLabReplayResponse(
         String contractVersion,
         String replayId,
         String playbackId,
+        @Schema(nullable = true, description = "Present when the bounded follow-up store is enabled.")
+        String runReference,
         RunMode mode,
         String delivery,
         String truthLabel,

@@ -220,6 +220,10 @@ class OpenApiDocumentationTest {
                         "SCENARIO_NOT_FOUND",
                         "KNOWLEDGE_QUESTION_NOT_FOUND",
                         "INCIDENT_LAB_REPLAY_NOT_AVAILABLE",
+                        "INCIDENT_FOLLOW_UP_RUN_EXPIRED",
+                        "INCIDENT_FOLLOW_UP_IDEMPOTENCY_CONFLICT",
+                        "INCIDENT_FOLLOW_UP_ALREADY_ATTEMPTED",
+                        "INCIDENT_FOLLOW_UP_NOT_VERIFIABLE",
                         "DEMO_ORDER_NOT_FOUND"
                 )))
                 .andExpect(jsonPath(

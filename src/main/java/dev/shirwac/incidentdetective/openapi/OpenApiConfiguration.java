@@ -168,12 +168,31 @@ public class OpenApiConfiguration {
                                     "total_tokens",
                                     "estimated_cost_usd"
                             )
+                    ),
+                    Map.entry(
+                            "IncidentLabReplayResponse",
+                            Set.of("run_reference")
+                    ),
+                    Map.entry(
+                            "IncidentFollowUpResponse",
+                            Set.of("provider")
                     )
             );
-    private static final Map<String, Set<String>> OPTIONAL_PROPERTIES = Map.of(
-            "GeneratedCaseLiveRequest", Set.of("incident_family"),
-            "IncidentLabRunRequest", Set.of("seed", "evidence_mode")
-    );
+    private static final Map<String, Set<String>> OPTIONAL_PROPERTIES =
+            Map.ofEntries(
+                    Map.entry(
+                            "GeneratedCaseLiveRequest",
+                            Set.of("incident_family")
+                    ),
+                    Map.entry(
+                            "IncidentLabRunRequest",
+                            Set.of("seed", "evidence_mode")
+                    ),
+                    Map.entry(
+                            "IncidentFollowUpRequest",
+                            Set.of("suggestion_id")
+                    )
+            );
 
     @Bean
     OpenAPI incidentDetectiveOpenApi() {
@@ -239,6 +258,10 @@ public class OpenApiConfiguration {
     ) {
         NULLABLE_PROPERTIES.forEach((schemaName, propertyNames) -> {
             Schema<?> owner = schemas.get(schemaName);
+            if (owner == null && "IncidentFollowUpResponse".equals(schemaName)) {
+                // The endpoint exists only in the rag profile.
+                return;
+            }
             if (owner == null || owner.getProperties() == null) {
                 throw new IllegalStateException(
                         "OpenAPI schema is missing: " + schemaName

@@ -6,11 +6,13 @@ import dev.shirwac.incidentdetective.domain.evidence.LogEvidence;
 import dev.shirwac.incidentdetective.domain.verification.VerificationReport;
 import dev.shirwac.incidentdetective.incidentlab.IncidentLabPlanResponse;
 import dev.shirwac.incidentdetective.incidentlab.IncidentLabRunResponse;
+import dev.shirwac.incidentdetective.incidentlab.followup.IncidentFollowUpService;
 import dev.shirwac.incidentdetective.investigation.tools.RunbookRetrievalBackend;
 import dev.shirwac.incidentdetective.live.LiveToolEvent;
 import dev.shirwac.incidentdetective.replay.ModelTokenUsage;
 import dev.shirwac.incidentdetective.replay.RunMode;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
@@ -85,14 +87,17 @@ public final class IncidentLabReplayService {
 
     private final Clock clock;
     private final LoadedFixture loaded;
+    private final ObjectProvider<IncidentFollowUpService> followUps;
 
     public IncidentLabReplayService(
             JsonMapper jsonMapper,
             Clock clock,
+            ObjectProvider<IncidentFollowUpService> followUps,
             @Value("${incident-detective.incident-lab-replay.resource:}")
             String configuredResource
     ) {
         this.clock = clock;
+        this.followUps = followUps;
         String resource = configuredResource == null
                 ? ""
                 : configuredResource.strip();
@@ -110,10 +115,15 @@ public final class IncidentLabReplayService {
             throw new IncidentLabReplayUnavailableException();
         }
         IncidentLabReplayFixture fixture = loaded.fixture();
+        IncidentFollowUpService followUpService = followUps.getIfAvailable();
+        String runReference = followUpService == null
+                ? null
+                : followUpService.registerReplay(fixture.recordedRun());
         return new IncidentLabReplayResponse(
                 IncidentLabReplayResponse.CONTRACT_VERSION,
                 fixture.replayId(),
                 UUID.randomUUID().toString(),
+                runReference,
                 RunMode.RECORDED_REPLAY,
                 IncidentLabReplayResponse.DELIVERY,
                 IncidentLabReplayResponse.TRUTH_LABEL,

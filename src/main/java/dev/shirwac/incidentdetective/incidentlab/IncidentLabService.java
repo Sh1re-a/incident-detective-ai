@@ -13,7 +13,9 @@ import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
 import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
 import dev.shirwac.incidentdetective.live.LiveAiRunGuard;
 import dev.shirwac.incidentdetective.live.LiveAiOperation;
+import dev.shirwac.incidentdetective.incidentlab.followup.IncidentFollowUpService;
 import dev.shirwac.incidentdetective.nordly.KnowledgeRagSafetyGate;
+import dev.shirwac.incidentdetective.observability.IncidentLabEventLogger;
 import dev.shirwac.incidentdetective.planning.IncidentBlastRadius;
 import dev.shirwac.incidentdetective.planning.IncidentPlan;
 import dev.shirwac.incidentdetective.planning.IncidentPlanDecision;
@@ -83,19 +85,25 @@ public final class IncidentLabService {
     private final GeneratedIncidentAlarmEvaluator alarmEvaluator;
     private final AdkAgentTurnService adkAgent;
     private final IncidentLabResponsePresenter responsePresenter;
+    private final IncidentLabEventLogger eventLogger;
+    private final IncidentFollowUpService followUps;
 
     public IncidentLabService(
             KnowledgeRagSafetyGate safetyGate,
             LiveAiRunGuard liveAiRunGuard,
             IncidentPlannerGateway planner,
             GeneratedCaseGenerationService generatedCases,
-            AdkAgentTurnService adkAgent
+            AdkAgentTurnService adkAgent,
+            IncidentLabEventLogger eventLogger,
+            IncidentFollowUpService followUps
     ) {
         this.safetyGate = safetyGate;
         this.liveAiRunGuard = liveAiRunGuard;
         this.planner = planner;
         this.generatedCases = generatedCases;
         this.adkAgent = adkAgent;
+        this.eventLogger = eventLogger;
+        this.followUps = followUps;
         planValidator = new IncidentPlanValidator();
         alarmEvaluator = new GeneratedIncidentAlarmEvaluator();
         responsePresenter = new IncidentLabResponsePresenter();
@@ -103,85 +111,166 @@ public final class IncidentLabService {
 
     public IncidentLabPlanResponse createPlan(IncidentLabPlanRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-        IncidentPlanningRequest planningRequest = new IncidentPlanningRequest(
-                request.instruction()
-        );
-        if (requestsRealScope(planningRequest.instruction())) {
-            return blockedRealScopePlan();
+        String correlationId = eventLogger.newCorrelationId();
+        try {
+            IncidentPlanningRequest planningRequest =
+                    new IncidentPlanningRequest(request.instruction());
+            IncidentLabPlanResponse response;
+            if (requestsRealScope(planningRequest.instruction())) {
+                response = blockedRealScopePlan();
+            } else {
+                KnowledgeRagSafetyGate.Decision safety = safetyGate.evaluate(
+                        planningRequest.instruction()
+                );
+                response = safety.allowed()
+                        ? liveAiRunGuard.runConfirmed(
+                                request.confirmLiveAi(),
+                                LiveAiOperation.INCIDENT_PLAN,
+                                () -> proposeAndValidate(
+                                        planningRequest,
+                                        safety
+                                )
+                        )
+                        : blockedPlan(safety);
+            }
+            recordPlanDecision(correlationId, response);
+            return response;
+        } catch (RuntimeException failure) {
+            eventLogger.operationFailed(
+                    correlationId,
+                    "plan",
+                    null,
+                    failure
+            );
+            throw failure;
         }
-        KnowledgeRagSafetyGate.Decision safety = safetyGate.evaluate(
-                planningRequest.instruction()
-        );
-        if (!safety.allowed()) {
-            return blockedPlan(safety);
-        }
-
-        return liveAiRunGuard.runConfirmed(
-                request.confirmLiveAi(),
-                LiveAiOperation.INCIDENT_PLAN,
-                () -> proposeAndValidate(planningRequest, safety)
-        );
     }
 
     public IncidentLabRunResponse run(IncidentLabRunRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-        IncidentPlan canonicalPlan = requireCanonicalPlan(request.plan());
-        GeneratedCaseGeneration generation = generatedCases.generate(
-                new GeneratedCaseGenerationRequest(
-                        request.seed(),
-                        canonicalPlan.incidentFamily(),
-                        request.evidenceMode(),
-                        GeneratedNoiseLevel.LOW
-                )
-        );
-        GeneratedCase generated = generation.generatedCase();
-        List<LogEvidence> backendLogs = generated.investigationData()
-                .evidenceInventory()
-                .stream()
-                .filter(LogEvidence.class::isInstance)
-                .map(LogEvidence.class::cast)
-                .sorted(LOG_ORDER)
-                .toList();
-        Optional<SignalAlarmReceipt> alarm = alarmEvaluator.evaluate(
-                canonicalPlan.incidentFamily(),
-                generated.investigationData()
-        );
-        AdkAgentTurnResponse agentTurn = alarm.isPresent()
-                ? adkAgent.runGeneratedCase(
+        String correlationId = eventLogger.newCorrelationId();
+        String planRef = null;
+        try {
+            IncidentPlan canonicalPlan = requireCanonicalPlan(request.plan());
+            planRef = eventLogger.planRef(canonicalPlan);
+            GeneratedCaseGeneration generation = generatedCases.generate(
+                    new GeneratedCaseGenerationRequest(
+                            request.seed(),
+                            canonicalPlan.incidentFamily(),
+                            request.evidenceMode(),
+                            GeneratedNoiseLevel.LOW
+                    )
+            );
+            GeneratedCase generated = generation.generatedCase();
+            List<LogEvidence> backendLogs = generated.investigationData()
+                    .evidenceInventory()
+                    .stream()
+                    .filter(LogEvidence.class::isInstance)
+                    .map(LogEvidence.class::cast)
+                    .sorted(LOG_ORDER)
+                    .toList();
+            eventLogger.runStarted(
+                    correlationId,
+                    planRef,
+                    generation.receipt(),
+                    backendLogs.size()
+            );
+            Optional<SignalAlarmReceipt> alarm = alarmEvaluator.evaluate(
+                    canonicalPlan.incidentFamily(),
+                    generated.investigationData()
+            );
+            eventLogger.alarmEvaluated(
+                    correlationId,
+                    planRef,
+                    generated.scenario().scenarioId(),
+                    alarm.orElse(null)
+            );
+            AdkAgentTurnResponse agentTurn = null;
+            if (alarm.isPresent()) {
+                SignalAlarmReceipt alarmReceipt = alarm.orElseThrow();
+                eventLogger.adkStarted(correlationId, planRef, alarmReceipt);
+                agentTurn = adkAgent.runGeneratedCase(
                         generated,
                         trustedAgentMessage(canonicalPlan.incidentFamily()),
                         request.confirmLiveAi()
-                )
-                : null;
-        IncidentLabResponsePresenter.Presentation presentation =
-                responsePresenter.present(
-                        generated.scenario(),
-                        backendLogs,
-                        alarm.orElse(null),
+                );
+                eventLogger.adkCompleted(
+                        correlationId,
+                        planRef,
+                        alarmReceipt.alarmId(),
                         agentTurn
                 );
-        agentTurn = IncidentLabResponsePresenter.sanitizeAgentTurn(
-                agentTurn,
-                presentation.answerState()
-        );
+                eventLogger.verificationCompleted(
+                        correlationId,
+                        planRef,
+                        alarmReceipt.alarmId(),
+                        agentTurn
+                );
+            }
+            IncidentLabResponsePresenter.Presentation presentation =
+                    responsePresenter.present(
+                            generated.scenario(),
+                            backendLogs,
+                            alarm.orElse(null),
+                            agentTurn
+                    );
+            agentTurn = IncidentLabResponsePresenter.sanitizeAgentTurn(
+                    agentTurn,
+                    presentation.answerState()
+            );
+            String outcome = runOutcome(alarm, agentTurn);
+            IncidentLabRunResponse response = new IncidentLabRunResponse(
+                    IncidentLabRunResponse.CONTRACT_VERSION,
+                    outcome,
+                    IncidentLabRunResponse.DELIVERY,
+                    IncidentLabRunResponse.TRUTH_LABEL,
+                    presentation.answerState(),
+                    presentation.businessResponse(),
+                    presentation.developerResponse(),
+                    presentation.actionReceipt(),
+                    presentation.localizedPresentations(),
+                    canonicalPlan,
+                    generation.receipt(),
+                    generated.scenario(),
+                    backendLogs,
+                    alarm.orElse(null),
+                    agentTurn,
+                    RUN_LIMITATIONS
+            );
+            response = response.withRunReference(
+                    followUps.registerLive(response)
+            );
+            eventLogger.runCompleted(
+                    correlationId,
+                    planRef,
+                    outcome,
+                    presentation.answerState(),
+                    alarm.isPresent(),
+                    agentTurn != null
+            );
+            return response;
+        } catch (RuntimeException failure) {
+            eventLogger.operationFailed(
+                    correlationId,
+                    "run",
+                    planRef,
+                    failure
+            );
+            throw failure;
+        }
+    }
 
-        return new IncidentLabRunResponse(
-                IncidentLabRunResponse.CONTRACT_VERSION,
-                runOutcome(alarm, agentTurn),
-                IncidentLabRunResponse.DELIVERY,
-                IncidentLabRunResponse.TRUTH_LABEL,
-                presentation.answerState(),
-                presentation.businessResponse(),
-                presentation.developerResponse(),
-                presentation.actionReceipt(),
-                presentation.localizedPresentations(),
-                canonicalPlan,
-                generation.receipt(),
-                generated.scenario(),
-                backendLogs,
-                alarm.orElse(null),
-                agentTurn,
-                RUN_LIMITATIONS
+    private void recordPlanDecision(
+            String correlationId,
+            IncidentLabPlanResponse response
+    ) {
+        eventLogger.planDecided(
+                correlationId,
+                response.outcome(),
+                response.safety().decision(),
+                response.safety().reasonCode(),
+                response.javaValidation(),
+                response.providerReceipt()
         );
     }
 

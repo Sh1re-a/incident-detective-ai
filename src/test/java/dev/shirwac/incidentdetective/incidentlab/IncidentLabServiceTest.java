@@ -18,6 +18,7 @@ import dev.shirwac.incidentdetective.generated.GeneratedEvidenceMode;
 import dev.shirwac.incidentdetective.generated.GeneratedIncidentFamily;
 import dev.shirwac.incidentdetective.generated.GeneratedNoiseLevel;
 import dev.shirwac.incidentdetective.generated.NordlyIncidentGeneratedCaseGenerator;
+import dev.shirwac.incidentdetective.incidentlab.followup.IncidentFollowUpService;
 import dev.shirwac.incidentdetective.generated.PaymentTimeoutGeneratedCaseGenerator;
 import dev.shirwac.incidentdetective.investigation.InvestigationData;
 import dev.shirwac.incidentdetective.investigation.tools.ToolName;
@@ -27,6 +28,7 @@ import dev.shirwac.incidentdetective.live.LiveInvestigationException;
 import dev.shirwac.incidentdetective.live.LiveInvestigationFailure;
 import dev.shirwac.incidentdetective.live.LiveToolEvent;
 import dev.shirwac.incidentdetective.nordly.KnowledgeRagSafetyGate;
+import dev.shirwac.incidentdetective.observability.IncidentLabEventLogger;
 import dev.shirwac.incidentdetective.planning.IncidentBlastRadius;
 import dev.shirwac.incidentdetective.planning.IncidentPlan;
 import dev.shirwac.incidentdetective.planning.IncidentPlanDecision;
@@ -74,6 +76,8 @@ class IncidentLabServiceTest {
     private IncidentPlannerGateway planner;
     private GeneratedCaseGenerationService generatedCases;
     private AdkAgentTurnService adkAgent;
+    private IncidentLabEventLogger eventLogger;
+    private IncidentFollowUpService followUps;
     private IncidentLabService service;
 
     @BeforeEach
@@ -83,12 +87,21 @@ class IncidentLabServiceTest {
         planner = mock(IncidentPlannerGateway.class);
         generatedCases = mock(GeneratedCaseGenerationService.class);
         adkAgent = mock(AdkAgentTurnService.class);
+        eventLogger = mock(IncidentLabEventLogger.class);
+        followUps = mock(IncidentFollowUpService.class);
+        when(followUps.registerLive(any())).thenReturn(
+                "ilr_12345678901234567890123456789012"
+        );
+        when(eventLogger.newCorrelationId()).thenReturn("correlation-test");
+        when(eventLogger.planRef(any())).thenReturn("plan-test");
         service = new IncidentLabService(
                 safetyGate,
                 liveAiRunGuard,
                 planner,
                 generatedCases,
-                adkAgent
+                adkAgent,
+                eventLogger,
+                followUps
         );
     }
 

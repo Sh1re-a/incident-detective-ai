@@ -31,7 +31,9 @@ public record IncidentLabRunResponse(
         SignalAlarmReceipt alarmReceipt,
         @Schema(nullable = true)
         AdkAgentTurnResponse agentTurn,
-        List<String> limitations
+        List<String> limitations,
+        @Schema(nullable = true, description = "Opaque 24-hour reference for questions about this frozen synthetic run.")
+        String runReference
 ) {
 
     public static final String CONTRACT_VERSION = "incident-lab-run-v3";
@@ -46,6 +48,70 @@ public record IncidentLabRunResponse(
         );
         backendLogs = backendLogs == null ? List.of() : List.copyOf(backendLogs);
         limitations = limitations == null ? List.of() : List.copyOf(limitations);
+    }
+
+    public IncidentLabRunResponse(
+            String contractVersion,
+            String outcome,
+            String delivery,
+            String truthLabel,
+            AnswerState answerState,
+            BusinessResponse businessResponse,
+            DeveloperResponse developerResponse,
+            ActionReceipt actionReceipt,
+            LocalizedPresentations localizedPresentations,
+            IncidentPlan plan,
+            GeneratedCaseReceipt generationReceipt,
+            Scenario scenario,
+            List<LogEvidence> backendLogs,
+            SignalAlarmReceipt alarmReceipt,
+            AdkAgentTurnResponse agentTurn,
+            List<String> limitations
+    ) {
+        this(
+                contractVersion,
+                outcome,
+                delivery,
+                truthLabel,
+                answerState,
+                businessResponse,
+                developerResponse,
+                actionReceipt,
+                localizedPresentations,
+                plan,
+                generationReceipt,
+                scenario,
+                backendLogs,
+                alarmReceipt,
+                agentTurn,
+                limitations,
+                null
+        );
+    }
+
+    public IncidentLabRunResponse withRunReference(String reference) {
+        if (reference == null || reference.isBlank()) {
+            throw new IllegalArgumentException("run reference must not be blank");
+        }
+        return new IncidentLabRunResponse(
+                contractVersion,
+                outcome,
+                delivery,
+                truthLabel,
+                answerState,
+                businessResponse,
+                developerResponse,
+                actionReceipt,
+                localizedPresentations,
+                plan,
+                generationReceipt,
+                scenario,
+                backendLogs,
+                alarmReceipt,
+                agentTurn,
+                limitations,
+                reference
+        );
     }
 
     public enum AnswerState {

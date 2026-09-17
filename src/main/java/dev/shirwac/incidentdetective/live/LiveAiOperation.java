@@ -9,6 +9,7 @@ package dev.shirwac.incidentdetective.live;
  */
 public enum LiveAiOperation {
     CUSTOMER_CHAT_ROUTE(5_000, false),
+    INCIDENT_FOLLOW_UP(5_000, false),
     INCIDENT_PLAN(5_000, false),
     KNOWLEDGE_RAG(10_000, true),
     ADK_TURN(20_000, true),

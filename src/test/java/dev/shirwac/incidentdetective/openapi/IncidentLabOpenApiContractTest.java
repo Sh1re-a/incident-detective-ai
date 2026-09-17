@@ -197,6 +197,55 @@ class IncidentLabOpenApiContractTest {
         );
     }
 
+    @Test
+    void documentsBoundedIncidentFollowUpContract() throws Exception {
+        JsonNode document = jsonMapper.readTree(
+                mockMvc.perform(get("/v3/api-docs"))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString()
+        );
+
+        assertEquals(
+                "#/components/schemas/IncidentFollowUpRequest",
+                document.at(
+                        "/paths/~1api~1v1~1incident-lab~1follow-ups/post/"
+                                + "requestBody/content/application~1json/schema/$ref"
+                ).asText()
+        );
+        assertEquals(
+                "#/components/schemas/IncidentFollowUpResponse",
+                document.at(
+                        "/paths/~1api~1v1~1incident-lab~1follow-ups/post/"
+                                + "responses/200/content/application~1json/schema/$ref"
+                ).asText()
+        );
+
+        JsonNode schemas = document.at("/components/schemas");
+        JsonNode request = schemas.get("IncidentFollowUpRequest");
+        assertEquals(
+                Set.of(
+                        "run_reference",
+                        "client_turn_id",
+                        "question",
+                        "locale",
+                        "confirm_live_ai"
+                ),
+                textValues(request.get("required"))
+        );
+        JsonNode response = schemas.get("IncidentFollowUpResponse");
+        assertTrue(textValues(response.get("required")).containsAll(Set.of(
+                "answer",
+                "claims",
+                "citations",
+                "steps",
+                "verification",
+                "receipt"
+        )));
+        assertTrue(allowsNull(response.get("properties").get("provider")));
+    }
+
     private static Set<String> textValues(JsonNode values) {
         Set<String> result = new HashSet<>();
         values.forEach(value -> result.add(value.asText()));
