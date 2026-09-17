@@ -279,6 +279,19 @@ summary:focus-visible {
   padding: 4px 0 7px;
 }
 
+.agent-session-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 58px;
+}
+
+.agent-session-header .agent-identity {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .agent-identity__mark {
   display: grid;
   place-items: center;
@@ -1014,14 +1027,12 @@ button.agent-identity__badge:hover {
 }
 
 .end-conversation-button {
-  position: absolute;
-  top: 68px;
-  right: 4px;
-  z-index: 3;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex: 0 0 auto;
   min-height: 34px;
+  margin-left: auto;
   padding: 0 12px;
   border: 1px solid #dfe6ef;
   border-radius: 999px;
@@ -1049,10 +1060,6 @@ button.agent-identity__badge:hover {
 .end-conversation-button svg {
   width: 15px;
   height: 15px;
-}
-
-.chat-column--has-end-control .chat-thread {
-  padding-top: 50px;
 }
 
 .drift-requesting {
@@ -2271,9 +2278,13 @@ button.agent-identity__badge:hover {
     width: 100%;
   }
 
+  .agent-session-header {
+    gap: 8px;
+  }
+
   .end-conversation-button {
-    top: 63px;
-    right: 0;
+    min-height: 36px;
+    padding-inline: 10px;
   }
 
   .drift-requesting__signal {

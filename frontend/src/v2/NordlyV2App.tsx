@@ -13,11 +13,13 @@ import {
   motion,
 } from "motion/react";
 import {
+  createIncidentLabPlan,
   getDemoOrder,
   getKnowledgeDocuments,
   getLiveAiStatus,
   IncidentApiError,
   runDemoCustomerChatTurn,
+  runIncidentLab,
   runIncidentLabFollowUp,
   runIncidentLabReplay,
   runKnowledgeReplay,
@@ -29,7 +31,9 @@ import type {
   IncidentLabFollowUpCitation,
   IncidentLabFollowUpResponse,
   IncidentLabFollowUpSuggestionId,
+  IncidentLabPlanResponse,
   IncidentLabReplayResponse,
+  IncidentLabRunResponse,
   KnowledgeDocumentLibraryDocument,
   KnowledgeDocumentLibraryResponse,
   KnowledgeRagLocale,
@@ -74,10 +78,24 @@ type EvidenceState =
   | { kind: "support"; response: DemoCustomerChatTurnResponse }
   | {
     kind: "drift";
-    replay: IncidentLabReplayResponse;
+    session: DriftSession;
     focus?: Pick<IncidentLabFollowUpCitation, "target_scene" | "target_id">;
   }
   | null;
+
+type DriftSession =
+  | {
+    mode: "live_ai";
+    run: IncidentLabRunResponse;
+    runReference: string | null;
+    plan: IncidentLabPlanResponse;
+  }
+  | {
+    mode: "recorded_replay";
+    run: IncidentLabRunResponse;
+    runReference: string | null;
+    replay: IncidentLabReplayResponse;
+  };
 
 type AgentBadge = {
   label: string;
@@ -122,7 +140,7 @@ const COPY = {
     cancel: "Avbryt",
     searchDocuments: "Sök i dokumenten",
     behindAnswer: "Så kom svaret fram",
-    behindReport: "Så kom rapporten fram",
+    behindReport: "Så kom jag fram till det",
     source: "Källa",
     order: "Order",
     status: "Status",
@@ -132,20 +150,23 @@ const COPY = {
     newConversation: "Ny konversation",
     endConversation: "Avsluta samtal",
     replayPill: "Verifierad replay",
-    driftIdleTitle: "Driftagenten håller koll.",
-    driftIdleBody: "Ett AI-genererat syntetiskt fall. Replayen spelar upp en registrerad backendkörning så du kan följa hur agenten analyserade och rapporterade.",
+    driftIdleTitle: "Driftagenten väntar på en signal.",
+    driftIdleBody: "Starta ett syntetiskt larm och se hur agenten granskar bevis, rapporterar vad den vet och svarar på dina frågor.",
     startReplay: "Spela verifierad replay",
+    startDriftAlarm: "Starta live-utredning",
     liveAvailable: "Live-AI tillgänglig",
     livePaused: "Live-AI pausad · se replay",
     liveOffline: "AI offline · se replay",
     liveUnknown: "AI-status okänd · se replay",
-    replayTruth: "Registrerad backendkörning · inga nya AI-anrop",
+    replayTruth: "Historisk inspelning · 0 nya AI-anrop",
+    liveTruth: "Ny AI-körning · syntetisk data · endast läsning",
+    replayChatPlaceholder: "Fri chatt kräver Live-AI",
     replayNotAvailable: "Replay är inte tillgänglig",
-    receiptWaiting: "Väntar på backendens kompletta kvitto…",
-    receiptReady: "Kvitto mottaget · spelar upp registrerade händelser",
-    showNow: "Visa resultat nu",
-    replayUnavailable: "Replayen kunde inte laddas.",
-    incidentHello: "Hej, jag har en driftrapport.",
+    receiptWaiting: "Larm mottaget · Driftagenten granskar källorna…",
+    receiptReady: "Driftagenten granskar loggar och relevanta driftinstruktioner…",
+    showNow: "Visa rapporten",
+    replayUnavailable: "Larmdemot kunde inte laddas.",
+    incidentHello: "Hej, jag har upptäckt ett larm.",
     whenQuestion: "När hände det?",
     whyQuestion: "Vet du varför?",
     timeAnswer: (times: string, service: string) => `${times}. Händelserna registrerades i ${service}, som är larmets signalkälla.`,
@@ -210,7 +231,7 @@ const COPY = {
     cancel: "Cancel",
     searchDocuments: "Search documents",
     behindAnswer: "How this answer was made",
-    behindReport: "How this report was made",
+    behindReport: "How I reached this",
     source: "Source",
     order: "Order",
     status: "Status",
@@ -220,20 +241,23 @@ const COPY = {
     newConversation: "New conversation",
     endConversation: "End conversation",
     replayPill: "Verified replay",
-    driftIdleTitle: "The Operations agent is watching.",
-    driftIdleBody: "An AI-generated synthetic case. The replay plays back a registered backend run so you can follow how the agent analysed and reported it.",
+    driftIdleTitle: "The Operations agent is waiting for a signal.",
+    driftIdleBody: "Start a synthetic alert and watch the agent inspect evidence, report what it knows, and answer your questions.",
     startReplay: "Play verified replay",
+    startDriftAlarm: "Start live investigation",
     liveAvailable: "Live AI available",
     livePaused: "Live AI paused · view replay",
     liveOffline: "AI offline · view replay",
     liveUnknown: "AI status unknown · view replay",
-    replayTruth: "Registered backend run · no new AI calls",
+    replayTruth: "Historical recording · 0 new AI calls",
+    liveTruth: "New AI run · synthetic data · read only",
+    replayChatPlaceholder: "Free chat requires Live AI",
     replayNotAvailable: "Replay is unavailable",
-    receiptWaiting: "Waiting for the backend's complete receipt…",
-    receiptReady: "Receipt received · replaying registered events",
-    showNow: "Show result now",
-    replayUnavailable: "The replay could not be loaded.",
-    incidentHello: "Hi, I have an operations report.",
+    receiptWaiting: "Alert received · the Operations agent is checking the sources…",
+    receiptReady: "The Operations agent is reviewing logs and relevant operating guides…",
+    showNow: "Show the report",
+    replayUnavailable: "The alert demo could not be loaded.",
+    incidentHello: "Hi, I detected an alert.",
     whenQuestion: "When did it happen?",
     whyQuestion: "Do you know why?",
     timeAnswer: (times: string, service: string) => `${times}. The events were recorded in ${service}, which is the alarm's signal source.`,
@@ -280,16 +304,8 @@ const COPY = {
   },
 } as const;
 
-const REPLAY_STEP_DELAYS = [650, 1250, 1450, 1200, 1650] as const;
+const REPLAY_STEP_DELAYS = [550, 1350, 1550] as const;
 const SUPPORT_REPLAY_STEP_DELAYS = [450, 750, 1250, 850, 750, 1350] as const;
-
-const FOLLOW_UP_IDS: IncidentLabFollowUpSuggestionId[] = [
-  "how_conclusion",
-  "show_sources",
-  "what_unknown",
-  "customer_impact",
-  "agent_boundary",
-];
 
 function modeFromHash(): Mode {
   const hash = window.location.hash.replace(/^#/, "");
@@ -346,9 +362,8 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
-function alarmLogs(replay: IncidentLabReplayResponse | null): LogEvidence[] {
-  if (!replay) return [];
-  const run = replay.recorded_run;
+function alarmLogs(run: IncidentLabRunResponse | null): LogEvidence[] {
+  if (!run) return [];
   const ids = new Set(run.alarm_receipt?.evidence_ids ?? []);
   const exact = run.backend_logs.filter((item) => ids.has(item.evidence_id));
   if (exact.length > 0) return exact;
@@ -363,6 +378,33 @@ function statusLabel(logs: LogEvidence[]) {
 
 function titleForDocument(document: KnowledgeDocumentLibraryDocument, locale: Locale) {
   return locale === "sv" ? document.title_sv : document.title;
+}
+
+function runbookDocumentSource(
+  runbook: RunbookEvidence,
+  library: KnowledgeDocumentLibraryResponse | null,
+  locale: Locale,
+): DemoCustomerChatSource | null {
+  if (!library) return null;
+  const sourceId = runbook.content.document_id;
+  const document = library.documents.find((item) => item.id === sourceId)
+    ?? library.documents.find((item) => item.id === sourceId.replace(/^rb-/, "kb-"));
+  if (!document) return null;
+  const chunk = document.chunks.find((item) => item.id === runbook.content.chunk_id) ?? null;
+  return {
+    kind: "company_policy",
+    document_id: document.id,
+    chunk_id: chunk?.id ?? null,
+    document_version: document.version,
+    title: titleForDocument(document, locale),
+    section_heading: chunk?.section_heading ?? null,
+    source_ref: chunk?.source_ref ?? runbook.source_ref,
+    evidence_id: runbook.evidence_id,
+    lifecycle: document.lifecycle,
+    similarity: null,
+    display_summary_sv: chunk?.display_summary_sv ?? document.summary_sv,
+    display_summary_en: chunk?.display_summary_en ?? document.summary_en,
+  };
 }
 
 function supportOutcomeLabel(response: DemoCustomerChatTurnResponse, locale: Locale) {
@@ -398,8 +440,10 @@ export default function NordlyV2App() {
   const [supportTurns, setSupportTurns] = useState<CustomerChatTurn[]>([]);
   const [supportDraft, setSupportDraft] = useState("");
   const [supportPendingId, setSupportPendingId] = useState<string | null>(null);
-  const [replay, setReplay] = useState<IncidentLabReplayResponse | null>(null);
-  const [replayState, setReplayState] = useState<"idle" | "requesting" | "playing" | "ready" | "error">("idle");
+  const [driftSession, setDriftSession] = useState<DriftSession | null>(null);
+  const [driftState, setDriftState] = useState<"idle" | "requesting" | "playing" | "ready" | "error">("idle");
+  const [driftFailureMode, setDriftFailureMode] = useState<DriftSession["mode"] | null>(null);
+  const [driftError, setDriftError] = useState<string | null>(null);
   const [playbackStage, setPlaybackStage] = useState(0);
   const [driftTurns, setDriftTurns] = useState<DriftTurn[]>([]);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
@@ -446,15 +490,15 @@ export default function NordlyV2App() {
   }, []);
 
   useEffect(() => {
-    if (replayState !== "playing") return;
-    if (playbackStage >= 5) {
-      setReplayState("ready");
+    if (driftState !== "playing") return;
+    if (playbackStage >= 3) {
+      setDriftState("ready");
       return;
     }
     const delay = REPLAY_STEP_DELAYS[playbackStage] ?? 1200;
     const timer = window.setTimeout(() => setPlaybackStage((current) => current + 1), delay);
     return () => window.clearTimeout(timer);
-  }, [playbackStage, replayState]);
+  }, [driftState, playbackStage]);
 
   const setMode = useCallback((next: Mode) => {
     setEvidence(null);
@@ -546,34 +590,81 @@ export default function NordlyV2App() {
   }, [locale, supportPendingId, supportTurns]);
 
   const startReplay = useCallback(async () => {
-    if (replayState === "requesting") return;
+    if (driftState === "requesting") return;
     const sessionVersion = driftSessionVersionRef.current;
-    setReplayState("requesting");
+    setDriftFailureMode("recorded_replay");
+    setDriftError(null);
+    setDriftSession(null);
+    setDriftState("requesting");
     setPlaybackStage(0);
     setDriftTurns([]);
     try {
       const response = await runIncidentLabReplay();
       if (driftSessionVersionRef.current !== sessionVersion) return;
-      setReplay(response);
-      setReplayState("playing");
-    } catch {
+      setDriftSession({
+        mode: "recorded_replay",
+        run: response.recorded_run,
+        runReference: response.run_reference ?? response.recorded_run.run_reference,
+        replay: response,
+      });
+      setDriftState("playing");
+    } catch (error) {
       if (driftSessionVersionRef.current !== sessionVersion) return;
-      setReplayState("error");
+      setDriftError(apiErrorText(error, locale));
+      setDriftState("error");
     }
-  }, [replayState]);
+  }, [driftState, locale]);
+
+  const startLiveInvestigation = useCallback(async () => {
+    if (driftState === "requesting") return;
+    const sessionVersion = driftSessionVersionRef.current;
+    setDriftFailureMode("live_ai");
+    setDriftError(null);
+    setDriftSession(null);
+    setDriftState("requesting");
+    setPlaybackStage(0);
+    setDriftTurns([]);
+    try {
+      const plan = await createIncidentLabPlan({
+        instruction: localized(
+          locale,
+          "Skapa ett syntetiskt driftlarm i Nordlys köpflöde. Undersök bevisen och rapportera vad de faktiskt stödjer utan skrivåtgärder.",
+          "Create a synthetic operations alert in Nordly's checkout flow. Inspect the evidence and report only what it supports, without write actions.",
+        ),
+        confirm_live_ai: true,
+      });
+      if (driftSessionVersionRef.current !== sessionVersion) return;
+      const approvedPlan = plan.outcome === "plan_ready" ? plan.java_validation?.plan : null;
+      if (!approvedPlan) {
+        const rejected = locale === "sv"
+          ? plan.safety.summary_sv
+          : plan.safety.summary_en;
+        throw new IncidentApiError(rejected, 422, plan.safety.reason_code);
+      }
+      const run = await runIncidentLab({
+        plan: approvedPlan,
+        evidence_mode: "diagnostic",
+        confirm_live_ai: true,
+      });
+      if (driftSessionVersionRef.current !== sessionVersion) return;
+      setDriftSession({ mode: "live_ai", run, runReference: run.run_reference, plan });
+      setDriftState("playing");
+    } catch (error) {
+      if (driftSessionVersionRef.current !== sessionVersion) return;
+      setDriftError(apiErrorText(error, locale));
+      setDriftState("error");
+    }
+  }, [driftState, locale]);
 
   const resetDriftConversation = useCallback(() => {
     driftSessionVersionRef.current += 1;
-    setReplay(null);
-    setReplayState("idle");
+    setDriftSession(null);
+    setDriftState("idle");
+    setDriftFailureMode(null);
+    setDriftError(null);
     setPlaybackStage(0);
     setDriftTurns([]);
     setEvidence(null);
-  }, []);
-
-  const skipPlayback = useCallback(() => {
-    setPlaybackStage(5);
-    setReplayState("ready");
   }, []);
 
   const submitDrift = useCallback(async (
@@ -581,16 +672,17 @@ export default function NordlyV2App() {
     suggestionId?: IncidentLabFollowUpSuggestionId | LocalDriftSuggestion,
   ) => {
     const question = rawQuestion.trim();
-    if (!question || !replay) return;
+    if (!question || !driftSession) return;
     const sessionVersion = driftSessionVersionRef.current;
     const id = clientId("drift");
-    const logs = alarmLogs(replay);
+    const { run } = driftSession;
+    const logs = alarmLogs(run);
     if (["when", "what_unknown_receipt", "customer_impact_receipt"].includes(suggestionId ?? "")) {
-      const presentation = replay.recorded_run.localized_presentations[locale].business_response;
+      const presentation = run.localized_presentations[locale].business_response;
       const answer = suggestionId === "when"
         ? copy.timeAnswer(
           logs.map((log) => clock(log.observed_at)).join(", "),
-          replay.recorded_run.alarm_receipt?.service ?? logs[0]?.content.service ?? "backend",
+          run.alarm_receipt?.service ?? logs[0]?.content.service ?? "backend",
         )
         : suggestionId === "what_unknown_receipt"
           ? presentation.what_remains_unknown.join(" ")
@@ -614,7 +706,17 @@ export default function NordlyV2App() {
       error: null,
     };
     setDriftTurns((current) => [...current, turn]);
-    if (!replay.run_reference) {
+    if (driftSession.mode === "recorded_replay" && !suggestionId) {
+      setDriftTurns((current) => current.map((item) => item.id === id
+        ? {
+          ...item,
+          pending: false,
+          error: localized(locale, "Fri chatt kräver Live-AI. Välj en av frågorna nedan i replayläget.", "Free chat requires Live AI. Choose one of the questions below in replay mode."),
+        }
+        : item));
+      return;
+    }
+    if (!driftSession.runReference) {
       setDriftTurns((current) => current.map((item) => item.id === id
         ? { ...item, pending: false, error: copy.noRunReference }
         : item));
@@ -622,12 +724,12 @@ export default function NordlyV2App() {
     }
     try {
       const response = await runIncidentLabFollowUp({
-        run_reference: replay.run_reference,
+        run_reference: driftSession.runReference,
         client_turn_id: id,
         question,
         suggestion_id: suggestionId,
         locale,
-        confirm_live_ai: false,
+        confirm_live_ai: driftSession.mode === "live_ai",
       });
       if (driftSessionVersionRef.current !== sessionVersion) return;
       setDriftTurns((current) => current.map((item) => item.id === id
@@ -639,7 +741,7 @@ export default function NordlyV2App() {
         ? { ...item, pending: false, error: apiErrorText(error, locale) }
         : item));
     }
-  }, [copy, locale, replay]);
+  }, [copy, driftSession, locale]);
 
   const currentDocument = useMemo(() => {
     if (!documents) return null;
@@ -690,16 +792,20 @@ export default function NordlyV2App() {
                   <DriftAgentView
                     locale={locale}
                     liveAiStatus={liveAiStatus}
-                    replay={replay}
-                    replayState={replayState}
+                    session={driftSession}
+                    sessionState={driftState}
+                    failureMode={driftFailureMode}
+                    error={driftError}
                     playbackStage={playbackStage}
                     turns={driftTurns}
+                    documents={documents}
+                    startLiveInvestigation={startLiveInvestigation}
                     startReplay={startReplay}
                     resetConversation={resetDriftConversation}
                     refreshLiveAiStatus={() => refreshLiveAiStatus()}
-                    skipPlayback={skipPlayback}
                     submit={submitDrift}
-                    openEvidence={(focus) => replay && openEvidence({ kind: "drift", replay, focus })}
+                    openEvidence={(focus) => driftSession && openEvidence({ kind: "drift", session: driftSession, focus })}
+                    openDocument={(source) => openDocument(source, "drift")}
                   />
                 ) : (
                   <DocumentArchiveView
@@ -1006,11 +1112,13 @@ function SupportAgentView({
 
   return (
     <section className="chat-stage" aria-label={copy.modes.support}>
-      <div className={`chat-column${conversationActive ? " chat-column--has-end-control" : ""}`}>
-        <AgentIdentity kind="support" locale={locale} />
-        {conversationActive ? (
-          <EndConversationButton label={copy.endConversation} onClick={endConversation} />
-        ) : null}
+      <div className="chat-column">
+        <div className="agent-session-header">
+          <AgentIdentity kind="support" locale={locale} />
+          {conversationActive ? (
+            <EndConversationButton label={copy.endConversation} onClick={endConversation} />
+          ) : null}
+        </div>
         <div className={`chat-thread${!showConversation ? " chat-thread--offline" : ""}`} role="log" aria-live="polite" aria-relevant="additions text" aria-busy={Boolean(pendingId) || !liveAiStatusResolved || offlineReplayState === "requesting" || offlineReplayState === "playing"}>
           {liveAvailable ? <MessageBubble side="assistant">
             <p>{copy.greeting}</p>
@@ -1121,9 +1229,11 @@ function SupportAgentView({
           ) : null}
           <form className="chat-composer" onSubmit={onSubmit}>
             <label className="sr-only" htmlFor="support-message">{copy.supportPlaceholder}</label>
-            <input
-              id="support-message"
-              value={draft}
+              <input
+                id="support-message"
+                name="support-message"
+                autoComplete="off"
+                value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder={copy.supportPlaceholder}
               maxLength={500}
@@ -1237,14 +1347,24 @@ function ReplayOrderStrip({ order, locale }: { order: DemoOrder; locale: Locale 
   );
 }
 
-function SourceChips({ sources, locale, onOpen }: { sources: DemoCustomerChatSource[]; locale: Locale; onOpen: (source: DemoCustomerChatSource, returnMode?: Mode) => void }) {
+function SourceChips({
+  sources,
+  locale,
+  onOpen,
+  returnMode = "support",
+}: {
+  sources: DemoCustomerChatSource[];
+  locale: Locale;
+  onOpen: (source: DemoCustomerChatSource, returnMode?: Mode) => void;
+  returnMode?: Mode;
+}) {
   return (
     <div className="source-chips">
       {sources.map((source) => (
         <button
           key={source.evidence_id}
           type="button"
-          onClick={() => onOpen(source, "support")}
+          onClick={() => onOpen(source, returnMode)}
           disabled={!source.document_id}
         >
           <DocumentIcon />
@@ -1259,52 +1379,77 @@ function SourceChips({ sources, locale, onOpen }: { sources: DemoCustomerChatSou
 function DriftAgentView({
   locale,
   liveAiStatus,
-  replay,
-  replayState,
+  session,
+  sessionState,
+  failureMode,
+  error,
   playbackStage,
   turns,
+  documents,
+  startLiveInvestigation,
   startReplay,
   resetConversation,
   refreshLiveAiStatus,
-  skipPlayback,
   submit,
   openEvidence,
+  openDocument,
 }: {
   locale: Locale;
   liveAiStatus: LiveAiStatusResponse | null;
-  replay: IncidentLabReplayResponse | null;
-  replayState: "idle" | "requesting" | "playing" | "ready" | "error";
+  session: DriftSession | null;
+  sessionState: "idle" | "requesting" | "playing" | "ready" | "error";
+  failureMode: DriftSession["mode"] | null;
+  error: string | null;
   playbackStage: number;
   turns: DriftTurn[];
+  documents: KnowledgeDocumentLibraryResponse | null;
+  startLiveInvestigation: () => Promise<void>;
   startReplay: () => Promise<void>;
   resetConversation: () => void;
   refreshLiveAiStatus: () => Promise<void>;
-  skipPlayback: () => void;
   submit: (question: string, suggestionId?: IncidentLabFollowUpSuggestionId | LocalDriftSuggestion) => Promise<void>;
   openEvidence: (focus?: Pick<IncidentLabFollowUpCitation, "target_scene" | "target_id">) => void;
+  openDocument: (source: DemoCustomerChatSource) => void;
 }) {
   const copy = COPY[locale];
   const bottomRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState("");
   const [slow, setSlow] = useState(false);
-  const logs = alarmLogs(replay);
-  const alarm = replay?.recorded_run.alarm_receipt;
+  const run = session?.run ?? null;
+  const logs = alarmLogs(run);
+  const alarm = run?.alarm_receipt;
+  const hasAlarm = Boolean(alarm);
   const count = Number(alarm?.signal.observed_value ?? logs.length);
   const service = alarm?.service ?? logs[0]?.content.service ?? "backend";
   const status = statusLabel(logs);
   const times = logs.map((log) => clock(log.observed_at));
-  const presentation = replay?.recorded_run.localized_presentations[locale].business_response;
-  const ready = replayState === "ready";
+  const presentation = run?.localized_presentations[locale].business_response;
+  const ready = sessionState === "ready";
   const pending = turns.some((turn) => turn.pending);
-  const canChat = ready && Boolean(replay?.run_reference) && !pending;
-  const runbooks = replay?.recorded_run.agent_turn?.tool_events
+  const liveChat = session?.mode === "live_ai";
+  const canChat = ready && liveChat && Boolean(session?.runReference) && !pending;
+  const runbooks = run?.agent_turn?.tool_events
     .flatMap((event) => event.evidence)
     .filter((item): item is RunbookEvidence => item.evidence_type === "runbook") ?? [];
+  const runbookSources = useMemo(
+    () => {
+      const unique = new Map<string, DemoCustomerChatSource>();
+      runbooks.forEach((runbook) => {
+        const source = runbookDocumentSource(runbook, documents, locale);
+        if (!source?.document_id) return;
+        const current = unique.get(source.document_id);
+        if (!current || (!current.chunk_id && source.chunk_id)) unique.set(source.document_id, source);
+      });
+      return [...unique.values()];
+    },
+    [documents, locale, runbooks],
+  );
+  const liveAvailable = liveAiStatus?.live_state === "available";
   const replayAvailable = liveAiStatus?.replay_available === true;
   const replayExplicitlyUnavailable = liveAiStatus?.replay_available === false;
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [playbackStage, replayState, turns.length]);
+  }, [playbackStage, sessionState, turns.length]);
   useEffect(() => {
     if (!pending) {
       setSlow(false);
@@ -1324,97 +1469,122 @@ function DriftAgentView({
     setDraft("");
     resetConversation();
   }, [resetConversation]);
-  const reportActive = ["requesting", "playing", "ready"].includes(replayState);
+  const openCitation = useCallback((citation: IncidentLabFollowUpCitation) => {
+    const runbook = runbooks.find((item) => item.evidence_id === citation.evidence_id);
+    const source = runbook ? runbookDocumentSource(runbook, documents, locale) : null;
+    if (source) {
+      openDocument(source);
+      return;
+    }
+    openEvidence(citation);
+  }, [documents, locale, openDocument, openEvidence, runbooks]);
+  const reportActive = ["requesting", "playing", "ready"].includes(sessionState);
+  const timeRange = times.length > 0
+    ? `${times[0]}–${times.at(-1)}`
+    : localized(locale, "Tid registrerad i larmkvittot", "Time recorded in the alert receipt");
+  const reportHeadline = presentation?.headline || (run?.answer_state === "diagnosed"
+    ? localized(locale, "Jag hittade en verifierad förklaring.", "I found a verified explanation.")
+    : copy.withheldTitle);
+  const reportBody = presentation?.what_is_known?.join(" ")
+    || presentation?.what_remains_unknown?.join(" ")
+    || copy.withheldBody;
   return (
     <section className="chat-stage" aria-label={copy.modes.drift}>
-      <div className={`chat-column${reportActive ? " chat-column--has-end-control" : ""}`}>
-        <AgentIdentity kind="drift" locale={locale} />
-        {reportActive ? <EndConversationButton label={copy.endConversation} onClick={endConversation} /> : null}
-        <div className="chat-thread chat-thread--drift" role="log" aria-live="polite" aria-relevant="additions text" aria-busy={replayState === "requesting" || pending}>
-          {replayState === "idle" ? (
+      <div className="chat-column">
+        <div className="agent-session-header">
+          <AgentIdentity kind="drift" locale={locale} />
+          {reportActive ? <EndConversationButton label={copy.endConversation} onClick={endConversation} /> : null}
+        </div>
+        <div className="chat-thread chat-thread--drift" role="log" aria-live="polite" aria-relevant="additions text" aria-busy={sessionState === "requesting" || sessionState === "playing" || pending}>
+          {sessionState === "idle" ? (
             <AgentIdleState
               title={copy.driftIdleTitle}
-              body={replayExplicitlyUnavailable
-                ? localized(locale, "Varken Live-AI eller replay är tillgänglig just nu. Kontrollera igen om en stund.", "Neither Live AI nor replay is available right now. Check again shortly.")
-                : copy.driftIdleBody}
+              body={copy.driftIdleBody}
               actions={<>
-                <button type="button" className="button-primary" onClick={() => void startReplay()} disabled={!replayAvailable}>
-                  {replayExplicitlyUnavailable ? copy.replayNotAvailable : copy.startReplay}
-                </button>
-                <button type="button" className="button-secondary" onClick={() => void refreshLiveAiStatus()}>
-                  <RefreshIcon />{localized(locale, "Kontrollera AI igen", "Check AI again")}
-                </button>
+                {liveAvailable ? (
+                  <>
+                    <button type="button" className="button-primary" onClick={() => void startLiveInvestigation()}>{copy.startDriftAlarm}</button>
+                    {replayAvailable ? <button type="button" className="button-secondary" onClick={() => void startReplay()}>{copy.startReplay}</button> : null}
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="button-primary" onClick={() => void startReplay()} disabled={!replayAvailable}>
+                      {replayExplicitlyUnavailable ? localized(locale, "Replay är inte tillgänglig", "Replay unavailable") : copy.startReplay}
+                    </button>
+                    <button type="button" className="button-secondary" onClick={() => void refreshLiveAiStatus()}>
+                      <RefreshIcon />{localized(locale, "Kontrollera AI igen", "Check AI again")}
+                    </button>
+                  </>
+                )}
               </>}
-              footnote={replayExplicitlyUnavailable
-                ? localized(locale, "Backend rapporterar att replay saknas", "Backend reports that replay is unavailable")
-                : copy.replayTruth}
+              footnote={liveAvailable ? copy.liveTruth : copy.replayTruth}
             />
-          ) : replayState === "requesting" ? (
+          ) : sessionState === "requesting" ? (
             <div className="drift-requesting" role="status">
               <span className="drift-requesting__signal"><NordlySignal /></span>
               <strong>{copy.receiptWaiting}</strong>
               <TypingIndicator label="" />
             </div>
-          ) : replayState === "error" ? (
+          ) : sessionState === "error" ? (
             <AgentIdleState
-              title={copy.replayUnavailable}
-              body={localized(locale, "Försök igen eller kontrollera om AI:n är tillbaka.", "Try again or check whether AI is back.")}
+              title={failureMode === "live_ai"
+                ? localized(locale, "Live-utredningen kunde inte slutföras.", "The live investigation could not be completed.")
+                : copy.replayUnavailable}
+              body={error ?? localized(locale, "Ingen automatisk omkörning gjordes.", "No automatic retry was made.")}
               actions={<>
-                <button type="button" className="button-primary" onClick={() => void startReplay()} disabled={!replayAvailable}>
-                  <RefreshIcon />{replayExplicitlyUnavailable ? copy.replayNotAvailable : copy.retry}
-                </button>
-                <button type="button" className="button-secondary" onClick={() => void refreshLiveAiStatus()}>
-                  <RefreshIcon />{localized(locale, "Kontrollera AI igen", "Check AI again")}
-                </button>
+                {failureMode === "live_ai" && liveAvailable ? (
+                  <button type="button" className="button-primary" onClick={() => void startLiveInvestigation()}><RefreshIcon />{copy.retry}</button>
+                ) : null}
+                {replayAvailable ? (
+                  <button type="button" className="button-secondary" onClick={() => void startReplay()}>{copy.startReplay}</button>
+                ) : (
+                  <button type="button" className="button-secondary" onClick={() => void refreshLiveAiStatus()}><RefreshIcon />{localized(locale, "Kontrollera AI igen", "Check AI again")}</button>
+                )}
               </>}
-              footnote={copy.replayTruth}
+              footnote={localized(locale, "Inget svar ersattes automatiskt med replay.", "No answer was automatically replaced with a replay.")}
             />
-          ) : replay ? (
+          ) : session ? (
             <>
-              {replayState === "playing" ? (
-                <div className="playback-status" role="status">
-                  <span><CheckIcon />{copy.receiptReady}</span>
-                  <button type="button" onClick={skipPlayback}>{copy.showNow}</button>
-                </div>
-              ) : null}
               <AnimatePresence initial={false}>
                 {playbackStage >= 1 ? (
-                  <MessageBubble key="alarm" side="assistant" tone="alert" timestamp={times.at(-1)}>
-                    <p className="message-emphasis">{copy.incidentHello}</p>
+                  <MessageBubble key="alarm" side="assistant" tone={hasAlarm ? "alert" : "default"} timestamp={times.at(-1)}>
+                    <p className="message-emphasis">{hasAlarm
+                      ? copy.incidentHello
+                      : localized(locale, "Körningen skapade inget larm.", "The run did not create an alert.")}</p>
                     <p>{presentation?.what_happened}</p>
                     <p>{presentation?.impact}</p>
-                    <div className="incident-strip"><AlertIcon /><strong>{count} × {status}</strong><span>·</span><span>{times[0]}–{times.at(-1)}</span><span>·</span><span>{service.replaceAll("_", " ")}</span></div>
+                    {hasAlarm ? <div className="incident-strip"><AlertIcon /><strong>{count} × {status}</strong><span>·</span><span>{timeRange}</span><span>·</span><span>{service.replaceAll("_", " ")}</span></div> : null}
                   </MessageBubble>
                 ) : null}
-                {playbackStage >= 2 ? (
-                  <MessageBubble key="when-question" side="user"><p>{copy.whenQuestion}</p></MessageBubble>
+                {playbackStage === 2 ? (
+                  <MessageBubble key="investigating" side="assistant" tone="pending">
+                    <TypingIndicator label={copy.receiptReady} />
+                  </MessageBubble>
                 ) : null}
                 {playbackStage >= 3 ? (
-                  <MessageBubble key="when-answer" side="assistant">
-                    <p>{copy.timeAnswer(times.join(", "), service)}</p>
-                    <div className="source-chips source-chips--times">
-                      {logs.map((log) => (
-                        <button key={log.evidence_id} type="button" onClick={() => openEvidence({ target_scene: "logs", target_id: log.evidence_id })}>
-                          <DocumentIcon />{clock(log.observed_at)}<ChevronRightIcon />
-                        </button>
-                      ))}
-                    </div>
-                    <div className="verified-row"><CheckIcon />{localized(locale, "Från larmkvittot · inget nytt AI-anrop", "From the alarm receipt · no new AI call")}</div>
-                  </MessageBubble>
-                ) : null}
-                {playbackStage >= 4 ? (
-                  <MessageBubble key="why-question" side="user"><p>{copy.whyQuestion}</p></MessageBubble>
-                ) : null}
-                {playbackStage >= 5 ? (
-                  <MessageBubble key="why-answer" side="assistant" tone="withheld">
-                    <p className="message-emphasis">{copy.withheldTitle}</p>
-                    <p>{presentation?.what_remains_unknown.join(" ") || copy.withheldBody}</p>
+                  <MessageBubble key="report" side="assistant">
+                    <p className="message-emphasis">{reportHeadline}</p>
+                    <p>{reportBody}</p>
                     <div className="source-chips">
-                      <button type="button" onClick={() => openEvidence({ target_scene: "logs", target_id: logs[0]?.evidence_id ?? alarm?.alarm_id ?? "logs" })}><DocumentIcon />{logs.length} {localized(locale, "visade loggar", "shown logs")}<ChevronRightIcon /></button>
-                      <button type="button" onClick={() => openEvidence({ target_scene: "agent_rag", target_id: runbooks[0]?.evidence_id ?? "runbooks" })}><DocumentIcon />{runbooks.length} {localized(locale, "runbookpassager", "runbook passages")}<ChevronRightIcon /></button>
+                      {logs.length > 0 ? (
+                        <button type="button" onClick={() => openEvidence({ target_scene: "logs", target_id: logs[0].evidence_id })}>
+                          <DocumentIcon />{logs.length} {localized(locale, "markerade loggar", "highlighted logs")}<ChevronRightIcon />
+                        </button>
+                      ) : null}
                     </div>
+                    {runbookSources.length > 0 ? (
+                      <SourceChips sources={runbookSources} locale={locale} onOpen={openDocument} returnMode="drift" />
+                    ) : runbooks.length > 0 ? (
+                      <div className="source-chips">
+                        <button type="button" onClick={() => openEvidence({ target_scene: "agent_rag", target_id: runbooks[0].evidence_id })}>
+                          <DocumentIcon />{localized(locale, "Driftinstruktioner", "Operating guides")}<ChevronRightIcon />
+                        </button>
+                      </div>
+                    ) : null}
                     <button type="button" className="disclosure-row" onClick={() => openEvidence()}><span>{copy.behindReport}</span><ChevronRightIcon /></button>
-                    <div className="verified-row"><CheckIcon />{copy.readOnly}</div>
+                    <div className="verified-row"><CheckIcon />{session.mode === "live_ai"
+                      ? localized(locale, "Syntetiskt fall · ny backendkörning · endast läsning", "Synthetic case · new backend run · read only")
+                      : localized(locale, "Historisk backendkörning · 0 nya AI-anrop", "Historical backend run · 0 new AI calls")}</div>
                   </MessageBubble>
                 ) : null}
               </AnimatePresence>
@@ -1425,17 +1595,20 @@ function DriftAgentView({
                   <MessageBubble side="assistant" tone={turn.error ? "error" : "default"}>
                     {turn.pending ? <TypingIndicator label={slow ? copy.slow : copy.waiting} /> : null}
                     {turn.localAnswer ? <p>{turn.localAnswer}</p> : null}
-                    {turn.localAnswer ? <div className="verified-row"><CheckIcon />{localized(locale, "Från larmkvittot · inget nytt AI-anrop", "From the alarm receipt · no new AI call")}</div> : null}
+                    {turn.localAnswer ? <div className="verified-row"><CheckIcon />{localized(locale, "Från körningskvittot · inget nytt AI-anrop", "From the run receipt · no new AI call")}</div> : null}
                     {turn.response ? (
                       <>
                         <p>{turn.response.answer.text}</p>
                         {turn.response.citations.length > 0 ? (
                           <div className="source-chips">
-                            {turn.response.citations.slice(0, 3).map((citation) => (
-                              <button key={citation.evidence_id} type="button" onClick={() => openEvidence(citation)}>
-                                <DocumentIcon />{citation.label}<ChevronRightIcon />
-                              </button>
-                            ))}
+                            {turn.response.citations.slice(0, 3).map((citation) => {
+                              const documentSource = runbookSources.find((source) => source.evidence_id === citation.evidence_id);
+                              return (
+                                <button key={citation.evidence_id} type="button" onClick={() => openCitation(citation)}>
+                                  <DocumentIcon />{documentSource?.title ?? citation.label}<ChevronRightIcon />
+                                </button>
+                              );
+                            })}
                           </div>
                         ) : null}
                       </>
@@ -1449,18 +1622,17 @@ function DriftAgentView({
           ) : null}
         </div>
 
-        {ready && replay ? (
+        {ready && session ? (
           <div className="chat-composer-wrap">
             {turns.length === 0 ? (
               <div className="suggestion-row suggestion-row--drift">
                 <button type="button" onClick={() => void submit(copy.whenQuestion, "when")} disabled={pending}>{copy.whenQuestion}</button>
-                {replay.run_reference ? FOLLOW_UP_IDS.slice(0, 3).map((id) => (
+                {session.runReference ? (["how_conclusion", "what_unknown"] as const).map((id) => (
                   <button key={id} type="button" onClick={() => void submit(copy.driftSuggestions[id], id)} disabled={pending}>{copy.driftSuggestions[id]}</button>
                 )) : (
                   <>
                     <button type="button" onClick={() => void submit(copy.driftSuggestions.what_unknown, "what_unknown_receipt")} disabled={pending}>{copy.driftSuggestions.what_unknown}</button>
                     <button type="button" onClick={() => void submit(copy.driftSuggestions.customer_impact, "customer_impact_receipt")} disabled={pending}>{copy.driftSuggestions.customer_impact}</button>
-                    <button type="button" onClick={() => openEvidence()}>{copy.driftSuggestions.show_sources}</button>
                   </>
                 )}
               </div>
@@ -1469,9 +1641,15 @@ function DriftAgentView({
               <label className="sr-only" htmlFor="drift-message">{copy.driftPlaceholder}</label>
               <input
                 id="drift-message"
+                name="drift-message"
+                autoComplete="off"
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                placeholder={!replay.run_reference ? copy.noRunReference : copy.driftPlaceholder}
+                placeholder={!session.runReference
+                  ? copy.noRunReference
+                  : liveChat
+                    ? copy.driftPlaceholder
+                    : copy.replayChatPlaceholder}
                 maxLength={500}
                 disabled={!canChat}
               />
@@ -1744,7 +1922,7 @@ function EvidenceSheet({
         ) : (
           <DriftEvidence
             key={`${state.focus?.target_scene ?? "overview"}-${state.focus?.target_id ?? "all"}`}
-            replay={state.replay}
+            session={state.session}
             locale={locale}
             focus={state.focus}
           />
@@ -1757,18 +1935,30 @@ function EvidenceSheet({
 function SupportEvidence({ response, locale, openDocument }: { response: DemoCustomerChatTurnResponse; locale: Locale; openDocument: (source: DemoCustomerChatSource, returnMode?: Mode) => void }) {
   const copy = COPY[locale];
   const blocked = response.outcome === "refused" || response.safety.decision === "BLOCK";
+  const blockedBeforeAi = blocked && response.receipt.provider_calls === 0;
+  const handledWithinBoundary = blocked && !blockedBeforeAi;
   const executedSteps = response.tool_events.filter((event) => event.executed);
   return (
     <div className="evidence-content">
       <span className="eyebrow">{blocked ? copy.safetyReceipt : copy.evidenceEyebrow}</span>
-      <h2 id="evidence-title">{blocked ? copy.stoppedBeforeAi : copy.behindAnswer}</h2>
+      <h2 id="evidence-title">{blockedBeforeAi
+        ? copy.stoppedBeforeAi
+        : handledWithinBoundary
+          ? localized(locale, "Hanterad inom säkerhetsgränsen", "Handled within the safety boundary")
+          : copy.behindAnswer}</h2>
       <p className="evidence-content__lead">{copy.registeredNotThoughts}</p>
       <div className="evidence-timeline">
-        {blocked ? (
+        {blockedBeforeAi ? (
           <>
             <EvidenceStep icon={<ShieldIcon />} title={localized(locale, "Frågan kontrollerades", "The question was checked")} body={locale === "sv" ? response.safety.summary_sv : response.safety.summary_en} />
             <EvidenceStep icon={<CheckIcon />} title={localized(locale, "Inget dokumentinnehåll lästes", "No document content was read")} body={`${response.receipt.read_operations} ${localized(locale, "läsningar", "reads")}`} />
             <EvidenceStep icon={<CheckIcon />} title={localized(locale, "Inget skickades till modellen", "Nothing was sent to the model")} body={`${response.receipt.provider_calls} ${localized(locale, "provideranrop", "provider calls")}`} />
+          </>
+        ) : handledWithinBoundary ? (
+          <>
+            <EvidenceStep icon={<ShieldIcon />} title={localized(locale, "Befogenheten kontrollerades", "Authority was checked")} body={locale === "sv" ? response.safety.summary_sv : response.safety.summary_en} />
+            <EvidenceStep icon={<ChatIcon />} title={localized(locale, "Ett naturligt svar formulerades", "A natural response was composed")} body={`${response.receipt.provider_calls} ${localized(locale, "modell-anrop", "model call")}`} />
+            <EvidenceStep icon={<CheckIcon />} title={localized(locale, "Ingen åtgärd utfördes", "No action was performed")} body={localized(locale, "Agenten höll sig inom företagets regler.", "The agent stayed within the company's rules.")} />
           </>
         ) : executedSteps.slice(0, 5).map((event) => (
           <EvidenceStep
@@ -1793,24 +1983,27 @@ function SupportEvidence({ response, locale, openDocument }: { response: DemoCus
         [localized(locale, "Backendläsningar", "Backend reads"), String(response.receipt.read_operations)],
         [localized(locale, "Modellanrop", "Model calls"), String(response.receipt.provider_calls)],
         [localized(locale, "Dokumentpassager", "Document passages"), String(response.sources.filter((source) => source.kind === "company_policy" && source.chunk_id).length)],
+        [localized(locale, "Estimerad kostnad", "Estimated cost"), response.receipt.estimated_cost_usd === null || response.receipt.estimated_cost_usd === undefined ? localized(locale, "Ej rapporterad", "Not reported") : `$${response.receipt.estimated_cost_usd.toFixed(8)}`],
         [localized(locale, "Ändringar", "Changes"), "0"],
       ]} />
-      {blocked ? <div className="evidence-result evidence-result--safe"><CheckIcon /><strong>{copy.safetyWon}</strong></div> : null}
+      {blocked ? <div className="evidence-result evidence-result--safe"><CheckIcon /><strong>{blockedBeforeAi
+        ? copy.safetyWon
+        : localized(locale, "Företagets regler följdes · ingen åtgärd utfördes", "Company rules followed · no action performed")}</strong></div> : null}
     </div>
   );
 }
 
 function DriftEvidence({
-  replay,
+  session,
   locale,
   focus,
 }: {
-  replay: IncidentLabReplayResponse;
+  session: DriftSession;
   locale: Locale;
   focus?: Pick<IncidentLabFollowUpCitation, "target_scene" | "target_id">;
 }) {
   const copy = COPY[locale];
-  const run = replay.recorded_run;
+  const run = session.run;
   const alarm = run.alarm_receipt;
   const agent = run.agent_turn;
   const evidence = agent?.tool_events.flatMap((event) => event.evidence) ?? [];
@@ -1832,7 +2025,7 @@ function DriftEvidence({
   const focusedLogId = focus?.target_scene === "logs" ? focus.target_id : null;
   if (focusedLogId) highlightedLogIds.add(focusedLogId);
   const visibleLogs = [...logIndex.values()].filter((log) => highlightedLogIds.has(log.evidence_id));
-  const sourceLogs = visibleLogs.length > 0 ? visibleLogs : alarmLogs(replay);
+  const sourceLogs = visibleLogs.length > 0 ? visibleLogs : alarmLogs(run);
   const released = agent?.verification_event?.answer_released ?? false;
   const failedCheckCount = agent?.verification_event
     ? [
@@ -1846,36 +2039,53 @@ function DriftEvidence({
       agent.verification_event.final_author_valid,
     ].filter((valid) => !valid).length
     : 0;
+  const presentation = run.localized_presentations[locale].business_response;
+  const conclusion = presentation.headline || (released ? presentation.what_is_known.join(" ") : copy.withheldTitle);
+  const estimatedCost = agent?.receipt.estimated_cost_usd;
   return (
     <div className="evidence-content">
       <span className="eyebrow">{copy.reportEyebrow}</span>
       <h2 id="evidence-title">{copy.behindReport}</h2>
       <p className="evidence-content__lead">{copy.registeredNotThoughts}</p>
       <div className="evidence-timeline">
-        <EvidenceStep icon={<AlertIcon />} title={localized(locale, "Larmet upptäcktes", "The alarm was detected")} body={`${alarm?.signal.observed_value ?? 0} HTTP 5xx · ${alarm?.signal.lookback_seconds ?? 0} ${localized(locale, "sekunder", "seconds")}`} />
+        <EvidenceStep
+          icon={<AlertIcon />}
+          title={alarm
+            ? localized(locale, "Larmet upptäcktes", "The alarm was detected")
+            : localized(locale, "Inget larm utlöstes", "No alert was triggered")}
+          body={alarm
+            ? `${alarm.signal.observed_value} HTTP 5xx · ${alarm.signal.lookback_seconds ?? localized(locale, "okänt fönster", "unknown window")} ${typeof alarm.signal.lookback_seconds === "number" ? localized(locale, "sekunder", "seconds") : ""}`
+            : localized(locale, "Agentutredningen startade inte och inga åtgärder utfördes.", "The agent investigation did not start and no actions were performed.")}
+        />
         <EvidenceStep icon={<ToolIcon />} title={localized(locale, "Bevis hämtades", "Evidence was retrieved")} body={`${evidence.length} ${localized(locale, "avgränsade bevis", "bounded evidence items")} · ${copy.readOnly}`} />
         <EvidenceStep icon={<DocumentIcon />} title={localized(locale, "Runbookpassager hämtades", "Runbook passages were retrieved")} body={`${runbooks.length} ${localized(locale, "runbookpassager", "runbook passages")}`} />
         <div className={focus?.target_scene === "java" ? "evidence-focus" : ""}>
           <EvidenceStep
-            tone="amber"
+            tone={released ? "blue" : "amber"}
             icon={<ShieldIcon />}
-            title={localized(locale, "Verifieringen höll tillbaka diagnosen", "Verification withheld the diagnosis")}
-            body={localized(
-              locale,
-              failedCheckCount === 1
-                ? "1 kontroll blev inte godkänd. Diagnosen visades därför inte som verifierad."
-                : `${failedCheckCount || 1} kontroller blev inte godkända. Diagnosen visades därför inte som verifierad.`,
-              failedCheckCount === 1
-                ? "1 check failed. The diagnosis was therefore not released as verified."
-                : `${failedCheckCount || 1} checks failed. The diagnosis was therefore not released as verified.`,
-            )}
+            title={released
+              ? localized(locale, "Verifieringen godkände slutsatsen", "Verification released the conclusion")
+              : localized(locale, "Verifieringen höll tillbaka diagnosen", "Verification withheld the diagnosis")}
+            body={released
+              ? localized(locale, "Källor, direkt evidensstöd och agentordning godkändes.", "Sources, direct evidence support, and agent order passed verification.")
+              : localized(
+                locale,
+                failedCheckCount === 1
+                  ? "1 kontroll blev inte godkänd. Diagnosen visades därför inte som verifierad."
+                  : `${failedCheckCount || 1} kontroller blev inte godkända. Diagnosen visades därför inte som verifierad.`,
+                failedCheckCount === 1
+                  ? "1 check failed. The diagnosis was therefore not released as verified."
+                  : `${failedCheckCount || 1} checks failed. The diagnosis was therefore not released as verified.`,
+              )}
           />
         </div>
       </div>
-      <div className="evidence-result evidence-result--amber">
+      <div className={`evidence-result${released ? " evidence-result--safe" : " evidence-result--amber"}`}>
         <span className="eyebrow">{localized(locale, "Rapporterad slutsats", "Reported conclusion")}</span>
-        <strong>{copy.withheldTitle}</strong>
-        <p>{localized(locale, "Agenten rapporterade påverkan utan att gissa eller ändra något.", "The agent reported the impact without guessing or changing anything.")}</p>
+        <strong>{conclusion}</strong>
+        <p>{released
+          ? presentation.what_is_known.join(" ")
+          : localized(locale, "Agenten rapporterade påverkan utan att gissa eller ändra något.", "The agent reported the impact without guessing or changing anything.")}</p>
       </div>
       <details className="evidence-details" open={focus?.target_scene === "logs"}>
         <summary>{localized(locale, "Markerade loggar", "Highlighted logs")}<ChevronRightIcon /></summary>
@@ -1921,15 +2131,26 @@ function DriftEvidence({
       </details>
       <details className="evidence-details" open={focus?.target_scene === "java"}>
         <summary>{copy.technicalReceipt}<ChevronRightIcon /></summary>
-        <ReceiptRows rows={[
-          [localized(locale, "Nya AI-anrop i uppspelningen", "New AI calls in this playback"), String(replay.playback_receipt.model_calls)],
+        <ReceiptRows rows={session.mode === "live_ai" ? [
+          [localized(locale, "Planeringsanrop", "Planner calls"), String(session.plan.provider_receipt ? 1 : 0)],
+          [localized(locale, "Agentens modellanrop", "Agent model calls"), String(agent?.receipt.model_calls ?? 0)],
+          [localized(locale, "Embedding-anrop", "Embedding calls"), String(agent?.receipt.embedding_calls ?? 0)],
+          [localized(locale, "ADK-verktyg", "ADK tools"), String(agent?.receipt.adk_tool_calls ?? 0)],
+          [localized(locale, "Agentkostnad, estimat", "Agent cost estimate"), estimatedCost === null || estimatedCost === undefined ? localized(locale, "Ej rapporterad", "Not reported") : `$${estimatedCost.toFixed(8)}`],
+          [localized(locale, "Svar frisläppt", "Answer released"), released ? localized(locale, "Ja", "Yes") : localized(locale, "Nej", "No")],
+          [localized(locale, "Ändringar", "Changes"), "0"],
+        ] : [
+          [localized(locale, "Nya AI-anrop i uppspelningen", "New AI calls in this playback"), String(session.replay.playback_receipt.model_calls)],
           [localized(locale, "Historiska modellanrop", "Historical model calls"), String(agent?.receipt.model_calls ?? 0)],
           [localized(locale, "Historiska ADK-verktyg", "Historical ADK tools"), String(agent?.receipt.adk_tool_calls ?? 0)],
+          [localized(locale, "Historisk agentkostnad, estimat", "Historical agent cost estimate"), estimatedCost === null || estimatedCost === undefined ? localized(locale, "Ej rapporterad", "Not reported") : `$${estimatedCost.toFixed(8)}`],
           [localized(locale, "Svar frisläppt", "Answer released"), released ? localized(locale, "Ja", "Yes") : localized(locale, "Nej", "No")],
           [localized(locale, "Ändringar", "Changes"), "0"],
         ]} />
       </details>
-      <p className="evidence-footnote">{localized(locale, "Den här uppspelningen", "This playback")} · 0 {localized(locale, "nya AI-anrop", "new AI calls")} · {copy.changesZero}</p>
+      <p className="evidence-footnote">{session.mode === "live_ai"
+        ? localized(locale, "Live-körning · backendregistrerade kvitton", "Live run · backend-recorded receipts")
+        : localized(locale, "Historisk uppspelning · 0 nya AI-anrop", "Historical playback · 0 new AI calls")} · {copy.changesZero}</p>
     </div>
   );
 }

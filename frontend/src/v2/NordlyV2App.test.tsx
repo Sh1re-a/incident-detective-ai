@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import NordlyV2App from "./NordlyV2App";
@@ -140,6 +140,119 @@ const incidentReplay = {
   },
 };
 
+const approvedPlan = {
+  contract_version: "incident-plan-v1",
+  incident_family: "payment_timeout",
+  severity: "high",
+  affected_services: ["payment_adapter"],
+  summary: "Syntetiskt betalningslarm",
+  synthetic_only: true,
+  write_actions_allowed: false,
+  human_approval_required: true,
+};
+
+const incidentPlanResponse = {
+  contract_version: "incident-lab-plan-v1",
+  outcome: "plan_ready",
+  safety: {
+    decision: "allowed",
+    reason_code: "ALLOWED",
+    summary_sv: "Planen är tillåten.",
+    summary_en: "The plan is allowed.",
+  },
+  java_validation: { decision: "APPROVED", plan: approvedPlan },
+  provider_receipt: { transport: "vertex_ai" },
+};
+
+const liveIncidentRun = {
+  ...incidentReplay.recorded_run,
+  run_reference: "ilr_live_test",
+  answer_state: "withheld",
+};
+
+const runbookEvidence = {
+  evidence_type: "runbook",
+  evidence_id: "runbook-payment-timeout-precedence",
+  display_summary: "Jämför klientens timeout med betalpartnerns svarstid.",
+  source_ref: "runbooks/rb-payment-provider-timeouts#timeout-precedence",
+  content: {
+    document_id: "rb-payment-provider-timeouts",
+    chunk_id: "timeout-precedence",
+    document_version: "1.0",
+    text: "Jämför klientens timeout med betalpartnerns svarstid innan en rotorsak rapporteras.",
+  },
+};
+
+const liveIncidentRunWithRunbook = {
+  ...liveIncidentRun,
+  agent_turn: {
+    tool_events: [{ evidence: [runbookEvidence], runbook_retrieval: null }],
+    receipt: {
+      model_calls: 1,
+      embedding_calls: 1,
+      adk_tool_calls: 1,
+      estimated_cost_usd: 0.0002,
+    },
+  },
+};
+
+const runbookDocument = {
+  ...protectedDocument,
+  id: "kb-payment-provider-timeouts",
+  display_filename: "payment-provider-timeouts.md",
+  document_type: "runbook",
+  classification: "internal_demo",
+  title: "Payment provider timeouts",
+  title_sv: "Timeouts hos betalpartnern",
+  summary_sv: "Godkänd driftinstruktion för timeoutfel.",
+  summary_en: "Approved operating guide for timeout failures.",
+  owner_team: "Platform Operations",
+  access_scopes: ["public_demo"],
+  rag_eligibility: {
+    eligible: true,
+    reason_code: "APPROVED_PUBLIC_DEMO" as const,
+    summary_sv: "Godkänd för demot.",
+    summary_en: "Approved for the demo.",
+  },
+  content_visible: true,
+  chunks: [{
+    id: "timeout-precedence",
+    section_heading: "Timeout före rotorsak",
+    source_ref: "runbooks/rb-payment-provider-timeouts#timeout-precedence",
+    evidence_id: "runbook-payment-timeout-precedence",
+    display_summary_sv: "Jämför timeoutgränserna först.",
+    display_summary_en: "Compare timeout thresholds first.",
+    text: "Jämför klientens timeout med betalpartnerns svarstid innan en rotorsak rapporteras.",
+    content_sha256: "b".repeat(64),
+  }],
+};
+
+const documentLibraryWithRunbook: KnowledgeDocumentLibraryResponse = {
+  ...documentLibrary,
+  document_count: 2,
+  chunk_count: 1,
+  eligible_document_count: 1,
+  eligible_chunk_count: 1,
+  documents: [protectedDocument, runbookDocument],
+};
+
+const driftFollowUpResponse = {
+  answer: { text: "Jag ser tre betalningsfel inom samma minut, men underlaget räcker ännu inte för att bevisa rotorsaken." },
+  citations: [],
+};
+
+const citedDriftFollowUpResponse = {
+  ...driftFollowUpResponse,
+  citations: [{
+    evidence_id: "runbook-payment-timeout-precedence",
+    source_ref: "runbooks/rb-payment-provider-timeouts#timeout-precedence",
+    source_type: "runbook",
+    label: "Timeout precedence",
+    target_scene: "agent_rag",
+    target_id: "runbook-payment-timeout-precedence",
+  }],
+};
+
 const blockedResponse = {
   contract_version: "nordly-demo-customer-chat-turn-v1",
   turn_id: "blocked-turn",
@@ -189,6 +302,21 @@ const blockedResponse = {
   },
   error: null,
   limitations: [],
+} as unknown as DemoCustomerChatTurnResponse;
+
+const handledBoundaryResponse = {
+  ...blockedResponse,
+  outcome: "outside_authority",
+  assistant_message: {
+    text_sv: "Jag kan förklara policyn, men jag kan inte ändra eller återbetala ordern här.",
+    text_en: "I can explain the policy, but I cannot change or refund the order here.",
+  },
+  receipt: {
+    ...blockedResponse.receipt,
+    provider_calls: 1,
+    generation_calls: 1,
+    estimated_cost_usd: 0.0001315,
+  },
 } as unknown as DemoCustomerChatTurnResponse;
 
 function jsonResponse(value: unknown) {
@@ -259,6 +387,29 @@ describe("Nordly v2", () => {
     expect(String((request?.[1] as RequestInit | undefined)?.body)).toContain('"confirm_live_ai":true');
   });
 
+  it("shows a natural safety boundary when AI handled the answer without taking action", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => Promise.resolve(
+      String(input).includes("/demo-customer/chat/turns")
+        ? jsonResponse(handledBoundaryResponse)
+        : String(input).includes("/live-ai/status")
+          ? jsonResponse(availableStatus)
+          : jsonResponse(documentLibrary),
+    )));
+    const user = userEvent.setup();
+
+    render(<NordlyV2App />);
+    await screen.findByText("Hej Shirre! Vad kan jag hjälpa dig med?");
+    await user.type(screen.getByRole("textbox", { name: "Skriv till Nordly…" }), "Kan du återbetala min order?");
+    await user.click(screen.getByRole("button", { name: "Skicka" }));
+    await screen.findByText("Jag kan förklara policyn, men jag kan inte ändra eller återbetala ordern här.");
+    await user.click(screen.getByRole("button", { name: "Så kom svaret fram" }));
+
+    expect(screen.getByRole("heading", { name: "Hanterad inom säkerhetsgränsen" })).toBeInTheDocument();
+    expect(screen.getByText("Ett naturligt svar formulerades")).toBeInTheDocument();
+    expect(screen.getByText("$0.00013150")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Så skyddades frågan" })).not.toBeInTheDocument();
+  });
+
   it("shows a clean two-action offline start without chat or a status badge", async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
@@ -285,7 +436,7 @@ describe("Nordly v2", () => {
     expect(await screen.findByText("När syns pengarna efter en återbetalning?")).toBeInTheDocument();
     const supportEndButton = screen.getByRole("button", { name: "Avsluta samtal" });
     expect(supportEndButton).toBeInTheDocument();
-    expect(supportEndButton.closest(".chat-column")).toHaveClass("chat-column--has-end-control");
+    expect(supportEndButton.closest(".agent-session-header")).toBeInTheDocument();
     expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/runs/recorded-replay"))).toHaveLength(2);
 
     await user.click(supportEndButton);
@@ -293,22 +444,23 @@ describe("Nordly v2", () => {
     expect(screen.queryByText("När syns pengarna efter en återbetalning?")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Driftagent" }));
-    expect(await screen.findByRole("heading", { name: "Driftagenten håller koll." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Driftagenten väntar på en signal." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Spela verifierad replay" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kontrollera AI igen" })).toBeInTheDocument();
     expect(screen.queryByText("Live-AI pausad · se replay")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
-    expect(screen.getByText(/AI-genererat syntetiskt fall/)).toBeInTheDocument();
-    expect(screen.getByText("Registrerad backendkörning · inga nya AI-anrop")).toBeInTheDocument();
+    expect(screen.getByText(/Starta ett syntetiskt larm/)).toBeInTheDocument();
+    expect(screen.getByText("Historisk inspelning · 0 nya AI-anrop")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Spela verifierad replay" }));
     const driftEndButton = await screen.findByRole("button", { name: "Avsluta samtal" });
-    expect(driftEndButton.closest(".chat-column")).toHaveClass("chat-column--has-end-control");
-    await user.click(await screen.findByRole("button", { name: "Visa resultat nu" }));
-    expect(screen.getByRole("textbox", { name: "Fråga om rapporten…" })).toBeEnabled();
+    expect(driftEndButton.closest(".agent-session-header")).toBeInTheDocument();
+    expect(await screen.findByRole("textbox", { name: "Fråga om rapporten…" }, { timeout: 4_500 })).toBeDisabled();
+    expect(screen.getByPlaceholderText("Fri chatt kräver Live-AI")).toBeInTheDocument();
+    expect(screen.queryByText("Vet du varför?")).not.toBeInTheDocument();
     expect(screen.queryByText("Live-AI pausad · se replay")).not.toBeInTheDocument();
     await user.click(driftEndButton);
-    expect(await screen.findByRole("heading", { name: "Driftagenten håller koll." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Driftagenten väntar på en signal." })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Avsluta samtal" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
   });
@@ -327,9 +479,120 @@ describe("Nordly v2", () => {
     expect(screen.getByText(/Varken Live-AI eller replay är tillgänglig/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Driftagent" }));
-    expect(await screen.findByRole("heading", { name: "Driftagenten håller koll." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Driftagenten väntar på en signal." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Replay är inte tillgänglig" })).toBeDisabled();
     expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
+  });
+
+  it("runs the approved live Drift flow and enables genuine free follow-up chat", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/live-ai/status")) return Promise.resolve(jsonResponse(availableStatus));
+      if (url.includes("/incident-lab/plans")) return Promise.resolve(jsonResponse(incidentPlanResponse));
+      if (url.includes("/incident-lab/follow-ups")) return Promise.resolve(jsonResponse(driftFollowUpResponse));
+      if (url.endsWith("/api/v1/incident-lab/runs")) return Promise.resolve(jsonResponse(liveIncidentRun));
+      if (url.includes("/incident-lab/runs/recorded-replay")) return Promise.resolve(jsonResponse(incidentReplay));
+      return Promise.resolve(jsonResponse(documentLibrary));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<NordlyV2App />);
+    await user.click(screen.getByRole("button", { name: "Driftagent" }));
+    expect(await screen.findByRole("button", { name: "Starta live-utredning" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Spela verifierad replay" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Starta live-utredning" }));
+
+    const input = await screen.findByRole("textbox", { name: "Fråga om rapporten…" }, { timeout: 4_500 });
+    expect(input).toBeEnabled();
+    await user.type(input, "va hände egentlien?? fattar nt");
+    await user.click(screen.getByRole("button", { name: "Skicka" }));
+    expect(await screen.findByText("Jag ser tre betalningsfel inom samma minut, men underlaget räcker ännu inte för att bevisa rotorsaken.")).toBeInTheDocument();
+
+    const planRequest = fetchMock.mock.calls.find(([url]) => String(url).includes("/incident-lab/plans"));
+    const runRequest = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/v1/incident-lab/runs"));
+    const followUpRequest = fetchMock.mock.calls.find(([url]) => String(url).includes("/incident-lab/follow-ups"));
+    expect(String((planRequest?.[1] as RequestInit | undefined)?.body)).toContain('"confirm_live_ai":true');
+    expect(String((runRequest?.[1] as RequestInit | undefined)?.body)).toContain('"confirm_live_ai":true');
+    expect(String((followUpRequest?.[1] as RequestInit | undefined)?.body)).toContain('"confirm_live_ai":true');
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/runs/recorded-replay"))).toHaveLength(0);
+  });
+
+  it("does not imply that a Drift document supported a follow-up with zero citations", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/live-ai/status")) return Promise.resolve(jsonResponse(availableStatus));
+      if (url.includes("/incident-lab/plans")) return Promise.resolve(jsonResponse(incidentPlanResponse));
+      if (url.includes("/incident-lab/follow-ups")) return Promise.resolve(jsonResponse(driftFollowUpResponse));
+      if (url.endsWith("/api/v1/incident-lab/runs")) return Promise.resolve(jsonResponse(liveIncidentRunWithRunbook));
+      return Promise.resolve(jsonResponse(documentLibraryWithRunbook));
+    }));
+    const user = userEvent.setup();
+
+    render(<NordlyV2App />);
+    await user.click(screen.getByRole("button", { name: "Driftagent" }));
+    await user.click(await screen.findByRole("button", { name: "Starta live-utredning" }));
+    const input = await screen.findByRole("textbox", { name: "Fråga om rapporten…" }, { timeout: 4_500 });
+    await user.type(input, "Vad vet du inte?");
+    await user.click(screen.getByRole("button", { name: "Skicka" }));
+
+    const answer = await screen.findByText(driftFollowUpResponse.answer.text);
+    const answerBubble = answer.closest(".message-bubble");
+    expect(answerBubble).not.toBeNull();
+    expect(answerBubble?.querySelector(".source-chips")).toBeNull();
+  });
+
+  it("opens the exact Drift document passage returned in follow-up citations", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/live-ai/status")) return Promise.resolve(jsonResponse(availableStatus));
+      if (url.includes("/incident-lab/plans")) return Promise.resolve(jsonResponse(incidentPlanResponse));
+      if (url.includes("/incident-lab/follow-ups")) return Promise.resolve(jsonResponse(citedDriftFollowUpResponse));
+      if (url.endsWith("/api/v1/incident-lab/runs")) return Promise.resolve(jsonResponse(liveIncidentRunWithRunbook));
+      return Promise.resolve(jsonResponse(documentLibraryWithRunbook));
+    }));
+    const user = userEvent.setup();
+
+    render(<NordlyV2App />);
+    await user.click(screen.getByRole("button", { name: "Driftagent" }));
+    await user.click(await screen.findByRole("button", { name: "Starta live-utredning" }));
+    const input = await screen.findByRole("textbox", { name: "Fråga om rapporten…" }, { timeout: 4_500 });
+    await user.type(input, "Vilken driftinstruktion stödjer rapporten?");
+    await user.click(screen.getByRole("button", { name: "Skicka" }));
+
+    const answer = await screen.findByText(citedDriftFollowUpResponse.answer.text);
+    const answerBubble = answer.closest(".message-bubble");
+    expect(answerBubble).not.toBeNull();
+    await user.click(within(answerBubble as HTMLElement).getByRole("button", { name: /Timeouts hos betalpartnern/ }));
+
+    expect(await screen.findByRole("heading", { name: "Timeouts hos betalpartnern" })).toBeInTheDocument();
+    expect(screen.getByText("Passage som användes i svaret")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tillbaka till Drift" })).toBeInTheDocument();
+  });
+
+  it("does not silently replace a failed paid Drift run with replay", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/live-ai/status")) return Promise.resolve(jsonResponse(availableStatus));
+      if (url.includes("/incident-lab/plans")) {
+        return Promise.resolve(new Response(JSON.stringify({ detail: "Modelltjänsten svarade inte." }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+      return Promise.resolve(jsonResponse(documentLibrary));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<NordlyV2App />);
+    await user.click(screen.getByRole("button", { name: "Driftagent" }));
+    await user.click(await screen.findByRole("button", { name: "Starta live-utredning" }));
+
+    expect(await screen.findByRole("heading", { name: "Live-utredningen kunde inte slutföras." })).toBeInTheDocument();
+    expect(screen.getByText("Modelltjänsten svarade inte.")).toBeInTheDocument();
+    expect(screen.getByText("Inget svar ersattes automatiskt med replay.")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/runs/recorded-replay"))).toHaveLength(0);
   });
 
   it("re-checks availability and transitions from offline start to live chat", async () => {
