@@ -3,6 +3,7 @@ package dev.shirwac.incidentdetective.nordly;
 import dev.shirwac.incidentdetective.ai.GeminiAiProperties;
 import dev.shirwac.incidentdetective.ai.ModelCostEstimate;
 import dev.shirwac.incidentdetective.ai.ModelProviderException;
+import dev.shirwac.incidentdetective.ai.ModelProviderFailure;
 import dev.shirwac.incidentdetective.live.LiveAiBudgetStoreUnavailableException;
 import dev.shirwac.incidentdetective.live.LiveInvestigationException;
 import org.slf4j.Logger;
@@ -525,6 +526,16 @@ public final class DemoCustomerChatService {
                 .limit(CustomerChatAnswerGateway.MAX_EVIDENCE_ITEMS)
                 .map(source -> answerEvidence(response, source))
                 .toList();
+        List<CustomerChatAnswerGateway.Claim> verifiedClaims =
+                "protected_boundary".equals(routedIntent)
+                        ? List.of()
+                        : response.verifiedClaims().stream()
+                        .map(claim -> new CustomerChatAnswerGateway.Claim(
+                                claim.textSv(),
+                                claim.textEn(),
+                                claim.citationIds()
+                        ))
+                        .toList();
         CustomerChatAnswerGateway.Result generated = answerGateway.generate(
                 request.confirmLiveAi(),
                 new CustomerChatAnswerGateway.Input(
@@ -533,9 +544,30 @@ public final class DemoCustomerChatService {
                         routedIntent,
                         response.outcome(),
                         recentConversation,
-                        evidence
+                        evidence,
+                        verifiedClaims
                 )
         );
+        boolean protectedBoundary = "protected_boundary".equals(routedIntent);
+        boolean safeProtectedBoundary = protectedBoundary
+                && CustomerChatAnswerClaimCoverage.protectedBoundarySafe(
+                generated.answer()
+        );
+        boolean claimsRequired = !"conversation".equals(routedIntent)
+                && !verifiedClaims.isEmpty();
+        boolean groundedStandardAnswer = !protectedBoundary
+                && (!claimsRequired || !generated.answer().claims().isEmpty())
+                && CustomerChatAnswerClaimCoverage.covers(generated.answer())
+                && CustomerChatAnswerClaimCoverage.claimsWithinVerifiedSet(
+                generated.answer(),
+                verifiedClaims
+        );
+        if (!safeProtectedBoundary && !groundedStandardAnswer) {
+            throw new ModelProviderException(
+                    ModelProviderFailure.MALFORMED_RESPONSE,
+                    "Customer chat answer contained factual text outside its cited claims"
+            );
+        }
         List<DemoCustomerChatTurnResponse.VerifiedClaim> generatedClaims =
                 generated.answer().claims().stream()
                         .map(claim -> new DemoCustomerChatTurnResponse.VerifiedClaim(
@@ -1875,11 +1907,39 @@ public final class DemoCustomerChatService {
     private List<DemoCustomerChatTurnResponse.VerifiedClaim> orderClaims(
             DemoOrderSnapshot order
     ) {
-        return List.of(new DemoCustomerChatTurnResponse.VerifiedClaim(
-                "Ordern är " + order.statusSv() + " och har ett registrerat leveransfönster.",
-                "The order is " + order.statusEn() + " and has a recorded delivery window.",
-                List.of(order.evidenceId())
-        ));
+        String itemsSv = order.itemCount() == 1
+                ? "1 vara"
+                : order.itemCount() + " varor";
+        String itemsEn = order.itemCount() == 1
+                ? "1 item"
+                : order.itemCount() + " items";
+        return List.of(
+                new DemoCustomerChatTurnResponse.VerifiedClaim(
+                        "Din order " + order.orderId() + " har statusen "
+                                + order.statusSv() + ".",
+                        "Your order " + order.orderId() + " has status "
+                                + order.statusEn() + ".",
+                        List.of(order.evidenceId())
+                ),
+                new DemoCustomerChatTurnResponse.VerifiedClaim(
+                        "Den beräknas komma " + dateRangeSv(
+                                order.estimatedDeliveryFrom(),
+                                order.estimatedDeliveryThrough()
+                        ) + ".",
+                        "It is expected to arrive " + dateRangeEn(
+                                order.estimatedDeliveryFrom(),
+                                order.estimatedDeliveryThrough()
+                        ) + ".",
+                        List.of(order.evidenceId())
+                ),
+                new DemoCustomerChatTurnResponse.VerifiedClaim(
+                        "Ordern innehåller " + itemsSv + ": "
+                                + order.itemSummarySv() + ".",
+                        "The order contains " + itemsEn + ": "
+                                + order.itemSummaryEn() + ".",
+                        List.of(order.evidenceId())
+                )
+        );
     }
 
     private List<DemoCustomerChatTurnResponse.VerifiedClaim> authorityClaims(
@@ -1890,30 +1950,30 @@ public final class DemoCustomerChatService {
     ) {
         String actionSv = switch (intent.intent()) {
             case CANCEL_ORDER ->
-                    "Assistenten får förklara regeln men inte avbeställa ordern.";
+                    "Jag kan inte avbeställa eller ändra ordern här; ingen ändring har gjorts.";
             case RETURN_ORDER ->
-                    "Assistenten får förklara returregeln men inte skapa en retur.";
+                    "Jag kan inte skapa eller godkänna en retur här; ingen ändring har gjorts.";
             case REFUND_ORDER ->
-                    "Assistenten är read-only och en ekonomisk åtgärd kräver en människa.";
+                    "Jag kan inte godkänna eller genomföra en återbetalning här; ingen ändring har gjorts.";
             case PURCHASE_ITEM ->
-                    "Assistenten får läsa den befintliga ordern men inte skapa köp eller lägga till varor.";
+                    "Jag kan inte skapa köp eller lägga till varor här; ingen ändring har gjorts.";
             case CHANGE_DELIVERY_ADDRESS ->
-                    "Assistenten får läsa ordern men inte ändra leveransadressen.";
+                    "Jag kan inte ändra leveransadressen här; ingen ändring har gjorts.";
             default -> throw new IllegalArgumentException(
                     "No authority claim for " + intent.intent()
             );
         };
         String actionEn = switch (intent.intent()) {
             case CANCEL_ORDER ->
-                    "The assistant may explain the rule but cannot cancel the order.";
+                    "I cannot cancel or change the order here; no change was made.";
             case RETURN_ORDER ->
-                    "The assistant may explain the return rule but cannot create a return.";
+                    "I cannot create or approve a return here; no change was made.";
             case REFUND_ORDER ->
-                    "The assistant is read-only and a financial action requires a human.";
+                    "I cannot approve or issue a refund here; no change was made.";
             case PURCHASE_ITEM ->
-                    "The assistant may read the existing order but cannot create purchases or add items.";
+                    "I cannot create purchases or add items here; no change was made.";
             case CHANGE_DELIVERY_ADDRESS ->
-                    "The assistant may read the order but cannot change its delivery address.";
+                    "I cannot change the delivery address here; no change was made.";
             default -> throw new IllegalArgumentException(
                     "No authority claim for " + intent.intent()
             );
@@ -1921,8 +1981,10 @@ public final class DemoCustomerChatService {
         List<DemoCustomerChatTurnResponse.VerifiedClaim> claims =
                 new ArrayList<>();
         claims.add(new DemoCustomerChatTurnResponse.VerifiedClaim(
-                "Ordern är " + order.statusSv() + ".",
-                "The order is " + order.statusEn() + ".",
+                "Din order " + order.orderId() + " har statusen "
+                        + order.statusSv() + ".",
+                "Your order " + order.orderId() + " has status "
+                        + order.statusEn() + ".",
                 List.of(order.evidenceId())
         ));
         claims.add(new DemoCustomerChatTurnResponse.VerifiedClaim(
@@ -1932,8 +1994,8 @@ public final class DemoCustomerChatService {
         ));
         if (supportPolicy != null) {
             claims.add(new DemoCustomerChatTurnResponse.VerifiedClaim(
-                    "Den fiktiva manuella supportvägen är telefon 123.",
-                    "The approved manual support route is phone 123.",
+                    "Du kan ringa 123 så hjälper kundservice dig vidare.",
+                    "You can call 123 and customer service will help you further.",
                     List.of(supportPolicy.evidenceId())
             ));
         }

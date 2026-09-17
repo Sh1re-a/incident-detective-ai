@@ -276,7 +276,7 @@ class IncidentFollowUpServiceTest {
         assertFalse(response.receipt().writeToolsAvailable());
         assertFalse(response.receipt().actionExecuted());
         assertTrue(response.answer().text().contains(
-                "Frågan ligger utanför det frysta körningskvittot"
+                "Jag har inte underlag för den frågan i den här utredningen"
         ));
         assertNull(response.answer().problemLocation().service());
         assertTrue(response.answer().known().isEmpty());

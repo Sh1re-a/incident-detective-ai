@@ -165,10 +165,15 @@ class DemoCustomerChatServiceTest {
         assertEquals("order_status", response.intent().name());
         assertEquals("answered", response.outcome());
         assertEquals("NORD-2051", response.order().orderId());
-        assertEquals(
-                "Jag har kollat det åt dig — din order är skickad och på väg.",
-                response.assistantMessage().textSv()
-        );
+        assertTrue(response.assistantMessage().textSv().contains(
+                "Din order NORD-2051 har statusen Skickad."
+        ));
+        assertTrue(response.assistantMessage().textSv().contains(
+                "Den beräknas komma 18–21 september."
+        ));
+        assertTrue(response.assistantMessage().textSv().contains(
+                "Aster bordslampa i sandbeige"
+        ));
         assertTrue(response.toolEvents().stream()
                 .anyMatch(event -> event.modelSelected()
                         && "get_current_order".equals(event.name())));
@@ -177,7 +182,7 @@ class DemoCustomerChatServiceTest {
                         event.name()
                 ) && "completed".equals(event.status())));
         assertEquals(
-                "Verifierat från den tillåtna källan.",
+                "Din order NORD-2051 har statusen Skickad.",
                 response.verifiedClaims().getFirst().textSv()
         );
         assertEquals(List.of(ORDER_EVIDENCE),
@@ -655,6 +660,55 @@ class DemoCustomerChatServiceTest {
         );
         assertEquals(2, response.receipt().providerCalls());
         assertEquals(2, response.receipt().generationCalls());
+        assertTrue(response.toolEvents().stream()
+                .anyMatch(event -> "compose_customer_answer".equals(
+                        event.name()
+                ) && "failed".equals(event.status())));
+        verifyNoInteractions(ragService);
+        assertControlledAiInvariant(response);
+    }
+
+    @Test
+    void withholdsAnUngroundedResultReturnedAtTheFinalReleaseBoundary() {
+        CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
+        when(router.route(any())).thenReturn(modelRoute(
+                CustomerChatModelRouter.Tool.GET_CURRENT_ORDER,
+                null
+        ));
+        doAnswer(invocation -> {
+            CustomerChatAnswerGateway.Input input = invocation.getArgument(1);
+            CustomerChatAnswerGateway.Claim verified =
+                    input.verifiedClaims().getFirst();
+            CustomerChatAnswerGateway.Result valid = composedAnswer(input);
+            return new CustomerChatAnswerGateway.Result(
+                    new CustomerChatAnswerGateway.Answer(
+                            verified.textSv()
+                                    + " Spårningslänken är https://tracking.invalid/GROUNDING-91D7.",
+                            verified.textEn()
+                                    + " The tracking link is https://tracking.invalid/GROUNDING-91D7.",
+                            List.of(verified)
+                    ),
+                    valid.provider(),
+                    valid.costEstimate()
+            );
+        }).when(answerGateway).generate(eq(true), any());
+
+        DemoCustomerChatTurnResponse response = aiService(router)
+                .run(request("Var är min order?", true));
+
+        assertEquals("unavailable", response.outcome());
+        assertEquals(
+                "CUSTOMER_CHAT_ANSWER_MODEL_RESPONSE_REJECTED",
+                response.error().code()
+        );
+        assertFalse(response.assistantMessage().textSv().contains(
+                "GROUNDING-91D7"
+        ));
+        assertTrue(response.verifiedClaims().isEmpty());
+        assertEquals(
+                "not_released_customer_answer_composition_failed",
+                response.verification().overallOutcome()
+        );
         assertTrue(response.toolEvents().stream()
                 .anyMatch(event -> "compose_customer_answer".equals(
                         event.name()
@@ -1692,33 +1746,18 @@ class DemoCustomerChatServiceTest {
     private CustomerChatAnswerGateway.Result composedAnswer(
             CustomerChatAnswerGateway.Input input
     ) {
-        CustomerChatAnswerGateway.Evidence cited = input.evidence().stream()
-                .filter(evidence -> !CONTEXT_EVIDENCE.equals(evidence.id()))
-                .findFirst()
-                .orElse(input.evidence().isEmpty()
-                        ? null
-                        : input.evidence().getFirst());
         boolean factual = Set.of("answered", "outside_authority")
                 .contains(input.routedOutcome())
                 && !"conversation".equals(input.routedIntent());
-        List<CustomerChatAnswerGateway.Claim> claims;
-        if (factual && cited != null
-                && "protected_boundary".equals(input.routedIntent())) {
-            claims = List.of(new CustomerChatAnswerGateway.Claim(
-                    "Skyddad information lämnas inte ut.",
-                    "Protected information is not disclosed.",
-                    List.of(cited.id())
-            ));
-        } else if (factual && cited != null) {
-            claims = List.of(new CustomerChatAnswerGateway.Claim(
-                    "Verifierat från den tillåtna källan.",
-                    "Verified from the allowed source.",
-                    List.of(cited.id())
-            ));
-        } else {
-            claims = List.of();
-        }
-        String textSv = switch (input.routedIntent()) {
+        List<CustomerChatAnswerGateway.Claim> claims = factual
+                && !"protected_boundary".equals(input.routedIntent())
+                ? input.verifiedClaims()
+                : List.of();
+        String textSv = factual && !claims.isEmpty()
+                ? claims.stream()
+                .map(CustomerChatAnswerGateway.Claim::textSv)
+                .collect(java.util.stream.Collectors.joining(" "))
+                : switch (input.routedIntent()) {
             case "order_status" ->
                     "Jag har kollat det åt dig — din order är skickad och på väg.";
             case "company_knowledge" ->
@@ -1728,10 +1767,14 @@ class DemoCustomerChatServiceTest {
             case "conversation" ->
                     "Absolut — vad vill du att jag hjälper dig med?";
             case "protected_boundary", "unsupported" ->
-                    "Jag kan inte lämna ut den informationen, men jag hjälper dig gärna med din order eller våra offentliga regler.";
+                    "Jag har inte tillgång till privat information, men jag hjälper dig gärna med din order.";
             default -> "Jag hjälper dig gärna vidare med det här.";
         };
-        String textEn = switch (input.routedIntent()) {
+        String textEn = factual && !claims.isEmpty()
+                ? claims.stream()
+                .map(CustomerChatAnswerGateway.Claim::textEn)
+                .collect(java.util.stream.Collectors.joining(" "))
+                : switch (input.routedIntent()) {
             case "order_status" ->
                     "I checked it for you — your order has shipped and is on its way.";
             case "company_knowledge" ->
@@ -1741,7 +1784,7 @@ class DemoCustomerChatServiceTest {
             case "conversation" ->
                     "Of course — what would you like help with?";
             case "protected_boundary", "unsupported" ->
-                    "I cannot disclose that information, but I am happy to help with your order or our public policies.";
+                    "I don't have access to private information, but I am happy to help with your order.";
             default -> "I am happy to help you with this.";
         };
         return new CustomerChatAnswerGateway.Result(

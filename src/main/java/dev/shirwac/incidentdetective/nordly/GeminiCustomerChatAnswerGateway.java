@@ -110,28 +110,6 @@ public final class GeminiCustomerChatAnswerGateway
             "(?i)(?:\\bAIza[0-9a-z_-]{20,}\\b|\\bsk-[0-9a-z_-]{16,}\\b|"
                     + "\\b(?:api[-_ ]?key|password|secret|token)\\s*[:=]\\s*\\S+)"
     );
-    private static final Pattern SWEDISH_BOUNDARY_LANGUAGE = Pattern.compile(
-            "(?:(?:kan|far).{0,24}inte|lamnar.{0,16}inte.{0,16}ut|"
-                    + "delar.{0,16}inte|har inte behorighet|"
-                    + "har (?:inte tillgang(?: till)?|ingen tillgang(?: till)?|"
-                    + "inte mojlighet att (?:lamna.{0,8}ut|dela))|"
-                    + "hall(?:s|er).{0,24}utanfor|skyddad information|"
-                    + "privat information|utanfor min befogenhet)"
-    );
-    private static final Pattern ENGLISH_BOUNDARY_LANGUAGE = Pattern.compile(
-            "(?:cannot|can't|do not disclose|does not disclose|"
-                    + "do not share|does not share|won't share|cannot access|"
-                    + "(?:do not|don't) have access(?: to)?|"
-                    + "kept.{0,24}outside|protected information|"
-                    + "private information|outside my authority|not authorized)"
-    );
-    private static final Pattern NAMED_PROTECTED_DISCLOSURE = Pattern.compile(
-            "\\b\\p{Lu}[\\p{L}'-]{1,30}\\s+"
-                    + "(?:tjanar|tjänar|har lon|har lön|bor pa|bor på|"
-                    + "earns?|is paid|lives at)\\b"
-    );
-    private static final Pattern DECIMAL_DIGIT = Pattern.compile("\\d");
-
     private final GeminiAiProperties properties;
     private final GoogleGenAiClientFactory clientFactory;
     private final GeminiCostEstimator costEstimator;
@@ -317,6 +295,28 @@ public final class GeminiCustomerChatAnswerGateway
                     null
             );
         }
+        if ((requiresEvidenceClaim(
+                input.routedIntent(),
+                input.routedOutcome()
+        ) || "conversation".equals(input.routedIntent()))
+                && !CustomerChatAnswerClaimCoverage.covers(answer)) {
+            throw failure(
+                    ModelProviderFailure.MALFORMED_RESPONSE,
+                    "Gemini customer chat answer contained factual text "
+                            + "outside its cited claims",
+                    null
+            );
+        }
+        if (!CustomerChatAnswerClaimCoverage.claimsWithinVerifiedSet(
+                answer,
+                input.verifiedClaims()
+        )) {
+            throw failure(
+                    ModelProviderFailure.MALFORMED_RESPONSE,
+                    "Gemini customer chat claims exceeded the backend-verified set",
+                    null
+            );
+        }
         String combined = answer.textSv() + '\n' + answer.textEn() + '\n'
                 + answer.claims().stream()
                 .map(claim -> claim.textSv() + '\n' + claim.textEn())
@@ -352,25 +352,9 @@ public final class GeminiCustomerChatAnswerGateway
         if (!exactBoundaryEvidence) {
             throw protectedBoundaryFailure();
         }
-        if (!boundaryText(answer.textSv(), SWEDISH_BOUNDARY_LANGUAGE)
-                || !boundaryText(answer.textEn(), ENGLISH_BOUNDARY_LANGUAGE)
-                || answer.claims().stream().anyMatch(claim ->
-                !claim.citationIds().equals(List.of(DATA_BOUNDARY_EVIDENCE))
-                        || unsafeProtectedText(claim.textSv())
-                        || unsafeProtectedText(claim.textEn()))) {
+        if (!CustomerChatAnswerClaimCoverage.protectedBoundarySafe(answer)) {
             throw protectedBoundaryFailure();
         }
-    }
-
-    private boolean boundaryText(String value, Pattern boundaryLanguage) {
-        String normalized = normalize(value);
-        return boundaryLanguage.matcher(normalized).find()
-                && !unsafeProtectedText(value);
-    }
-
-    private boolean unsafeProtectedText(String value) {
-        return DECIMAL_DIGIT.matcher(value).find()
-                || NAMED_PROTECTED_DISCLOSURE.matcher(value).find();
     }
 
     private ModelProviderException protectedBoundaryFailure() {

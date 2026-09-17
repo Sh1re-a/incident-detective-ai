@@ -47,6 +47,8 @@ class GeminiCustomerChatAnswerGatewayTest {
             "nordly-evidence-manual-support-contact";
     private static final String DATA_BOUNDARY_EVIDENCE =
             "nordly-evidence-data-minimization";
+    private static final String AUTHORITY_EVIDENCE =
+            "nordly-evidence-assistant-operating-role";
 
     private final GoogleGenAiClientFactory clientFactory = mock(
             GoogleGenAiClientFactory.class
@@ -67,6 +69,8 @@ class GeminiCustomerChatAnswerGatewayTest {
         assertTrue(prompt.contains("Jag har inte tillgång till"));
         assertTrue(prompt.contains("I don't have access to"));
         assertTrue(prompt.contains("do not invent or suggest a contact route"));
+        assertTrue(prompt.contains("Every factual sentence in text_sv and text_en"));
+        assertTrue(prompt.contains("Never add a tracking link"));
     }
 
     @Test
@@ -221,6 +225,181 @@ class GeminiCustomerChatAnswerGatewayTest {
     }
 
     @Test
+    void rejectsFactualAnswerSentenceMissingFromCitedClaims() {
+        assertMalformed("""
+                {
+                  "text_sv": "Order NORD-2051 är skickad. Du kan följa paketet via spårningslänken i din leveransbekräftelse.",
+                  "text_en": "Order NORD-2051 has shipped. You can follow the package through the tracking link in your shipping confirmation.",
+                  "claims": [{
+                    "text_sv": "Order NORD-2051 är skickad.",
+                    "text_en": "Order NORD-2051 has shipped.",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }]
+                }
+                """, answeredInput());
+    }
+
+    @Test
+    void rejectsOneUnsupportedFactAppendedToAnOtherwiseCoveredSentence() {
+        assertMalformed("""
+                {
+                  "text_sv": "Order NORD-2051 är skickad med DHL.",
+                  "text_en": "Order NORD-2051 has shipped with DHL.",
+                  "claims": [{
+                    "text_sv": "Order NORD-2051 är skickad.",
+                    "text_en": "Order NORD-2051 has shipped.",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }]
+                }
+                """, answeredInput());
+    }
+
+    @Test
+    void rejectsAClaimWhoseRangePunctuationWasChanged() {
+        CustomerChatAnswerGateway.Claim deliveryClaim =
+                new CustomerChatAnswerGateway.Claim(
+                        "Den beräknas komma 18–21 september.",
+                        "It is expected to arrive September 18–21.",
+                        List.of(ORDER_EVIDENCE)
+                );
+        CustomerChatAnswerGateway.Input input =
+                new CustomerChatAnswerGateway.Input(
+                        "När kommer den?",
+                        "sv",
+                        "order_status",
+                        "answered",
+                        List.of(),
+                        List.of(evidence()),
+                        List.of(deliveryClaim)
+                );
+
+        assertMalformed("""
+                {
+                  "text_sv": "Den beräknas komma 18, 21 september.",
+                  "text_en": "It is expected to arrive September 18, 21.",
+                  "claims": [{
+                    "text_sv": "Den beräknas komma 18–21 september.",
+                    "text_en": "It is expected to arrive September 18–21.",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }]
+                }
+                """, input);
+    }
+
+    @Test
+    void rejectsAPhantomClaimThatDoesNotAppearInTheAnswer() {
+        assertMalformed("""
+                {
+                  "text_sv": "Hej!",
+                  "text_en": "Hi!",
+                  "claims": [{
+                    "text_sv": "Order NORD-2051 är skickad.",
+                    "text_en": "Order NORD-2051 has shipped.",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }]
+                }
+                """, answeredInput());
+    }
+
+    @Test
+    void rejectsAFactualTailAfterANonFactualBridge() {
+        assertMalformed("""
+                {
+                  "text_sv": "Jag hjälper dig gärna vidare, och spårningslänken finns i leveransbekräftelsen.",
+                  "text_en": "I am happy to help further, and the tracking link is in the shipping confirmation.",
+                  "claims": [{
+                    "text_sv": "Order NORD-2051 är skickad.",
+                    "text_en": "Order NORD-2051 has shipped.",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }]
+                }
+                """, answeredInput());
+    }
+
+    @Test
+    void acceptsNaturalReplyWhenEveryFactCopiesAVerifiedClaim() {
+        CustomerChatAnswerGateway.Result result = gateway(properties(
+                "test-only-key"
+        )).decodeResponse(
+                response("""
+                        {
+                          "text_sv": "Hej! Order NORD-2051 är skickad.",
+                          "text_en": "Hi! Order NORD-2051 has shipped.",
+                          "claims": [{
+                            "text_sv": "Order NORD-2051 är skickad.",
+                            "text_en": "Order NORD-2051 has shipped.",
+                            "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                          }]
+                        }
+                        """, FinishReason.Known.STOP),
+                answeredInput(),
+                3
+        );
+
+        assertEquals(
+                "Hej! Order NORD-2051 är skickad.",
+                result.answer().textSv()
+        );
+    }
+
+    @Test
+    void acceptsBriefEmpathyWhileKeepingTheOrderFactInAClaim() {
+        CustomerChatAnswerGateway.Result result = gateway(properties(
+                "test-only-key"
+        )).decodeResponse(
+                response("""
+                        {
+                          "text_sv": "Hej! Jag förstår att väntan känns frustrerande. Order NORD-2051 är skickad. Jag hjälper dig gärna vidare.",
+                          "text_en": "Hi! I understand that waiting is frustrating. Order NORD-2051 has shipped. I am happy to help further.",
+                          "claims": [{
+                            "text_sv": "Order NORD-2051 är skickad.",
+                            "text_en": "Order NORD-2051 has shipped.",
+                            "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                          }]
+                        }
+                        """, FinishReason.Known.STOP),
+                answeredInput(),
+                3
+        );
+
+        assertTrue(result.answer().textSv().contains("väntan"));
+    }
+
+    @Test
+    void rejectsFactualConversationProseWithoutClaims() {
+        CustomerChatAnswerGateway.Input input = new CustomerChatAnswerGateway.Input(
+                "När har ni öppet?",
+                "sv",
+                "conversation",
+                "answered",
+                List.of(evidence())
+        );
+
+        assertMalformed("""
+                {
+                  "text_sv": "Nordlys kundservice har öppet till 17.",
+                  "text_en": "Nordly customer service is open until 17.",
+                  "claims": []
+                }
+                """, input);
+    }
+
+    @Test
+    void rejectsAClaimLaunderedThroughAllowedButNonSupportingEvidence() {
+        assertMalformed("""
+                {
+                  "text_sv": "Spårningslänken finns i leveransbekräftelsen.",
+                  "text_en": "The tracking link is in the shipping confirmation.",
+                  "claims": [{
+                    "text_sv": "Spårningslänken finns i leveransbekräftelsen.",
+                    "text_en": "The tracking link is in the shipping confirmation.",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }]
+                }
+                """, answeredInput());
+    }
+
+    @Test
     void rejectsAClaimThatTheAssistantPerformedABusinessAction() {
         assertMalformed("""
                 {
@@ -277,27 +456,18 @@ class GeminiCustomerChatAnswerGatewayTest {
     }
 
     @Test
-    void acceptsOnlyANaturalBoundaryFromTheExactBoundaryPolicy() {
-        CustomerChatAnswerGateway.Result result = gateway(properties(
-                "test-only-key"
-        )).decodeResponse(
-                response("""
-                        {
-                          "text_sv": "Jag kan inte lämna ut skyddad information, men jag hjälper dig gärna med din order.",
-                          "text_en": "I cannot disclose protected information, but I am happy to help with your order.",
-                          "claims": [{
-                            "text_sv": "Individuella löneuppgifter är privat personalinformation.",
-                            "text_en": "Individual compensation is private employee information.",
-                            "citation_ids": ["nordly-evidence-data-minimization"]
-                          }]
-                        }
-                        """, FinishReason.Known.STOP),
-                protectedBoundaryInput(),
-                2
-        );
-
-        assertEquals("Jag kan inte lämna ut skyddad information, men jag hjälper dig gärna med din order.",
-                result.answer().textSv());
+    void rejectsModelAuthoredClaimsForAProtectedBoundary() {
+        assertMalformed("""
+                {
+                  "text_sv": "Jag kan inte lämna ut skyddad information, men jag hjälper dig gärna med din order.",
+                  "text_en": "I cannot disclose protected information, but I am happy to help with your order.",
+                  "claims": [{
+                    "text_sv": "Individuella löneuppgifter är privat personalinformation.",
+                    "text_en": "Individual compensation is private employee information.",
+                    "citation_ids": ["nordly-evidence-data-minimization"]
+                  }]
+                }
+                """, protectedBoundaryInput());
     }
 
     @Test
@@ -317,6 +487,28 @@ class GeminiCustomerChatAnswerGatewayTest {
         );
 
         assertTrue(result.answer().claims().isEmpty());
+    }
+
+    @Test
+    void rejectsALogisticsTailFromAProtectedBoundaryReply() {
+        assertMalformed("""
+                {
+                  "text_sv": "Jag har inte möjlighet att lämna ut privat information. Spårningslänken finns i leveransbekräftelsen.",
+                  "text_en": "I do not have access to private information. The tracking link is in the shipping confirmation.",
+                  "claims": []
+                }
+                """, protectedBoundaryInput());
+    }
+
+    @Test
+    void rejectsAnUnrelatedFactHiddenBehindAProtectedBoundary() {
+        assertMalformed("""
+                {
+                  "text_sv": "Jag har inte tillgång till privat information. Ordern är levererad.",
+                  "text_en": "I do not have access to private information. The order was delivered.",
+                  "claims": []
+                }
+                """, protectedBoundaryInput());
     }
 
     @Test
@@ -415,7 +607,9 @@ class GeminiCustomerChatAnswerGatewayTest {
                         "sv",
                         "cancel_order",
                         "outside_authority",
-                        List.of(contactEvidence())
+                        List.of(),
+                        List.of(authorityEvidence(), contactEvidence()),
+                        List.of(cancellationBoundaryClaim(), contactClaim())
                 );
 
         CustomerChatAnswerGateway.Result result = gateway(properties(
@@ -423,20 +617,27 @@ class GeminiCustomerChatAnswerGatewayTest {
         )).decodeResponse(
                 response("""
                         {
-                          "text_sv": "Jag kan inte avbeställa ordern här. Ring 123.",
-                          "text_en": "I cannot cancel the order here. Call 123.",
-                          "claims": [{
-                            "text_sv": "Du kan ringa 123.",
-                            "text_en": "You can call 123.",
-                            "citation_ids": ["nordly-evidence-manual-support-contact"]
-                          }]
+                          "text_sv": "Jag kan inte avbeställa ordern här. Du kan ringa 123.",
+                          "text_en": "I cannot cancel the order here. You can call 123.",
+                          "claims": [
+                            {
+                              "text_sv": "Jag kan inte avbeställa ordern här.",
+                              "text_en": "I cannot cancel the order here.",
+                              "citation_ids": ["nordly-evidence-assistant-operating-role"]
+                            },
+                            {
+                              "text_sv": "Du kan ringa 123.",
+                              "text_en": "You can call 123.",
+                              "citation_ids": ["nordly-evidence-manual-support-contact"]
+                            }
+                          ]
                         }
                         """, FinishReason.Known.STOP),
                 input,
                 3
         );
 
-        assertEquals("Jag kan inte avbeställa ordern här. Ring 123.",
+        assertEquals("Jag kan inte avbeställa ordern här. Du kan ringa 123.",
                 result.answer().textSv());
     }
 
@@ -447,11 +648,11 @@ class GeminiCustomerChatAnswerGatewayTest {
         )).decodeResponse(
                 response("""
                         {
-                          "text_sv": "Hej! Ordern är skickad.",
-                          "text_en": "Hi! The order has shipped.",
+                          "text_sv": "Hej! Order NORD-2051 är skickad.",
+                          "text_en": "Hi! Order NORD-2051 has shipped.",
                           "claims": [{
-                            "text_sv": "Ordern är skickad.",
-                            "text_en": "The order has shipped.",
+                            "text_sv": "Order NORD-2051 är skickad.",
+                            "text_en": "Order NORD-2051 has shipped.",
                             "citation_ids": ["nordly-demo-order-2051-snapshot"]
                           }]
                         }
@@ -460,7 +661,8 @@ class GeminiCustomerChatAnswerGatewayTest {
                 1
         );
 
-        assertEquals("Hej! Ordern är skickad.", result.answer().textSv());
+        assertEquals("Hej! Order NORD-2051 är skickad.",
+                result.answer().textSv());
     }
 
     @Test
@@ -566,7 +768,9 @@ class GeminiCustomerChatAnswerGatewayTest {
                 "sv",
                 "order_status",
                 "answered",
-                List.of(evidence())
+                List.of(),
+                List.of(evidence()),
+                List.of(orderStatusClaim())
         );
     }
 
@@ -588,7 +792,9 @@ class GeminiCustomerChatAnswerGatewayTest {
         return new CustomerChatAnswerGateway.Evidence(
                 ORDER_EVIDENCE,
                 "Aktuell order",
-                "Order NORD-2051 är skickad."
+                "Order NORD-2051 är skickad och beräknas anlända mellan "
+                        + "18 och 21 september. Order NORD-2051 has shipped "
+                        + "and is expected to arrive between September 18 and 21."
         );
     }
 
@@ -597,15 +803,49 @@ class GeminiCustomerChatAnswerGatewayTest {
                 CONTACT_EVIDENCE,
                 "Godkänd supportväg",
                 "För ett legitimt orderärende kan kunden ringa det syntetiska "
-                        + "supportnumret 123."
+                        + "supportnumret 123. For a legitimate order matter, "
+                        + "the customer can call the synthetic support number 123."
+        );
+    }
+
+    private CustomerChatAnswerGateway.Evidence authorityEvidence() {
+        return new CustomerChatAnswerGateway.Evidence(
+                AUTHORITY_EVIDENCE,
+                "Assistentens befogenhet",
+                "Jag kan inte avbeställa ordern här. "
+                        + "I cannot cancel the order here."
+        );
+    }
+
+    private CustomerChatAnswerGateway.Claim orderStatusClaim() {
+        return new CustomerChatAnswerGateway.Claim(
+                "Order NORD-2051 är skickad.",
+                "Order NORD-2051 has shipped.",
+                List.of(ORDER_EVIDENCE)
+        );
+    }
+
+    private CustomerChatAnswerGateway.Claim cancellationBoundaryClaim() {
+        return new CustomerChatAnswerGateway.Claim(
+                "Jag kan inte avbeställa ordern här.",
+                "I cannot cancel the order here.",
+                List.of(AUTHORITY_EVIDENCE)
+        );
+    }
+
+    private CustomerChatAnswerGateway.Claim contactClaim() {
+        return new CustomerChatAnswerGateway.Claim(
+                "Du kan ringa 123.",
+                "You can call 123.",
+                List.of(CONTACT_EVIDENCE)
         );
     }
 
     private String validAnswer() {
         return """
                 {
-                  "text_sv": "Hej! Din order NORD-2051 är skickad.",
-                  "text_en": "Hi! Your order NORD-2051 has shipped.",
+                  "text_sv": "Hej! Order NORD-2051 är skickad.",
+                  "text_en": "Hi! Order NORD-2051 has shipped.",
                   "claims": [{
                     "text_sv": "Order NORD-2051 är skickad.",
                     "text_en": "Order NORD-2051 has shipped.",

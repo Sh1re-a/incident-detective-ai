@@ -86,7 +86,7 @@
       "impact": "I det syntetiska fallet misslyckades betalningar i kassan.",
       "what_is_known": [
         "Larmet löste ut när antalet HTTP 5xx-svar uppmättes till 3 händelser under 30 sekunder; gränsen är minst 3 händelser.",
-        "Java har inte frisläppt någon diagnos."
+        "Jag kan därför inte bekräfta någon orsak ännu."
       ],
       "what_remains_unknown": [
         "Rotorsak och berörd tjänst är inte fastställda."
@@ -132,7 +132,7 @@
           "impact": "I det syntetiska fallet misslyckades betalningar i kassan.",
           "what_is_known": [
             "Larmet löste ut när antalet HTTP 5xx-svar uppmättes till 3 händelser under 30 sekunder; gränsen är minst 3 händelser.",
-            "Java har inte frisläppt någon diagnos."
+            "Jag kan därför inte bekräfta någon orsak ännu."
           ],
           "what_remains_unknown": [
             "Rotorsak och berörd tjänst är inte fastställda."

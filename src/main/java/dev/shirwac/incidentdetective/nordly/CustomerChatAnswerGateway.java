@@ -26,7 +26,8 @@ public interface CustomerChatAnswerGateway {
             String routedIntent,
             String routedOutcome,
             List<DemoCustomerChatTurnRequest.ConversationTurn> recentConversation,
-            List<Evidence> evidence
+            List<Evidence> evidence,
+            List<Claim> verifiedClaims
     ) {
         public Input {
             customerMessage = required(
@@ -63,6 +64,34 @@ public interface CustomerChatAnswerGateway {
                         "evidence items must be non-null and have unique IDs"
                 );
             }
+            verifiedClaims = verifiedClaims == null
+                    ? List.of()
+                    : List.copyOf(verifiedClaims);
+            if (verifiedClaims.size() > 3
+                    || verifiedClaims.stream().anyMatch(item -> item == null)) {
+                throw new IllegalArgumentException(
+                        "verifiedClaims must contain at most three non-null claims"
+                );
+            }
+        }
+
+        public Input(
+                String customerMessage,
+                String locale,
+                String routedIntent,
+                String routedOutcome,
+                List<DemoCustomerChatTurnRequest.ConversationTurn> recentConversation,
+                List<Evidence> evidence
+        ) {
+            this(
+                    customerMessage,
+                    locale,
+                    routedIntent,
+                    routedOutcome,
+                    recentConversation,
+                    evidence,
+                    List.of()
+            );
         }
 
         public Input(
@@ -78,7 +107,8 @@ public interface CustomerChatAnswerGateway {
                     routedIntent,
                     routedOutcome,
                     List.of(),
-                    evidence
+                    evidence,
+                    List.of()
             );
         }
     }

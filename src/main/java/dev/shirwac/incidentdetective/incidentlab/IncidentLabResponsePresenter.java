@@ -346,7 +346,7 @@ final class IncidentLabResponsePresenter {
                         impact(scenario, alarm.incidentFamily()),
                         List.of(
                                 alarmText(alarm),
-                                "Java har inte frisläppt någon diagnos."
+                                "Jag kan därför inte bekräfta någon orsak ännu."
                         ),
                         List.of(
                                 "Rotorsak och berörd tjänst är inte fastställda."

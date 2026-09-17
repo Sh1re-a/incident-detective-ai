@@ -132,11 +132,11 @@ const COPY = {
     send: "Skicka",
     supportSuggestions: ["Vad beställde jag?", "När har kundservice öppet?", "Kan jag få pengarna tillbaka?"],
     waiting: "Nordly undersöker…",
-    slow: "Det tar lite längre än vanligt. Vi väntar fortfarande på backendens kompletta kvitto.",
+    slow: "Det tar lite längre än vanligt. Jag arbetar fortfarande med ditt svar.",
     retry: "Försök igen",
     confirmTitle: "Sök i Nordlys godkända dokument?",
     confirmBody: "För att svara behöver jag göra en live-sökning i företagets policydokument.",
-    noProviderYet: "Inga provideranrop har gjorts ännu.",
+    noProviderYet: "Ingen sökning har startat ännu.",
     cancel: "Avbryt",
     searchDocuments: "Sök i dokumenten",
     behindAnswer: "Så kom svaret fram",
@@ -326,13 +326,25 @@ function clientId(prefix: string) {
 }
 
 function apiErrorText(error: unknown, locale: Locale) {
-  if (error instanceof IncidentApiError) return error.message;
-  return locale === "sv" ? "Backend kunde inte lämna ett svar." : "The backend could not return an answer.";
+  void error;
+  return locale === "sv"
+    ? "Jag kunde inte slutföra svaret just nu. Försök igen."
+    : "I could not complete the answer right now. Please try again.";
 }
 
 function clock(value: string) {
   const match = value.match(/T(\d{2}:\d{2}:\d{2})/);
   return match?.[1] ?? value;
+}
+
+function serviceLabel(value: string, locale: Locale) {
+  if (value.toUpperCase() === "PAYMENT_ADAPTER") {
+    return localized(locale, "betalningsflödet", "the payment flow");
+  }
+  if (value.toLowerCase() === "backend") {
+    return localized(locale, "köpflödet", "the checkout flow");
+  }
+  return value.replaceAll("_", " ").toLowerCase();
 }
 
 function shortDate(value: string, locale: Locale) {
@@ -682,7 +694,10 @@ export default function NordlyV2App() {
       const answer = suggestionId === "when"
         ? copy.timeAnswer(
           logs.map((log) => clock(log.observed_at)).join(", "),
-          run.alarm_receipt?.service ?? logs[0]?.content.service ?? "backend",
+          serviceLabel(
+            run.alarm_receipt?.service ?? logs[0]?.content.service ?? "backend",
+            locale,
+          ),
         )
         : suggestionId === "what_unknown_receipt"
           ? presentation.what_remains_unknown.join(" ")
@@ -1553,7 +1568,7 @@ function DriftAgentView({
                       : localized(locale, "Körningen skapade inget larm.", "The run did not create an alert.")}</p>
                     <p>{presentation?.what_happened}</p>
                     <p>{presentation?.impact}</p>
-                    {hasAlarm ? <div className="incident-strip"><AlertIcon /><strong>{count} × {status}</strong><span>·</span><span>{timeRange}</span><span>·</span><span>{service.replaceAll("_", " ")}</span></div> : null}
+                    {hasAlarm ? <div className="incident-strip"><AlertIcon /><strong>{count} × {status}</strong><span>·</span><span>{timeRange}</span><span>·</span><span>{serviceLabel(service, locale)}</span></div> : null}
                   </MessageBubble>
                 ) : null}
                 {playbackStage === 2 ? (
@@ -1583,8 +1598,8 @@ function DriftAgentView({
                     ) : null}
                     <button type="button" className="disclosure-row" onClick={() => openEvidence()}><span>{copy.behindReport}</span><ChevronRightIcon /></button>
                     <div className="verified-row"><CheckIcon />{session.mode === "live_ai"
-                      ? localized(locale, "Syntetiskt fall · ny backendkörning · endast läsning", "Synthetic case · new backend run · read only")
-                      : localized(locale, "Historisk backendkörning · 0 nya AI-anrop", "Historical backend run · 0 new AI calls")}</div>
+                      ? localized(locale, "Liveanalys · syntetiskt fall · inget ändrat", "Live analysis · synthetic case · nothing changed")
+                      : localized(locale, "Verifierad repris · inget ändrat", "Verified replay · nothing changed")}</div>
                   </MessageBubble>
                 ) : null}
               </AnimatePresence>
@@ -1595,7 +1610,7 @@ function DriftAgentView({
                   <MessageBubble side="assistant" tone={turn.error ? "error" : "default"}>
                     {turn.pending ? <TypingIndicator label={slow ? copy.slow : copy.waiting} /> : null}
                     {turn.localAnswer ? <p>{turn.localAnswer}</p> : null}
-                    {turn.localAnswer ? <div className="verified-row"><CheckIcon />{localized(locale, "Från körningskvittot · inget nytt AI-anrop", "From the run receipt · no new AI call")}</div> : null}
+                    {turn.localAnswer ? <div className="verified-row"><CheckIcon />{localized(locale, "Baserat på den här rapporten · inget ändrat", "Based on this report · nothing changed")}</div> : null}
                     {turn.response ? (
                       <>
                         <p>{turn.response.answer.text}</p>

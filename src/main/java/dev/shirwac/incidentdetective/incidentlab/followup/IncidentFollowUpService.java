@@ -537,8 +537,8 @@ public final class IncidentFollowUpService {
 
     private String outsideText(String locale, String boundary) {
         return local(locale,
-                "Jag kan förklara den här incidentens signaler, källor, påverkan och verifiering. Frågan ligger utanför det frysta körningskvittot. ",
-                "I can explain this incident's signals, sources, impact, and verification. The question is outside the frozen run receipt. ")
+                "Jag kan förklara den här incidentens signaler, källor, påverkan och verifiering. Jag har inte underlag för den frågan i den här utredningen. ",
+                "I can explain this incident's signals, sources, impact, and verification. I do not have support for that question in this investigation. ")
                 + boundary;
     }
 

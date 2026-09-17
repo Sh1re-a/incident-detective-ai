@@ -54,7 +54,7 @@ public final class IncidentFollowUpSnapshotProjector {
                 "java://incident-lab/verification/"
                         + run.scenario().scenarioId(),
                 "java_verification",
-                "Java verification receipt",
+                "Kontrollkvitto",
                 javaDetail,
                 IncidentFollowUpResponse.TargetScene.JAVA,
                 javaId

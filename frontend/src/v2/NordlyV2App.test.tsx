@@ -591,7 +591,9 @@ describe("Nordly v2", () => {
     await user.click(await screen.findByRole("button", { name: "Starta live-utredning" }));
 
     expect(await screen.findByRole("heading", { name: "Live-utredningen kunde inte slutföras." })).toBeInTheDocument();
-    expect(screen.getByText("Modelltjänsten svarade inte.")).toBeInTheDocument();
+    expect(screen.getByText(
+      "Jag kunde inte slutföra svaret just nu. Försök igen.",
+    )).toBeInTheDocument();
     expect(screen.getByText("Inget svar ersattes automatiskt med replay.")).toBeInTheDocument();
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/runs/recorded-replay"))).toHaveLength(0);
   });
