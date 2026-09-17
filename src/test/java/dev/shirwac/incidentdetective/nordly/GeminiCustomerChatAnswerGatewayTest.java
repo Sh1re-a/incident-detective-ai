@@ -304,6 +304,50 @@ class GeminiCustomerChatAnswerGatewayTest {
     }
 
     @Test
+    void acceptsNaturalSwedishAndContractedEnglishNoAccessWording() {
+        CustomerChatAnswerGateway.Result result = gateway(properties(
+                "test-only-key"
+        )).decodeResponse(
+                response("""
+                        {
+                          "text_sv": "Jag har inte tillgång till privata löneuppgifter, men jag hjälper dig gärna med din order.",
+                          "text_en": "I don't have access to private salary data, but I am happy to help with your order.",
+                          "claims": []
+                        }
+                        """, FinishReason.Known.STOP),
+                protectedBoundaryInput(),
+                2
+        );
+
+        assertEquals(
+                "Jag har inte tillgång till privata löneuppgifter, men jag hjälper dig gärna med din order.",
+                result.answer().textSv()
+        );
+    }
+
+    @Test
+    void acceptsNaturalSwedishPossibilityAndEnglishDoNotHaveAccessWording() {
+        CustomerChatAnswerGateway.Result result = gateway(properties(
+                "test-only-key"
+        )).decodeResponse(
+                response("""
+                        {
+                          "text_sv": "Jag har inte möjlighet att lämna ut individuella löneuppgifter, men jag kan hjälpa med en orderfråga.",
+                          "text_en": "I do not have access to individual compensation data, but I can help with an order question.",
+                          "claims": []
+                        }
+                        """, FinishReason.Known.STOP),
+                protectedBoundaryInput(),
+                2
+        );
+
+        assertEquals(
+                "I do not have access to individual compensation data, but I can help with an order question.",
+                result.answer().textEn()
+        );
+    }
+
+    @Test
     void rejectsAnUnsupportedContactRouteWithZeroClaims() {
         CustomerChatAnswerGateway.Input conversationInput =
                 new CustomerChatAnswerGateway.Input(

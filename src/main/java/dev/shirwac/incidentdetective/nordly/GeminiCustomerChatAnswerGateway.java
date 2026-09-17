@@ -113,12 +113,15 @@ public final class GeminiCustomerChatAnswerGateway
     private static final Pattern SWEDISH_BOUNDARY_LANGUAGE = Pattern.compile(
             "(?:(?:kan|far).{0,24}inte|lamnar.{0,16}inte.{0,16}ut|"
                     + "delar.{0,16}inte|har inte behorighet|"
+                    + "har (?:inte tillgang(?: till)?|ingen tillgang(?: till)?|"
+                    + "inte mojlighet att (?:lamna.{0,8}ut|dela))|"
                     + "hall(?:s|er).{0,24}utanfor|skyddad information|"
                     + "privat information|utanfor min befogenhet)"
     );
     private static final Pattern ENGLISH_BOUNDARY_LANGUAGE = Pattern.compile(
             "(?:cannot|can't|do not disclose|does not disclose|"
                     + "do not share|does not share|won't share|cannot access|"
+                    + "(?:do not|don't) have access(?: to)?|"
                     + "kept.{0,24}outside|protected information|"
                     + "private information|outside my authority|not authorized)"
     );
