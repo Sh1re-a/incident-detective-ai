@@ -8,7 +8,7 @@ public record LiveAiBudgetProperties(
         long dailyLimitMicroUsd,
         String priceProfileVersion
 ) {
-    public static final long DEFAULT_DAILY_LIMIT_MICRO_USD = 200_000;
+    public static final long DEFAULT_DAILY_LIMIT_MICRO_USD = 300_000;
     public static final String DEFAULT_PRICE_PROFILE_VERSION =
             "gemini-standard-2026-09-15-v1";
 

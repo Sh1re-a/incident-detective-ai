@@ -204,7 +204,7 @@ class CapabilitiesApiTest {
                         .value(28_000))
                 .andExpect(jsonPath(
                         "$.live_ai.budget.daily_live_run_limit"
-                ).value(20))
+                ).value(60))
                 .andExpect(jsonPath("$.live_ai.budget.daily_quota_scope")
                         .value("process_local"))
                 .andExpect(jsonPath("$.generated_cases.enabled").value(true))
