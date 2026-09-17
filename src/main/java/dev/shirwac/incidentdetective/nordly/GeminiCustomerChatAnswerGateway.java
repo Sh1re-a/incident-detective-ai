@@ -351,7 +351,6 @@ public final class GeminiCustomerChatAnswerGateway
         }
         if (!boundaryText(answer.textSv(), SWEDISH_BOUNDARY_LANGUAGE)
                 || !boundaryText(answer.textEn(), ENGLISH_BOUNDARY_LANGUAGE)
-                || answer.claims().isEmpty()
                 || answer.claims().stream().anyMatch(claim ->
                 !claim.citationIds().equals(List.of(DATA_BOUNDARY_EVIDENCE))
                         || unsafeProtectedText(claim.textSv())
@@ -458,7 +457,8 @@ public final class GeminiCustomerChatAnswerGateway
             String routedIntent,
             String routedOutcome
     ) {
-        return !"conversation".equals(routedIntent)
+        return !Set.of("conversation", PROTECTED_BOUNDARY_INTENT)
+                .contains(routedIntent)
                 && Set.of("answered", "outside_authority")
                 .contains(routedOutcome);
     }

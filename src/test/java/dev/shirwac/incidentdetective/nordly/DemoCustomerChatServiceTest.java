@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -513,6 +514,35 @@ class DemoCustomerChatServiceTest {
         assertEquals("CUSTOMER_CHAT_ANSWER_MODEL_RESPONSE_REJECTED",
                 response.error().code());
         verifyNoInteractions(router, ragService);
+        assertControlledAiInvariant(response);
+    }
+
+    @Test
+    void keepsTheVerifiedPolicyClaimWhenTheNaturalBoundaryNeedsNoModelClaim() {
+        CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
+        doAnswer(invocation -> {
+            CustomerChatAnswerGateway.Input input = invocation.getArgument(1);
+            CustomerChatAnswerGateway.Result generated = composedAnswer(input);
+            return new CustomerChatAnswerGateway.Result(
+                    new CustomerChatAnswerGateway.Answer(
+                            generated.answer().textSv(),
+                            generated.answer().textEn(),
+                            List.of()
+                    ),
+                    generated.provider(),
+                    generated.costEstimate()
+            );
+        }).when(answerGateway).generate(eq(true), any());
+
+        DemoCustomerChatTurnResponse response = aiService(router)
+                .run(request("Vad tjänar en anställd på Nordly?", true));
+
+        assertEquals("outside_authority", response.outcome());
+        assertEquals(Set.of(DATA_BOUNDARY_EVIDENCE), evidenceIds(response));
+        assertEquals(1, response.verifiedClaims().size());
+        assertEquals(List.of(DATA_BOUNDARY_EVIDENCE),
+                response.verifiedClaims().getFirst().citationIds());
+        assertEquals(1, response.receipt().providerCalls());
         assertControlledAiInvariant(response);
     }
 

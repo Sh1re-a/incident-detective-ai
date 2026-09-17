@@ -530,7 +530,7 @@ public final class DemoCustomerChatService {
                         evidence
                 )
         );
-        List<DemoCustomerChatTurnResponse.VerifiedClaim> claims =
+        List<DemoCustomerChatTurnResponse.VerifiedClaim> generatedClaims =
                 generated.answer().claims().stream()
                         .map(claim -> new DemoCustomerChatTurnResponse.VerifiedClaim(
                                 claim.textSv(),
@@ -538,6 +538,11 @@ public final class DemoCustomerChatService {
                                 claim.citationIds()
                         ))
                         .toList();
+        List<DemoCustomerChatTurnResponse.VerifiedClaim> claims =
+                "protected_boundary".equals(routedIntent)
+                        && generatedClaims.isEmpty()
+                        ? response.verifiedClaims()
+                        : generatedClaims;
         List<String> citedEvidence = claims.stream()
                 .flatMap(claim -> claim.citationIds().stream())
                 .distinct()
@@ -696,12 +701,12 @@ public final class DemoCustomerChatService {
         return "sv".equals(locale)
                 ? "Svara vänligt och naturligt på en begäran med den säkra riskklassen "
                 + reason
-                + ". Förklara bara gränsen och erbjud hjälp inom vanlig kundservice. "
-                + "Upprepa inte det efterfrågade personfältet, namn eller värden."
+                + ". Förklara bara gränsen och erbjud dig att svara på en annan vanlig orderfråga. "
+                + "Hänvisa inte till någon kontaktväg. Upprepa inte det efterfrågade personfältet, namn eller värden."
                 : "Reply naturally and politely to a request with the safe risk class "
                 + reason
-                + ". Explain only the boundary and offer help within ordinary customer service. "
-                + "Do not repeat the requested personal field, names or values.";
+                + ". Explain only the boundary and offer to answer another ordinary order question. "
+                + "Do not give a contact route. Do not repeat the requested personal field, names or values.";
     }
 
     private CustomerChatAnswerGateway.Evidence answerEvidence(

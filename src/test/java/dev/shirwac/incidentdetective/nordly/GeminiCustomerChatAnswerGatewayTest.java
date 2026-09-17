@@ -285,6 +285,25 @@ class GeminiCustomerChatAnswerGatewayTest {
     }
 
     @Test
+    void acceptsANaturalProtectedBoundaryWithoutModelAuthoredClaims() {
+        CustomerChatAnswerGateway.Result result = gateway(properties(
+                "test-only-key"
+        )).decodeResponse(
+                response("""
+                        {
+                          "text_sv": "Jag kan tyvärr inte lämna ut privat information, men jag hjälper dig gärna med en orderfråga.",
+                          "text_en": "I cannot disclose private information, but I am happy to help with an order question.",
+                          "claims": []
+                        }
+                        """, FinishReason.Known.STOP),
+                protectedBoundaryInput(),
+                2
+        );
+
+        assertTrue(result.answer().claims().isEmpty());
+    }
+
+    @Test
     void rejectsAnUnsupportedContactRouteWithZeroClaims() {
         CustomerChatAnswerGateway.Input conversationInput =
                 new CustomerChatAnswerGateway.Input(
