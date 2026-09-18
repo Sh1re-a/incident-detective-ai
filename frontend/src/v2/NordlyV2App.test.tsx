@@ -427,12 +427,12 @@ describe("Nordly v2", () => {
     expect(screen.queryByText("Live-AI pausad · se replay")).not.toBeInTheDocument();
     expect(screen.queryByText("Hej Shirre! Vad kan jag hjälpa dig med?")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Skriv till Nordly…" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Spela verifierad replay" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Visa säkerhetsreplay" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kontrollera AI igen" })).toBeInTheDocument();
     expect(screen.getByText("Verifierade källor · Endast läsning · Interaktiv AI-demo")).toBeInTheDocument();
     expect(screen.getByText("Portfolio-demo med syntetisk data · Använd Live-AI ansvarsfullt – begränsad dagskvot")).toBeInTheDocument();
     expect(screen.queryByText("All data är syntetisk")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Spela verifierad replay" }));
+    await user.click(screen.getByRole("button", { name: "Visa säkerhetsreplay" }));
     expect(await screen.findByText("När syns pengarna efter en återbetalning?")).toBeInTheDocument();
     const supportEndButton = screen.getByRole("button", { name: "Avsluta samtal" });
     expect(supportEndButton).toBeInTheDocument();
@@ -445,14 +445,16 @@ describe("Nordly v2", () => {
 
     await user.click(screen.getByRole("button", { name: "Driftagent" }));
     expect(await screen.findByRole("heading", { name: "Driftagenten väntar på en signal." })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Spela verifierad replay" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Visa säkerhetsreplay" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kontrollera AI igen" })).toBeInTheDocument();
     expect(screen.queryByText("Live-AI pausad · se replay")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
     expect(screen.getByText(/Starta ett syntetiskt larm/)).toBeInTheDocument();
-    expect(screen.getByText("Historisk inspelning · 0 nya AI-anrop")).toBeInTheDocument();
+    expect(screen.getByText(
+      "Historisk säkerhetskörning · osäkert svar stoppas · 0 nya AI-anrop",
+    )).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Spela verifierad replay" }));
+    await user.click(screen.getByRole("button", { name: "Visa säkerhetsreplay" }));
     const driftEndButton = await screen.findByRole("button", { name: "Avsluta samtal" });
     expect(driftEndButton.closest(".agent-session-header")).toBeInTheDocument();
     expect(await screen.findByRole("textbox", { name: "Fråga om rapporten…" }, { timeout: 4_500 })).toBeDisabled();
@@ -500,7 +502,7 @@ describe("Nordly v2", () => {
     render(<NordlyV2App />);
     await user.click(screen.getByRole("button", { name: "Driftagent" }));
     expect(await screen.findByRole("button", { name: "Starta live-utredning" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Spela verifierad replay" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Visa säkerhetsreplay" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Starta live-utredning" }));
 
     const input = await screen.findByRole("textbox", { name: "Fråga om rapporten…" }, { timeout: 4_500 });

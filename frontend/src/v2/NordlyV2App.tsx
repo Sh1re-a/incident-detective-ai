@@ -149,16 +149,16 @@ const COPY = {
     readOnly: "Endast läst · inget ändrat",
     newConversation: "Ny konversation",
     endConversation: "Avsluta samtal",
-    replayPill: "Verifierad replay",
+    replayPill: "Säkerhetsreplay",
     driftIdleTitle: "Driftagenten väntar på en signal.",
     driftIdleBody: "Starta ett syntetiskt larm och se hur agenten granskar bevis, rapporterar vad den vet och svarar på dina frågor.",
-    startReplay: "Spela verifierad replay",
+    startReplay: "Visa säkerhetsreplay",
     startDriftAlarm: "Starta live-utredning",
     liveAvailable: "Live-AI tillgänglig",
     livePaused: "Live-AI pausad · se replay",
     liveOffline: "AI offline · se replay",
     liveUnknown: "AI-status okänd · se replay",
-    replayTruth: "Historisk inspelning · 0 nya AI-anrop",
+    replayTruth: "Historisk säkerhetskörning · osäkert svar stoppas · 0 nya AI-anrop",
     liveTruth: "Ny AI-körning · syntetisk data · endast läsning",
     replayChatPlaceholder: "Fri chatt kräver Live-AI",
     replayNotAvailable: "Replay är inte tillgänglig",
@@ -240,16 +240,16 @@ const COPY = {
     readOnly: "Read only · nothing changed",
     newConversation: "New conversation",
     endConversation: "End conversation",
-    replayPill: "Verified replay",
+    replayPill: "Safety replay",
     driftIdleTitle: "The Operations agent is waiting for a signal.",
     driftIdleBody: "Start a synthetic alert and watch the agent inspect evidence, report what it knows, and answer your questions.",
-    startReplay: "Play verified replay",
+    startReplay: "View safety replay",
     startDriftAlarm: "Start live investigation",
     liveAvailable: "Live AI available",
     livePaused: "Live AI paused · view replay",
     liveOffline: "AI offline · view replay",
     liveUnknown: "AI status unknown · view replay",
-    replayTruth: "Historical recording · 0 new AI calls",
+    replayTruth: "Historical safety run · unsupported answer withheld · 0 new AI calls",
     liveTruth: "New AI run · synthetic data · read only",
     replayChatPlaceholder: "Free chat requires Live AI",
     replayNotAvailable: "Replay is unavailable",
@@ -1599,7 +1599,7 @@ function DriftAgentView({
                     <button type="button" className="disclosure-row" onClick={() => openEvidence()}><span>{copy.behindReport}</span><ChevronRightIcon /></button>
                     <div className="verified-row"><CheckIcon />{session.mode === "live_ai"
                       ? localized(locale, "Liveanalys · syntetiskt fall · inget ändrat", "Live analysis · synthetic case · nothing changed")
-                      : localized(locale, "Verifierad repris · inget ändrat", "Verified replay · nothing changed")}</div>
+                      : localized(locale, "Säkerhetsreplay · inget ändrat", "Safety replay · nothing changed")}</div>
                   </MessageBubble>
                 ) : null}
               </AnimatePresence>
