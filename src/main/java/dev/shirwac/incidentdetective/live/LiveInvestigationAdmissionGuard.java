@@ -13,7 +13,7 @@ import java.util.function.Supplier;
 @Component
 final class LiveInvestigationAdmissionGuard {
 
-    static final int MAX_STARTS_PER_WINDOW = 20;
+    static final int MAX_STARTS_PER_WINDOW = 100;
     static final Duration ROLLING_WINDOW = Duration.ofMinutes(10);
     static final Duration BUSY_RETRY_AFTER = Duration.ofSeconds(2);
 
