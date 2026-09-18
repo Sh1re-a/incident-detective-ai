@@ -19,7 +19,7 @@ class IncidentFollowUpSnapshotProjectorTest {
             new IncidentFollowUpSnapshotProjector();
 
     @Test
-    void diagnosedSnapshotKeepsVerifiedCauseAndPublicSources() throws Exception {
+    void diagnosedSnapshotKeepsEvidenceBoundCauseAndPublicSources() throws Exception {
         var root = mapper.readTree(new ClassPathResource(
                 "incident-lab/replays/test-golden-v1.json"
         ).getInputStream());
@@ -34,7 +34,9 @@ class IncidentFollowUpSnapshotProjectorTest {
         );
 
         assertEquals("CATALOG_SERVICE", snapshot.problemService());
-        assertTrue(snapshot.sv().cause().startsWith("Verifierad orsak:"));
+        assertTrue(snapshot.sv().cause().startsWith(
+                "Starkaste förklaringen i körningen:"
+        ));
         assertFalse(snapshot.sv().cause().contains("kan inte fastställas"));
         assertTrue(snapshot.sources().stream().anyMatch(source ->
                 "test-log-catalog-cache".equals(source.evidenceId())));

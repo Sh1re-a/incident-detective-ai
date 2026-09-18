@@ -124,12 +124,12 @@ public final class IncidentFollowUpSnapshotProjector {
         String cause = answerState == IncidentLabRunResponse.AnswerState.DIAGNOSED
                 ? business.whatIsKnown().stream()
                 .filter(value -> value.toLowerCase(Locale.ROOT)
-                        .contains("cause")
+                .contains("cause")
                         || value.toLowerCase(Locale.ROOT).contains("orsak"))
                 .findFirst()
                 .orElseGet(() -> ("sv".equals(locale)
-                        ? "Verifierad orsak: "
-                        : "Verified cause: ")
+                        ? "Starkaste förklaringen i körningen: "
+                        : "Strongest explanation in this run: ")
                         + humanize(developer.rootCauseCode()) + ".")
                 : ("sv".equals(locale)
                 ? "Rotorsaken kan inte fastställas från det verifierade underlaget."

@@ -208,7 +208,9 @@ class IncidentFollowUpServiceTest {
 
         assertEquals(IncidentFollowUpResponse.AnswerState.ANSWERED,
                 response.answerState());
-        assertTrue(response.answer().text().contains("Verifierad orsak"));
+        assertTrue(response.answer().text().contains(
+                "Starkaste förklaringen i körningen"
+        ));
         assertFalse(response.citations().isEmpty());
         assertEquals(0, response.receipt().providerCalls());
         verify(router, never()).route(any());
@@ -393,8 +395,8 @@ class IncidentFollowUpServiceTest {
                 mode,
                 IncidentLabRunResponse.AnswerState.DIAGNOSED,
                 "CATALOG_SERVICE",
-                report("Verifierad orsak: cache-invalideringen misslyckades."),
-                report("Verified cause: cache invalidation failed."),
+                report("Starkaste förklaringen i körningen: cache-invalideringen misslyckades."),
+                report("Strongest explanation in this run: cache invalidation failed."),
                 List.of(
                         new IncidentFollowUpSnapshot.Source(
                                 "log-1", "synthetic/log-1", "log",
@@ -441,7 +443,7 @@ class IncidentFollowUpServiceTest {
                 "Kunder såg gammal data.",
                 List.of(
                         "Larmet passerade den deterministiska tröskeln.",
-                        "Verifierad orsak: cache-invalideringen misslyckades."
+                        "Starkaste förklaringen i körningen: cache-invalideringen misslyckades."
                 ),
                 List.of("Produktion är inte undersökt."),
                 "Verifierad i det syntetiska fallet",
