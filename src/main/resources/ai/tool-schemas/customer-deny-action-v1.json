@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action"],
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "cancel_order",
+        "return_order",
+        "refund_order",
+        "purchase_item",
+        "change_delivery_address"
+      ]
+    }
+  }
+}

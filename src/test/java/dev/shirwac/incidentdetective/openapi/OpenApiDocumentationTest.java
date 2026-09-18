@@ -9,6 +9,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,6 +35,11 @@ class OpenApiDocumentationTest {
             "$.paths['" + LIVE_PATH + "'].post";
     private static final String PROBLEM_JSON_EXAMPLE =
             ".content['application/problem+json'].example";
+    private static final String DEMO_WORLD_PATH = "/api/v1/demo-world";
+    private static final String KNOWLEDGE_REPLAY_PATH =
+            "/api/v1/knowledge/questions/{questionId}/runs/recorded-replay";
+    private static final String KNOWLEDGE_DOCUMENTS_PATH =
+            "/api/v1/knowledge/documents";
 
     @Autowired
     private MockMvc mockMvc;
@@ -52,7 +58,16 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.ScenarioCatalogResponse"
                                 + ".properties.scenarios.items['$ref']"
-                ).value("#/components/schemas/Scenario"));
+                ).value("#/components/schemas/Scenario"))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ScenarioCatalogResponse.required"
+                ).value(containsInAnyOrder(
+                        "contract_version",
+                        "synthetic_only",
+                        "source",
+                        "truth_label",
+                        "scenarios"
+                )));
     }
 
     @Test
@@ -105,6 +120,10 @@ class OpenApiDocumentationTest {
                         "$.components.schemas.RecordedReplayResult.properties.tool_events"
                 ).exists())
                 .andExpect(jsonPath(
+                        "$.components.schemas.RecordedReplayResult.properties.provenance"
+                                + "['$ref']"
+                ).value("#/components/schemas/ReplayProvenance"))
+                .andExpect(jsonPath(
                         "$.components.schemas.RecordedReplayResult.properties.model_id"
                 ).exists())
                 .andExpect(jsonPath(
@@ -140,9 +159,19 @@ class OpenApiDocumentationTest {
                 ).value(containsInAnyOrder(
                         "run_id", "scenario_id", "mode", "truth_label", "status",
                         "started_at", "completed_at", "latency_ms", "scenario",
-                        "tool_events", "diagnosis", "verification", "comparison",
+                        "provenance", "tool_events", "diagnosis", "verification", "comparison",
                         "model_id", "prompt_version", "token_usage",
                         "estimated_cost_usd"
+                )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ReplayProvenance.required"
+                ).value(containsInAnyOrder(
+                        "synthetic",
+                        "source",
+                        "investigation_executed_in_this_run",
+                        "tool_calls_executed_in_this_run",
+                        "model_executed_in_this_run",
+                        "deterministic_verification_executed_in_this_run"
                 )))
                 .andExpect(jsonPath(
                         "$.components.schemas.LiveInvestigationResult.required.length()"
@@ -174,18 +203,28 @@ class OpenApiDocumentationTest {
                         "LIVE_AI_CONFIRMATION_REQUIRED",
                         "LIVE_AI_DISABLED",
                         "LIVE_AI_NOT_CONFIGURED",
+                        "LIVE_AI_COST_PROFILE_UNAVAILABLE",
+                        "LIVE_AI_BUDGET_UNAVAILABLE",
                         "LIVE_INVESTIGATION_TIMEOUT",
                         "MODEL_PROVIDER_TIMEOUT",
                         "MODEL_PROVIDER_RATE_LIMITED",
                         "MODEL_PROVIDER_ERROR",
                         "MALFORMED_MODEL_RESPONSE",
+                        "ADK_CONTROL_RECEIPT_INVALID",
                         "INVALID_MODEL_TOOL_ARGUMENTS",
                         "RAG_INDEX_NOT_READY",
                         "RAG_EMBEDDING_NOT_CONFIGURED",
                         "RAG_EMBEDDING_PROVIDER_ERROR",
                         "RAG_EMBEDDING_RESPONSE_INVALID",
                         "RAG_DATABASE_UNAVAILABLE",
-                        "SCENARIO_NOT_FOUND"
+                        "SCENARIO_NOT_FOUND",
+                        "KNOWLEDGE_QUESTION_NOT_FOUND",
+                        "INCIDENT_LAB_REPLAY_NOT_AVAILABLE",
+                        "INCIDENT_FOLLOW_UP_RUN_EXPIRED",
+                        "INCIDENT_FOLLOW_UP_IDEMPOTENCY_CONFLICT",
+                        "INCIDENT_FOLLOW_UP_ALREADY_ATTEMPTED",
+                        "INCIDENT_FOLLOW_UP_NOT_VERIFIABLE",
+                        "DEMO_ORDER_NOT_FOUND"
                 )))
                 .andExpect(jsonPath(
                         "$.components.schemas.ApiProblemResponse.properties.status.example"
@@ -196,7 +235,16 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.ApiProblemResponse.properties.code.example"
                 ).doesNotExist())
-                .andExpect(jsonPath("$.paths.length()").value(6))
+                .andExpect(jsonPath("$.paths.length()").value(15))
+                .andExpect(jsonPath(
+                        "$.paths['" + DEMO_WORLD_PATH + "'].get.summary"
+                ).value("Get the fictional Nordly demo world"))
+                .andExpect(jsonPath(
+                        "$.paths['" + KNOWLEDGE_REPLAY_PATH + "'].post.summary"
+                ).value("Replay a curated Nordly knowledge answer"))
+                .andExpect(jsonPath(
+                        "$.paths['" + KNOWLEDGE_DOCUMENTS_PATH + "'].get.summary"
+                ).value("Browse the synthetic Nordly knowledge library"))
                 .andExpect(jsonPath(LIVE_POST + ".responses['400']").exists())
                 .andExpect(jsonPath(LIVE_POST + ".responses['404']").exists())
                 .andExpect(jsonPath(LIVE_POST + ".responses['415']").exists())
@@ -285,6 +333,12 @@ class OpenApiDocumentationTest {
                         "$.components.schemas.LiveInvestigationResult.properties.model_cost_breakdown"
                 ).exists())
                 .andExpect(jsonPath(
+                        "$.components.schemas.LiveInvestigationResult"
+                                + ".properties.estimated_cost_usd.description"
+                ).value(containsString(
+                        "Model-generation-only paid Standard list-price estimate"
+                )))
+                .andExpect(jsonPath(
                         "$.components.schemas.ModelCostBreakdown.properties.observed_cache_savings_usd"
                 ).exists())
                 .andExpect(jsonPath(
@@ -306,8 +360,8 @@ class OpenApiDocumentationTest {
                 ).doesNotExist())
                 .andExpect(jsonPath(
                         "$.components.schemas.LiveInvestigationResult"
-                                + ".properties.estimated_cost_basis"
-                ).exists())
+                                + ".properties.estimated_cost_basis.description"
+                ).value(containsString("must not present the estimate as an invoice")))
                 .andExpect(jsonPath(
                         "$.components.schemas.Evidence.discriminator.propertyName"
                 ).value("evidence_type"))

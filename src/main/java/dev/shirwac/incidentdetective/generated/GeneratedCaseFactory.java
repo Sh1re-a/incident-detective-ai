@@ -8,22 +8,29 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Builds one immutable request-local case and attaches the shared runbook corpus. */
+/** Builds one immutable request-local Nordly case and attaches the shared runbook corpus. */
 @Service
 public final class GeneratedCaseFactory {
 
-    public static final String GENERATOR_VERSION = "payment-timeout-generator-v1";
+    public static final String GENERATOR_VERSION = "nordly-incident-generator-v2";
 
     private final ClasspathRunbookCorpus runbooks;
-    private final PaymentTimeoutGeneratedCaseGenerator generator =
+    private final PaymentTimeoutGeneratedCaseGenerator paymentTimeoutGenerator =
             new PaymentTimeoutGeneratedCaseGenerator();
+    private final NordlyIncidentGeneratedCaseGenerator nordlyGenerator =
+            new NordlyIncidentGeneratedCaseGenerator();
 
     public GeneratedCaseFactory(ClasspathRunbookCorpus runbooks) {
         this.runbooks = runbooks;
     }
 
     public GeneratedCase create(GeneratedCaseRequest request) {
-        GeneratedCase generated = generator.generate(request);
+        GeneratedCase generated = switch (request.incidentFamily()) {
+            case PAYMENT_TIMEOUT -> paymentTimeoutGenerator.generate(request);
+            case CATALOG_CACHE_INVALIDATION,
+                    ORDER_EVENT_BACKLOG,
+                    ORDER_IDEMPOTENCY_FAILURE -> nordlyGenerator.generate(request);
+        };
         List<Evidence> evidence = new ArrayList<>(
                 generated.investigationData().evidenceInventory()
         );

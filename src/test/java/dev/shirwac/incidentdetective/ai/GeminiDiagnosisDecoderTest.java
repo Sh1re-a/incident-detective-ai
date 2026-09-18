@@ -5,7 +5,11 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class GeminiDiagnosisDecoderTest {
@@ -65,8 +69,23 @@ class GeminiDiagnosisDecoderTest {
 
         assertEquals(ModelProviderFailure.MALFORMED_RESPONSE, broken.failure());
         assertEquals(
+                ModelResponseFailureMetadata.Category.JSON_DESERIALIZATION,
+                broken.safeMetadata().orElseThrow().category()
+        );
+        assertEquals(
+                ModelResponseFailureMetadata.Reason.INVALID_JSON,
+                broken.safeMetadata().orElseThrow().reason()
+        );
+        assertEquals(List.of(),
+                broken.safeMetadata().orElseThrow().propertyPaths());
+        assertNull(broken.getCause());
+        assertEquals(
                 ModelProviderFailure.MALFORMED_RESPONSE,
                 leakedField.failure()
+        );
+        assertEquals(
+                ModelResponseFailureMetadata.Reason.UNKNOWN_PROPERTY,
+                leakedField.safeMetadata().orElseThrow().reason()
         );
     }
 
@@ -109,5 +128,48 @@ class GeminiDiagnosisDecoderTest {
 
         assertEquals(ModelProviderFailure.MALFORMED_RESPONSE, missingClaims.failure());
         assertEquals(ModelProviderFailure.MALFORMED_RESPONSE, unsafeNextStep.failure());
+        assertEquals(
+                ModelResponseFailureMetadata.Category.BEAN_VALIDATION,
+                missingClaims.safeMetadata().orElseThrow().category()
+        );
+        assertEquals(
+                ModelResponseFailureMetadata.Reason.CONSTRAINT_VIOLATION,
+                missingClaims.safeMetadata().orElseThrow().reason()
+        );
+        assertEquals(
+                List.of("$", "claims"),
+                missingClaims.safeMetadata().orElseThrow().propertyPaths()
+        );
+        assertEquals(
+                List.of("safeNextStep.requiresHumanApproval"),
+                unsafeNextStep.safeMetadata().orElseThrow().propertyPaths()
+        );
+    }
+
+    @Test
+    void failureMetadataNeverRetainsRawModelValuesOrUnsafePaths() {
+        String secret = "DO-NOT-LOG-secret-value";
+        ModelProviderException exception = assertThrows(
+                ModelProviderException.class,
+                () -> decoder.decode("""
+                        {
+                          "status": "%s",
+                          "root_cause_code": null,
+                          "affected_service": null,
+                          "business_summary": "Needs evidence.",
+                          "technical_summary": "Needs evidence.",
+                          "claims": [],
+                          "safe_next_step": {
+                            "summary": "Collect more evidence.",
+                            "requires_human_approval": true
+                          }
+                        }
+                        """.formatted(secret))
+        );
+
+        String retained = exception.getMessage()
+                + exception.safeMetadata().orElseThrow();
+        assertFalse(retained.contains(secret));
+        assertNull(exception.getCause());
     }
 }

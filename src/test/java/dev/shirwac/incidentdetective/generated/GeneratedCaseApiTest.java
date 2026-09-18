@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -82,14 +83,17 @@ class GeneratedCaseApiTest {
     @BeforeEach
     void configureRequestLocalInvestigation() {
         reset(model, dailyQuota);
-        when(dailyQuota.tryConsume(anyInt())).thenReturn(
-                new GlobalDailyLiveQuota.Decision(true, 1, 20, QUOTA_RESET)
+        when(dailyQuota.tryConsume(anyInt(), anyLong(), anyLong())).thenReturn(
+                new GlobalDailyLiveQuota.Decision(
+                        true, 1, 20, 25_000, 200_000, QUOTA_RESET
+                )
         );
         stubCollectionRounds();
         when(model.synthesize(any(), anyList(), any())).thenAnswer(invocation -> {
+            Scenario scenario = invocation.getArgument(0);
             List<Evidence> evidence = invocation.getArgument(1);
             return new SynthesisModelResult(
-                    diagnosticDiagnosis(evidence),
+                    diagnosticDiagnosis(scenario, evidence),
                     metadata(ModelPhase.SYNTHESIZE, 1)
             );
         });
@@ -106,7 +110,9 @@ class GeneratedCaseApiTest {
                         .value("LIVE_AI_CONFIRMATION_REQUIRED"));
 
         verifyNoInteractions(model);
-        verify(dailyQuota, never()).tryConsume(anyInt());
+        verify(dailyQuota, never()).tryConsume(
+                anyInt(), anyLong(), anyLong()
+        );
     }
 
     @Test
@@ -116,6 +122,20 @@ class GeneratedCaseApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "evidence_mode": "diagnostic",
+                                  "noise_level": "none",
+                                  "confirm_live_ai": true
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST_BODY"));
+
+        mockMvc.perform(post(PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "seed": 42,
+                                  "incident_family": "warehouse_robots",
                                   "evidence_mode": "diagnostic",
                                   "noise_level": "none",
                                   "confirm_live_ai": true
@@ -139,7 +159,9 @@ class GeneratedCaseApiTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST_BODY"));
 
         verifyNoInteractions(model);
-        verify(dailyQuota, never()).tryConsume(anyInt());
+        verify(dailyQuota, never()).tryConsume(
+                anyInt(), anyLong(), anyLong()
+        );
     }
 
     @Test
@@ -174,6 +196,8 @@ class GeneratedCaseApiTest {
                 .andExpect(jsonPath("$.generation.generator_version")
                         .value(GeneratedCaseFactory.GENERATOR_VERSION))
                 .andExpect(jsonPath("$.generation.seed").value(99))
+                .andExpect(jsonPath("$.generation.incident_family")
+                        .value("payment_timeout"))
                 .andExpect(jsonPath("$.investigation.truth_label").value(
                         LiveInvestigationService.GENERATED_TRUTH_LABEL
                 ))
@@ -181,14 +205,38 @@ class GeneratedCaseApiTest {
                 .andExpect(jsonPath("$.investigation.tool_call_count").value(5))
                 .andExpect(jsonPath("$.investigation.model_call_count").value(3))
                 .andExpect(jsonPath(
+                        "$.investigation.token_usage.input_tokens"
+                ).value(360))
+                .andExpect(jsonPath(
+                        "$.investigation.token_usage.cached_input_tokens"
+                ).value(60))
+                .andExpect(jsonPath(
+                        "$.investigation.token_usage.output_tokens"
+                ).value(90))
+                .andExpect(jsonPath(
+                        "$.investigation.estimated_cost_usd"
+                ).value(0.0002115))
+                .andExpect(jsonPath(
+                        "$.investigation.model_cost_breakdown.uncached_input_usd"
+                ).value(0.000075))
+                .andExpect(jsonPath(
+                        "$.investigation.model_cost_breakdown.cached_input_usd"
+                ).value(0.0000015))
+                .andExpect(jsonPath(
+                        "$.investigation.model_cost_breakdown.output_usd"
+                ).value(0.000135))
+                .andExpect(jsonPath(
+                        "$.investigation.model_cost_breakdown"
+                                + ".observed_cache_savings_usd"
+                ).value(0.0000135))
+                .andExpect(jsonPath(
                         "$.investigation.verification.ground_truth_schema_pass"
                 ).value(true))
                 .andExpect(jsonPath(
                         "$.investigation.verification.claim_coverage.score"
                 ).value(1.0))
-                .andExpect(jsonPath(
-                        "$.investigation.comparison.root_cause_correct"
-                ).value(true))
+                .andExpect(jsonPath("$.investigation.comparison")
+                        .value((Object) null))
                 .andExpect(jsonPath(
                         "$.investigation.tool_events[*].tool_name"
                 ).value(containsInAnyOrder(
@@ -214,6 +262,38 @@ class GeneratedCaseApiTest {
         assertNull(response.get("hidden_ground_truth"));
         assertNull(response.get("investigation").get("hidden_ground_truth"));
         assertNull(response.get("investigation").get("ground_truth"));
+        assertTrue(response.get("investigation").get("comparison").isNull());
+    }
+
+    @Test
+    void selectedNordlyFamilyIsEchoedAndChangesTheGeneratedScenario()
+            throws Exception {
+        MvcResult result = mockMvc.perform(post(PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request(
+                                42,
+                                "catalog_cache_invalidation",
+                                true
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.generation.incident_family")
+                        .value("catalog_cache_invalidation"))
+                .andExpect(jsonPath("$.investigation.scenario_id")
+                        .value(org.hamcrest.Matchers.startsWith(
+                                "generated-catalog-cache-invalidation-"
+                        )))
+                .andExpect(jsonPath("$.investigation.scenario.affected_services[*]")
+                        .value(org.hamcrest.Matchers.hasItem("CATALOG_SERVICE")))
+                .andReturn();
+
+        JsonNode response = jsonMapper.readTree(
+                result.getResponse().getContentAsString()
+        );
+        assertEquals(
+                "CATALOG_CACHE_INVALIDATION_FAILURE",
+                response.at("/investigation/diagnosis/root_cause_code").asText()
+        );
+        assertTrue(response.get("investigation").get("comparison").isNull());
     }
 
     @Test
@@ -223,7 +303,7 @@ class GeneratedCaseApiTest {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(post + ".summary").value(
-                        "Generate and investigate a synthetic payment-timeout case"
+                        "Generate and investigate a synthetic Nordly incident"
                 ))
                 .andExpect(jsonPath(
                         post
@@ -250,10 +330,19 @@ class GeneratedCaseApiTest {
                 .andExpect(jsonPath(
                         "$.components.schemas.GeneratedCaseLiveRequest.required"
                 ).value(containsInAnyOrder(
-                        "seed",
-                        "evidence_mode",
-                        "noise_level",
-                        "confirm_live_ai"
+                                "seed",
+                                "evidence_mode",
+                                "noise_level",
+                                "confirm_live_ai"
+                        )))
+                .andExpect(jsonPath(
+                        "$.components.schemas.GeneratedCaseLiveRequest"
+                                + ".properties.incident_family.enum"
+                ).value(containsInAnyOrder(
+                        "payment_timeout",
+                        "catalog_cache_invalidation",
+                        "order_event_backlog",
+                        "order_idempotency_failure"
                 )))
                 .andExpect(jsonPath(
                         "$.components.schemas.GeneratedCaseRunResult"
@@ -286,9 +375,9 @@ class GeneratedCaseApiTest {
                                     "end", end
                             )),
                             call("generated-timeout-logs", ToolName.SEARCH_LOGS, Map.of(
-                                    "services", List.of("PAYMENT_ADAPTER"),
+                                    "services", List.of(),
                                     "levels", List.of(),
-                                    "query", "timeout",
+                                    "query", failureQuery(scenario),
                                     "start", start,
                                     "end", end
                             )),
@@ -296,7 +385,7 @@ class GeneratedCaseApiTest {
                                     "generated-runbook",
                                     ToolName.RETRIEVE_RUNBOOKS,
                                     Map.of(
-                                            "query", "payment timeout",
+                                            "query", runbookQuery(scenario),
                                             "max_results", 2
                                     )
                             )
@@ -323,7 +412,7 @@ class GeneratedCaseApiTest {
                                     "trace_id", traceId
                             )),
                             call("generated-release-log", ToolName.SEARCH_LOGS, Map.of(
-                                    "services", List.of("PAYMENT_ADAPTER"),
+                                    "services", List.of(),
                                     "levels", List.of(),
                                     "query", "release",
                                     "start", scenario.timeWindow().start().toString(),
@@ -335,7 +424,13 @@ class GeneratedCaseApiTest {
         });
     }
 
-    private Diagnosis diagnosticDiagnosis(List<Evidence> evidence) {
+    private Diagnosis diagnosticDiagnosis(
+            Scenario scenario,
+            List<Evidence> evidence
+    ) {
+        if (!scenario.scenarioId().startsWith("generated-payment-timeout-")) {
+            return nordlyDiagnosticDiagnosis(scenario, evidence);
+        }
         String timeoutConfig = evidenceId(evidence, "-log-timeout-config");
         String timeoutError = evidenceId(evidence, "-log-timeout-error");
         String failedTrace = evidenceId(evidence, "-trace-failed-checkout");
@@ -393,6 +488,115 @@ class GeneratedCaseApiTest {
                         true
                 )
         );
+    }
+
+    private Diagnosis nordlyDiagnosticDiagnosis(
+            Scenario scenario,
+            List<Evidence> evidence
+    ) {
+        FamilyDiagnosis expected = familyDiagnosis(scenario.scenarioId());
+        return new Diagnosis(
+                DiagnosisStatus.DIAGNOSED,
+                expected.rootCause(),
+                expected.affectedService(),
+                "Generated Nordly operations are affected in the selected family.",
+                "The generated evidence shows the selected bounded failure mechanism.",
+                List.of(
+                        claim(
+                                ClaimCode.ROOT_CAUSE,
+                                expected.rootCause(),
+                                evidenceId(evidence, "-log-causal-config"),
+                                evidenceId(evidence, "-trace-failure")
+                        ),
+                        claim(
+                                ClaimCode.AFFECTED_SERVICE,
+                                expected.affectedService(),
+                                evidenceId(evidence, "-log-failure"),
+                                evidenceId(evidence, "-trace-failure")
+                        ),
+                        claim(
+                                ClaimCode.TRIGGER,
+                                expected.trigger(),
+                                evidenceId(evidence, "-log-change-event"),
+                                evidenceId(evidence, "-log-causal-config")
+                        ),
+                        claim(
+                                ClaimCode.CUSTOMER_IMPACT,
+                                expected.impact(),
+                                evidenceId(evidence, "-metric-impact-ratio"),
+                                evidenceId(evidence, "-metric-impact-count")
+                        ),
+                        claim(
+                                ClaimCode.OBSERVED_SYMPTOM,
+                                expected.symptom(),
+                                evidenceId(evidence, "-metric-symptom"),
+                                evidenceId(evidence, "-log-failure")
+                        )
+                ),
+                new SafeNextStep(
+                        "Review the generated evidence with a human.",
+                        true
+                )
+        );
+    }
+
+    private FamilyDiagnosis familyDiagnosis(String scenarioId) {
+        if (scenarioId.startsWith("generated-catalog-cache-invalidation-")) {
+            return new FamilyDiagnosis(
+                    "CATALOG_CACHE_INVALIDATION_FAILURE",
+                    "CATALOG_SERVICE",
+                    "CATALOG_INVALIDATION_CONFIG_CHANGE",
+                    "STALE_CATALOG_RESULTS",
+                    "CATALOG_VERSION_DIVERGENCE"
+            );
+        }
+        if (scenarioId.startsWith("generated-order-event-backlog-")) {
+            return new FamilyDiagnosis(
+                    "ORDER_EVENT_CONSUMER_BACKLOG",
+                    "ORDER_EVENT_CONSUMER",
+                    "ORDER_CONSUMER_CONFIG_CHANGE",
+                    "ORDER_PROCESSING_DELAYS",
+                    "ORDER_CONSUMER_LAG"
+            );
+        }
+        if (scenarioId.startsWith("generated-order-idempotency-failure-")) {
+            return new FamilyDiagnosis(
+                    "ORDER_IDEMPOTENCY_FAILURE",
+                    "ORDER_SERVICE",
+                    "ORDER_IDEMPOTENCY_STORAGE_CHANGE",
+                    "DUPLICATE_ORDERS",
+                    "DUPLICATE_ORDER_CREATION"
+            );
+        }
+        throw new AssertionError("Unexpected generated family " + scenarioId);
+    }
+
+    private String failureQuery(Scenario scenario) {
+        String scenarioId = scenario.scenarioId();
+        if (scenarioId.contains("catalog-cache")) {
+            return "stale";
+        }
+        if (scenarioId.contains("order-event-backlog")) {
+            return "backlog";
+        }
+        if (scenarioId.contains("order-idempotency")) {
+            return "duplicate";
+        }
+        return "timeout";
+    }
+
+    private String runbookQuery(Scenario scenario) {
+        String scenarioId = scenario.scenarioId();
+        if (scenarioId.contains("catalog-cache")) {
+            return "catalog cache invalidation";
+        }
+        if (scenarioId.contains("order-event-backlog")) {
+            return "order event backlog";
+        }
+        if (scenarioId.contains("order-idempotency")) {
+            return "duplicate order idempotency";
+        }
+        return "payment timeout";
     }
 
     private Claim claim(
@@ -483,5 +687,30 @@ class GeneratedCaseApiTest {
                   "confirm_live_ai": %s
                 }
                 """.formatted(seed, confirmLiveAi);
+    }
+
+    private String request(
+            long seed,
+            String incidentFamily,
+            boolean confirmLiveAi
+    ) {
+        return """
+                {
+                  "seed": %d,
+                  "incident_family": "%s",
+                  "evidence_mode": "diagnostic",
+                  "noise_level": "none",
+                  "confirm_live_ai": %s
+                }
+                """.formatted(seed, incidentFamily, confirmLiveAi);
+    }
+
+    private record FamilyDiagnosis(
+            String rootCause,
+            String affectedService,
+            String trigger,
+            String impact,
+            String symptom
+    ) {
     }
 }

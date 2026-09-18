@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.rag;
 
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
 import com.google.genai.types.ContentEmbedding;
 import com.google.genai.types.ContentEmbeddingStatistics;
 import com.google.genai.types.EmbedContentConfig;
@@ -125,7 +126,8 @@ class GeminiEmbeddingGatewayTest {
                         "gemini-embedding-2",
                         DIMENSIONS,
                         "search-result-v1",
-                        0.0
+                        0.0,
+                        GoogleGenAiProvider.DEVELOPER_API
                 )
         );
     }

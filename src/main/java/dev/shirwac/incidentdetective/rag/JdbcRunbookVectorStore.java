@@ -19,6 +19,7 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
             AND embedding_model = :embeddingModel
             AND embedding_dimensions = :embeddingDimensions
             AND embedding_format_version = :embeddingFormatVersion
+            AND provider_transport = :providerTransport
             """;
 
     private final JdbcClient jdbc;
@@ -48,6 +49,43 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
     }
 
     @Override
+    public void synchronizeMetadata(
+            String corpusVersion,
+            RunbookCorpusEntry entry,
+            RagProperties profile
+    ) {
+        int updated = profileQuery("""
+                UPDATE runbook_embeddings
+                SET
+                    document_id = :documentId,
+                    document_version = :documentVersion,
+                    chunk_id = :chunkId,
+                    title = :title,
+                    display_summary = :displaySummary,
+                    source_ref = :sourceRef,
+                    body = :body
+                WHERE %s
+                  AND evidence_id = :evidenceId
+                  AND content_sha256 = :contentSha256
+                """.formatted(PROFILE_WHERE), corpusVersion, profile)
+                .param("documentId", entry.documentId())
+                .param("documentVersion", entry.documentVersion())
+                .param("chunkId", entry.chunkId())
+                .param("title", entry.title())
+                .param("displaySummary", entry.displaySummary())
+                .param("sourceRef", entry.sourceRef())
+                .param("body", entry.text())
+                .param("evidenceId", entry.evidenceId())
+                .param("contentSha256", entry.contentSha256())
+                .update();
+        if (updated != 1) {
+            throw new IllegalStateException(
+                    "current vector metadata row disappeared during import"
+            );
+        }
+    }
+
+    @Override
     public void upsert(
             String corpusVersion,
             RunbookCorpusEntry entry,
@@ -70,6 +108,7 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                     embedding_model,
                     embedding_dimensions,
                     embedding_format_version,
+                    provider_transport,
                     embedding,
                     input_characters,
                     provider_billable_characters,
@@ -89,6 +128,7 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                     :embeddingModel,
                     :embeddingDimensions,
                     :embeddingFormatVersion,
+                    :providerTransport,
                     CAST(:embedding AS vector),
                     :inputCharacters,
                     :providerBillableCharacters,
@@ -100,7 +140,8 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                     evidence_id,
                     embedding_model,
                     embedding_dimensions,
-                    embedding_format_version
+                    embedding_format_version,
+                    provider_transport
                 ) DO UPDATE SET
                     document_id = EXCLUDED.document_id,
                     document_version = EXCLUDED.document_version,
@@ -227,7 +268,11 @@ public final class JdbcRunbookVectorStore implements RunbookVectorStore {
                 .param("corpusVersion", corpusVersion)
                 .param("embeddingModel", profile.embeddingModel())
                 .param("embeddingDimensions", profile.embeddingDimensions())
-                .param("embeddingFormatVersion", profile.embeddingFormatVersion());
+                .param("embeddingFormatVersion", profile.embeddingFormatVersion())
+                .param(
+                        "providerTransport",
+                        profile.providerTransport().transport()
+                );
     }
 
     private RunbookSearchHit mapHit(ResultSet resultSet, int rowNumber)

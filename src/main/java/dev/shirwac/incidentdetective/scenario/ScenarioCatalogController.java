@@ -40,6 +40,6 @@ public final class ScenarioCatalogController {
             )
     )
     public ScenarioCatalogResponse listScenarios() {
-        return new ScenarioCatalogResponse(scenarios.findAll());
+        return ScenarioCatalogResponse.recordedFixtures(scenarios.findAll());
     }
 }

@@ -45,11 +45,21 @@ public record LiveInvestigationResult(
         Scenario scenario,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         List<LiveToolEvent> toolEvents,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                nullable = true,
+                description = "Released diagnosis, or null when deterministic "
+                        + "verification fails."
+        )
         Diagnosis diagnosis,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         VerificationReport verification,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                nullable = true,
+                description = "Always null for live runs because expected-answer "
+                        + "ground truth is private."
+        )
         ReplayComparison comparison,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         String modelId,
@@ -68,7 +78,10 @@ public record LiveInvestigationResult(
         @Schema(
                 requiredMode = Schema.RequiredMode.REQUIRED,
                 nullable = true,
-                description = "Null when no paid list-price estimate is configured."
+                description = "Model-generation-only paid Standard list-price "
+                        + "estimate in USD, calculated from provider-reported token "
+                        + "metadata. Not an invoice or actual charged amount. Null "
+                        + "when the model price or core usage is unavailable."
         )
         BigDecimal estimatedCostUsd,
         @Schema(
@@ -77,7 +90,11 @@ public record LiveInvestigationResult(
                 description = "Null when the model price or core provider usage is unavailable."
         )
         ModelCostBreakdown modelCostBreakdown,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                description = "Human-readable pricing snapshot and assumptions. "
+                        + "The frontend must not present the estimate as an invoice."
+        )
         String estimatedCostBasis,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "0")
         int toolCallCount,
@@ -87,6 +104,21 @@ public record LiveInvestigationResult(
         List<String> limitations
 ) {
     public LiveInvestigationResult {
+        if (status == LiveRunStatus.COMPLETED && diagnosis == null) {
+            throw new IllegalArgumentException(
+                    "a completed live run must release a diagnosis"
+            );
+        }
+        if (status == LiveRunStatus.VERIFICATION_FAILED && diagnosis != null) {
+            throw new IllegalArgumentException(
+                    "a failed live verification must not release a diagnosis"
+            );
+        }
+        if (comparison != null) {
+            throw new IllegalArgumentException(
+                    "a live run must not expose expected-answer comparison"
+            );
+        }
         toolEvents = List.copyOf(toolEvents);
         modelCalls = List.copyOf(modelCalls);
         limitations = List.copyOf(limitations);

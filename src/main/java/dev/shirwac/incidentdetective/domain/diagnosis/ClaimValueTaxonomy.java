@@ -88,7 +88,9 @@ public final class ClaimValueTaxonomy {
                 "PAYMENT_PROVIDER_RESPONSE",
                 "PAYMENT_TIMEOUT_CONFIG_AUDIT",
                 "CATALOG_SOURCE_OF_TRUTH_VERSION",
-                "CATALOG_TAX_CALCULATION_TRACE"
+                "CATALOG_TAX_CALCULATION_TRACE",
+                "ORDER_CONSUMER_CONFIG_AUDIT",
+                "ORDER_IDEMPOTENCY_STORAGE_AUDIT"
         ));
         return Collections.unmodifiableMap(values);
     }

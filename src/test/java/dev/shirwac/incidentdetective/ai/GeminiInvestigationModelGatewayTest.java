@@ -197,16 +197,18 @@ class GeminiInvestigationModelGatewayTest {
         JsonMapper mapper = JsonMapper.builder()
                 .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
                 .build();
+        GeminiAiProperties properties = new GeminiAiProperties(
+                "test-key",
+                true,
+                "gemini-test",
+                GeminiThinkingLevel.LOW,
+                GeminiPromptContracts.LIVE_PROMPT_VERSION
+        );
         return new GeminiInvestigationModelGateway(
-                new GeminiAiProperties(
-                        "test-key",
-                        true,
-                        "gemini-test",
-                        GeminiThinkingLevel.LOW,
-                        GeminiPromptContracts.LIVE_PROMPT_VERSION
-                ),
+                properties,
+                new GoogleGenAiClientFactory(properties),
                 new DiagnosisContractProperties(
-                        "ai/diagnosis-schema-v3.json"
+                        GeminiPromptContracts.DIAGNOSIS_SCHEMA_RESOURCE
                 ),
                 new GeminiDiagnosisDecoder(
                         mapper,

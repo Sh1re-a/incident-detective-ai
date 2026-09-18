@@ -54,7 +54,8 @@ public final class DiagnosisValidator implements ConstraintValidator<ValidDiagno
             return false;
         }
 
-        return diagnosis.claims().stream()
+        return hasUniqueClaimKeys(diagnosis.claims())
+                && diagnosis.claims().stream()
                 .allMatch(claim -> claim.claimCode() != null
                         && claim.claimCode().allowedForInsufficientEvidence()
                         && hasEvidence(claim)

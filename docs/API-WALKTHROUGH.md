@@ -56,10 +56,13 @@ En trygg demoordning är:
 - aktiv embeddingprofil endast när pgvector faktiskt är aktivt,
 - cachepolicy: `provider_implicit`, explicit caching avstängd.
 
-`live_ai.enabled_by_configuration` och `credentials_configured` visar de två
-lokala förutsättningarna separat. `request_configured = true` betyder att båda
-är uppfyllda, men garanterar inte att providern är nåbar eller frisk. Endpointen
-returnerar aldrig en providernyckel.
+`live_ai.enabled_by_configuration` och
+`provider.routing_configuration_complete` visar de två lokala
+routingförutsättningarna separat. `request_routing_configured = true` betyder
+att båda är uppfyllda. `provider.credential_status = not_checked` för Vertex
+eftersom endpointen inte laddar eller validerar ADC. Inget av fälten garanterar
+lyckad autentisering eller att providern är nåbar. Endpointen returnerar aldrig
+en providernyckel.
 
 ## 1. Scenario-listan
 
@@ -196,9 +199,20 @@ De måste hållas isär. En modell kan gissa rätt rotorsak men använda dåliga
 ### Två statusnivåer som inte ska blandas ihop
 
 - `diagnosis.status = insufficient_evidence` betyder att modellen ärligt avstod. Körningen kan fortfarande vara tekniskt `completed`.
-- `run.status = verification_failed` betyder att en strukturerad diagnos kom tillbaka men att den deterministiska kontrollen hittade ett hårt fel, till exempel ett påhittat evidence-ID.
+- `run.status = verification_failed` eller ADK-turnens `outcome = verification_failed`
+  betyder att Java inte släppte någon diagnos. Antingen bröt själva
+  `Diagnosis`-payloaden mot kontraktet, eller så hittade den senare
+  deterministiska kontrollen ett hårt fel. Ett evidence-ID kan vara riktigt och
+  ändå vara fel källa för det påstående som modellen gjorde. Då är
+  `citations_valid = true`, `direct_evidence_support_valid = false` och svaret
+  hålls inne trots att huvuddiagnosen råkade matcha testfacit.
 
-Ett `verification_failed`-resultat returneras som HTTP 200 eftersom API-körningen lyckades och verifieringsutfallet är det resultat som ska inspekteras. Providerfel och ogiltiga requests använder däremot 4xx/5xx.
+Ett `verification_failed`-resultat returneras som HTTP 200 eftersom API-körningen
+lyckades och stoppkvittot är resultatet som ska inspekteras. Vid ett tidigt
+Diagnosis-kontraktsfel är `diagnosis`, `verification` och `comparison` null,
+medan events, read-only tool-resultat, kostnad och kontrollkvitto behålls.
+Providerfel före ett komplett kvitto och ogiltiga requests använder däremot
+4xx/5xx.
 
 ## GroundTruth utan överdrift
 

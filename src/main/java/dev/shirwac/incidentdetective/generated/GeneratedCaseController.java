@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/generated-cases")
 @Tag(
         name = "Generated live investigation",
-        description = "Generates one reproducible synthetic case and investigates it with Gemini."
+        description = "Generates one reproducible Nordly case and investigates it with Gemini."
 )
 public final class GeneratedCaseController {
 
@@ -33,8 +33,9 @@ public final class GeneratedCaseController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     @Operation(
-            summary = "Generate and investigate a synthetic payment-timeout case",
-            description = "A deterministic Java generator creates request-local signals and "
+            summary = "Generate and investigate a synthetic Nordly incident",
+            description = "A deterministic Java generator creates one selected family of "
+                    + "request-local signals and "
                     + "a hidden reference answer. Gemini may inspect signals only through bounded "
                     + "read-only tools. Java then verifies the structured diagnosis."
     )

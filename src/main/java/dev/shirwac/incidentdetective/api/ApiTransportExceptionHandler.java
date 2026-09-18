@@ -5,6 +5,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -23,6 +24,18 @@ public final class ApiTransportExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 "Invalid request body",
                 "Send a valid JSON body that matches the endpoint contract.",
+                INVALID_REQUEST_BODY
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ProblemDetail handleInvalidArguments(
+            MethodArgumentNotValidException exception
+    ) {
+        return ApiProblemFactory.create(
+                HttpStatus.BAD_REQUEST,
+                "Invalid request body",
+                "Send values within the documented request limits.",
                 INVALID_REQUEST_BODY
         );
     }

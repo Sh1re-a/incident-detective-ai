@@ -26,6 +26,7 @@ class GeminiSchemaResourceTest {
                 "ai/diagnosis-schema-v2.json",
                 "ai/diagnosis-schema-v3.json",
                 "ai/diagnosis-schema-v4.json",
+                "ai/diagnosis-schema-v5.json",
                 "ai/tool-schemas/get_metrics-v1.json",
                 "ai/tool-schemas/search_logs-v1.json",
                 "ai/tool-schemas/get_trace-v1.json",
@@ -57,7 +58,8 @@ class GeminiSchemaResourceTest {
                 "ai/prompts/collect-gemini-live-v5.txt",
                 "ai/prompts/synthesize-gemini-live-v5.txt",
                 "ai/prompts/collect-gemini-live-v6.txt",
-                "ai/prompts/synthesize-gemini-live-v6.txt"
+                "ai/prompts/synthesize-gemini-live-v6.txt",
+                "ai/prompts/synthesize-gemini-live-v7.txt"
         )) {
             String prompt = new ClassPathResource(resourcePath)
                     .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
@@ -206,5 +208,51 @@ class GeminiSchemaResourceTest {
                 .get("evidence_ids");
         assertEquals(1, evidenceIds.get("minItems").asInt(), resourcePath);
         assertEquals(2, evidenceIds.get("maxItems").asInt(), resourcePath);
+    }
+
+    @Test
+    void synthesisPromptV7DefinesTheGeneralAbstentionBoundary()
+            throws Exception {
+        String resourcePath = "ai/prompts/synthesize-gemini-live-v7.txt";
+        String prompt = new ClassPathResource(resourcePath)
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+
+        assertTrue(prompt.contains("Decide the status before creating claims"));
+        assertTrue(prompt.contains("correlation, not a causal mechanism"));
+        assertTrue(prompt.contains("no independent log or trace proves"));
+        assertTrue(prompt.contains("at most one observed_symptom claim"));
+        assertTrue(prompt.contains("one strongest evidence ID per claim"));
+        assertFalse(prompt.contains("ground_truth"));
+        assertFalse(prompt.contains("allowed_evidence_ids"));
+        assertFalse(prompt.contains("ORDER_EVENT_CONSUMER_BACKLOG"));
+    }
+
+    @Test
+    void diagnosisSchemaV5DocumentsAbstentionWithoutChangingItsShape()
+            throws Exception {
+        JsonNode v4;
+        JsonNode v5;
+        try (InputStream input = new ClassPathResource(
+                "ai/diagnosis-schema-v4.json"
+        ).getInputStream()) {
+            v4 = jsonMapper.readTree(input);
+        }
+        try (InputStream input = new ClassPathResource(
+                "ai/diagnosis-schema-v5.json"
+        ).getInputStream()) {
+            v5 = jsonMapper.readTree(input);
+        }
+
+        assertEquals(v4.get("required"), v5.get("required"));
+        assertEquals(
+                new HashSet<>(v4.get("properties").propertyNames()),
+                new HashSet<>(v5.get("properties").propertyNames())
+        );
+        assertEquals(v4.at("/properties/status/enum"),
+                v5.at("/properties/status/enum"));
+        assertEquals(v4.at("/properties/claims/maxItems"),
+                v5.at("/properties/claims/maxItems"));
+        assertTrue(v5.at("/properties/status/description").isString());
+        assertTrue(v5.at("/properties/claims/description").isString());
     }
 }

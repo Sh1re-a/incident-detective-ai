@@ -57,6 +57,21 @@ class RecordedReplayApiTest {
                 .andExpect(jsonPath("$.started_at").exists())
                 .andExpect(jsonPath("$.completed_at").exists())
                 .andExpect(jsonPath("$.latency_ms").value(greaterThanOrEqualTo(0)))
+                .andExpect(jsonPath("$.provenance.synthetic").value(true))
+                .andExpect(jsonPath("$.provenance.source")
+                        .value("versioned_recorded_fixture"))
+                .andExpect(jsonPath(
+                        "$.provenance.investigation_executed_in_this_run"
+                ).value(false))
+                .andExpect(jsonPath(
+                        "$.provenance.tool_calls_executed_in_this_run"
+                ).value(false))
+                .andExpect(jsonPath(
+                        "$.provenance.model_executed_in_this_run"
+                ).value(false))
+                .andExpect(jsonPath(
+                        "$.provenance.deterministic_verification_executed_in_this_run"
+                ).value(true))
                 .andExpect(jsonPath("$.scenario.scenario_id").value(scenarioId))
                 .andExpect(jsonPath("$.tool_events.length()").value(4))
                 .andExpect(jsonPath("$.tool_events[0].event_id").value(

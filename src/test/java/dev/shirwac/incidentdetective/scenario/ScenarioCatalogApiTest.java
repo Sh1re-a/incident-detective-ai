@@ -24,6 +24,13 @@ class ScenarioCatalogApiTest {
     void listsSafeScenarioSummariesInFixtureOrder() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/scenarios"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contract_version")
+                        .value(ScenarioCatalogResponse.CONTRACT_VERSION))
+                .andExpect(jsonPath("$.synthetic_only").value(true))
+                .andExpect(jsonPath("$.source")
+                        .value(ScenarioCatalogResponse.SOURCE))
+                .andExpect(jsonPath("$.truth_label")
+                        .value(ScenarioCatalogResponse.TRUTH_LABEL))
                 .andExpect(jsonPath("$.scenarios.length()").value(2))
                 .andExpect(jsonPath("$.scenarios[*].scenario_id").value(contains(
                         "checkout-orders-at-risk-v1",

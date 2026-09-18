@@ -2,6 +2,12 @@ package dev.shirwac.incidentdetective.rag;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
+import jakarta.validation.Validation;
+import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeCorpus;
+import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeCorpusImporter;
+import dev.shirwac.incidentdetective.nordly.NordlyKnowledgeIndexReadiness;
+import dev.shirwac.incidentdetective.nordly.NordlyResourceCatalog;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -11,7 +17,12 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,7 +39,8 @@ class JdbcRunbookVectorStoreIT {
             "gemini-embedding-2",
             768,
             "search-result-v1",
-            0.0
+            0.0,
+            GoogleGenAiProvider.DEVELOPER_API
     );
 
     @Container
@@ -130,6 +142,207 @@ class JdbcRunbookVectorStoreIT {
                 store.search(CORPUS_VERSION, PROFILE, unitVector(0), 1, -1)
                         .getFirst().entry().text()
         );
+    }
+
+    @Test
+    void synchronizesMetadataWithoutReplacingTheCurrentEmbedding() {
+        RunbookCorpusEntry original = new RunbookCorpusEntry(
+                "policy-section",
+                "policy-document",
+                "1.1",
+                "section-one",
+                "Policy title",
+                "Old display summary",
+                "knowledge/policy-document#section-one",
+                "The approved policy body is unchanged."
+        );
+        RunbookCorpusEntry current = new RunbookCorpusEntry(
+                "policy-section",
+                "policy-document",
+                "1.2",
+                "section-one",
+                "Policy title",
+                "Current display summary",
+                "knowledge/policy-document#section-one",
+                "The approved policy body is unchanged."
+        );
+        store.upsert(
+                CORPUS_VERSION,
+                original,
+                PROFILE,
+                new EmbeddingResult(unitVector(0), 20, 10, 3.0, 5)
+        );
+
+        assertTrue(store.containsCurrent(CORPUS_VERSION, current, PROFILE));
+        store.synchronizeMetadata(CORPUS_VERSION, current, PROFILE);
+
+        RunbookSearchHit hit = store.search(
+                CORPUS_VERSION,
+                PROFILE,
+                unitVector(0),
+                1,
+                -1
+        ).getFirst();
+        RunbookCorpusEntry stored = hit.entry();
+        assertEquals("1.2", stored.documentVersion());
+        assertEquals("Current display summary", stored.displaySummary());
+        assertEquals(1.0, hit.cosineSimilarity(), 0.000_001);
+        assertEquals(5L, JdbcClient.create(dataSource)
+                .sql("""
+                        SELECT embedding_latency_ms
+                        FROM runbook_embeddings
+                        WHERE evidence_id = 'policy-section'
+                        """)
+                .query(Long.class)
+                .single());
+    }
+
+    @Test
+    void neverTreatsDeveloperApiVectorsAsCurrentVertexVectors() {
+        RagProperties vertexProfile = new RagProperties(
+                "gemini-embedding-2",
+                768,
+                "search-result-v1",
+                0.0,
+                GoogleGenAiProvider.VERTEX_AI
+        );
+        RunbookCorpusEntry entry = entry(
+                "provider-bound-vector",
+                "Provider-bound vector",
+                "The same model ID can still use a different provider transport."
+        );
+
+        store.upsert(CORPUS_VERSION, entry, PROFILE, embedding(unitVector(0)));
+
+        assertTrue(store.containsCurrent(CORPUS_VERSION, entry, PROFILE));
+        assertFalse(store.containsCurrent(
+                CORPUS_VERSION,
+                entry,
+                vertexProfile
+        ));
+        assertEquals(0, store.count(CORPUS_VERSION, vertexProfile));
+
+        store.upsert(
+                CORPUS_VERSION,
+                entry,
+                vertexProfile,
+                embedding(unitVector(1))
+        );
+
+        assertEquals(1, store.count(CORPUS_VERSION, PROFILE));
+        assertEquals(1, store.count(CORPUS_VERSION, vertexProfile));
+        assertEquals(2L, JdbcClient.create(dataSource)
+                .sql("SELECT COUNT(*) FROM runbook_embeddings")
+                .query(Long.class)
+                .single());
+    }
+
+    @Test
+    void importsTheVersionedCorpusAndReportsEveryChunkCurrentWithoutAProvider() {
+        ClasspathRunbookCorpus corpus = new ClasspathRunbookCorpus(
+                JsonMapper.builder()
+                        .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                        .build(),
+                Validation.buildDefaultValidatorFactory().getValidator()
+        );
+        EmbeddingGateway deterministicEmbeddings = new EmbeddingGateway() {
+            @Override
+            public EmbeddingResult embedQuery(String query) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public EmbeddingResult embedDocument(String title, String text) {
+                int activeIndex = Math.floorMod(title.hashCode(), 768);
+                return new EmbeddingResult(
+                        unitVector(activeIndex),
+                        title.length() + text.length(),
+                        null,
+                        null,
+                        0
+                );
+            }
+        };
+        RunbookCorpusImporter importer = new RunbookCorpusImporter(
+                corpus,
+                store,
+                deterministicEmbeddings,
+                PROFILE,
+                Clock.fixed(Instant.parse("2026-09-03T08:00:00Z"), ZoneOffset.UTC)
+        );
+
+        RunbookImportReport first = importer.importMissingOrChanged();
+        RunbookImportReport second = importer.importMissingOrChanged();
+        RunbookIndexStatus status = new RunbookIndexReadiness(
+                corpus,
+                store,
+                PROFILE
+        ).inspect();
+
+        assertEquals(12, first.importedChunks());
+        assertEquals("developer_api", first.providerTransport());
+        assertEquals(0, first.skippedChunks());
+        assertEquals(0, second.importedChunks());
+        assertEquals(12, second.skippedChunks());
+        assertTrue(status.ready());
+        assertEquals(12, status.indexedChunks());
+        assertEquals(12, status.currentChunks());
+        assertEquals(12, status.expectedChunks());
+    }
+
+    @Test
+    void importsNordlyIntoASeparateVersionWithApprovedDocumentsOnly() {
+        JsonMapper mapper = JsonMapper.builder()
+                .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                .build();
+        NordlyKnowledgeCorpus corpus = new NordlyKnowledgeCorpus(
+                new NordlyResourceCatalog(mapper)
+        );
+        EmbeddingGateway deterministicEmbeddings = new EmbeddingGateway() {
+            @Override
+            public EmbeddingResult embedQuery(String query) {
+                return embedding(unitVector(0));
+            }
+
+            @Override
+            public EmbeddingResult embedDocument(String title, String text) {
+                return embedding(unitVector(Math.floorMod(title.hashCode(), 768)));
+            }
+        };
+        NordlyKnowledgeCorpusImporter importer =
+                new NordlyKnowledgeCorpusImporter(
+                        corpus,
+                        store,
+                        deterministicEmbeddings,
+                        PROFILE,
+                        Clock.fixed(
+                                Instant.parse("2026-09-03T08:00:00Z"),
+                                ZoneOffset.UTC
+                        )
+                );
+
+        RunbookImportReport first = importer.importMissingOrChanged();
+        RunbookImportReport second = importer.importMissingOrChanged();
+        RunbookIndexStatus status = new NordlyKnowledgeIndexReadiness(
+                corpus,
+                store,
+                PROFILE
+        ).inspect();
+
+        assertEquals("nordly-knowledge-corpus-v3", first.corpusVersion());
+        assertEquals("developer_api", first.providerTransport());
+        assertEquals(32, first.importedChunks());
+        assertEquals(0, second.importedChunks());
+        assertEquals(32, second.skippedChunks());
+        assertTrue(status.ready());
+        assertEquals(32, store.count(corpus.version(), PROFILE));
+        assertFalse(store.documentIds(corpus.version(), PROFILE)
+                .contains("kb-legacy-refund-playbook"));
+        assertFalse(store.documentIds(corpus.version(), PROFILE)
+                .contains("kb-untrusted-shortcuts"));
+        assertFalse(store.documentIds(corpus.version(), PROFILE)
+                .contains("kb-employee-compensation-register"));
+        assertEquals(0, store.count("runbook-corpus-v1", PROFILE));
     }
 
     private static RunbookCorpusEntry entry(

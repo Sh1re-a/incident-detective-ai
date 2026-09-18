@@ -1,0 +1,504 @@
+{
+  "fixture_version": "incident-lab-replay-fixture-v1",
+  "replay_id": "test-contract-fixture-v1",
+  "recording_source": "test_contract_fixture",
+  "recorded_at": "2026-09-15T08:00:00Z",
+  "source_content_git_sha": "test-fixture",
+  "runtime_build_git_sha": null,
+  "runtime_build_identity_verified": false,
+  "recorded_instruction": "Testa den publika replay-strukturen utan att kontakta AI eller databas.",
+  "recorded_instruction_locale": "sv",
+  "recorded_plan": {
+    "contract_version": "incident-lab-plan-v1",
+    "outcome": "plan_ready",
+    "delivery": "synchronous_post_run",
+    "truth_label": "Test-only contract fixture — no planning model was called.",
+    "safety": {
+      "decision": "allowed",
+      "reason_code": "none",
+      "summary_sv": "Testfixturen är avgränsad.",
+      "summary_en": "The test fixture is bounded."
+    },
+    "proposal": {
+      "status": "candidate",
+      "summary": "Synthetic CATALOG_SERVICE incident with catalog version divergence.",
+      "incident_family": "catalog_cache_invalidation",
+      "requested_severity": "high",
+      "affected_services": ["catalog_service"],
+      "requested_blast_radius": "single_service"
+    },
+    "java_validation": {
+      "decision": "APPROVED",
+      "plan": {
+        "contract_version": "incident-plan-v1",
+        "incident_family": "catalog_cache_invalidation",
+        "severity": "high",
+        "affected_services": ["catalog_service"],
+        "summary": "Synthetic CATALOG_SERVICE incident with catalog version divergence.",
+        "synthetic_only": true,
+        "write_actions_allowed": false,
+        "human_approval_required": true
+      },
+      "adjustments": [],
+      "rejection": null
+    },
+    "provider_receipt": null,
+    "limitations": ["Test resource only; no provider was called."]
+  },
+  "recorded_run": {
+    "contract_version": "incident-lab-run-v3",
+    "outcome": "alarm_investigated",
+    "delivery": "synchronous_post_run",
+    "truth_label": "Test-only Incident Lab contract fixture — no model or ADK runtime was called.",
+    "answer_state": "diagnosed",
+    "business_response": {
+      "headline": "Rotorsaken är verifierad i testfixturen",
+      "what_happened": "Ett syntetiskt kataloglarm passerade testkontraktet.",
+      "impact": "Testdata visar inaktuella produktuppgifter.",
+      "what_is_known": ["Ett testlarm och ett testbevis finns."],
+      "what_remains_unknown": [],
+      "safe_next_step": "Gör ingen ändring från testsvaret.",
+      "certainty": "Testkontrakt",
+      "human_approval_required": true
+    },
+    "developer_response": {
+      "summary": "Testkvittot håller ihop larm, logg, RAG och verifiering.",
+      "root_cause_code": "CATALOG_CACHE_INVALIDATION_FAILURE",
+      "affected_service": "CATALOG_SERVICE",
+      "verified_claims": [
+        {
+          "claim_code": "root_cause",
+          "claim_value_code": "CATALOG_CACHE_INVALIDATION_FAILURE",
+          "evidence_ids": ["test-log-catalog-cache"]
+        }
+      ],
+      "highlighted_log_evidence_ids": ["test-log-catalog-cache"],
+      "missing_evidence_codes": [],
+      "failed_verification_checks": [],
+      "next_read": "Granska testkvittot."
+    },
+    "action_receipt": {
+      "status": "proposed_only",
+      "read_operations": 3,
+      "write_tools_available": false,
+      "action_executed": false,
+      "human_approval_required": true,
+      "proposed_next_step": "Granska testkvittot.",
+      "summary": "Tre testläsningar och inga åtgärder."
+    },
+    "localized_presentations": {
+      "sv": {
+        "business_response": {
+          "headline": "Rotorsaken är verifierad i testfixturen",
+          "what_happened": "Ett syntetiskt kataloglarm passerade testkontraktet.",
+          "impact": "Testdata visar inaktuella produktuppgifter.",
+          "what_is_known": ["Ett testlarm och ett testbevis finns."],
+          "what_remains_unknown": [],
+          "safe_next_step": "Gör ingen ändring från testsvaret.",
+          "certainty": "Testkontrakt",
+          "human_approval_required": true
+        },
+        "developer_response": {
+          "summary": "Testkvittot håller ihop larm, logg, RAG och verifiering.",
+          "root_cause_code": "CATALOG_CACHE_INVALIDATION_FAILURE",
+          "affected_service": "CATALOG_SERVICE",
+          "verified_claims": [
+            {
+              "claim_code": "root_cause",
+              "claim_value_code": "CATALOG_CACHE_INVALIDATION_FAILURE",
+              "evidence_ids": ["test-log-catalog-cache"]
+            }
+          ],
+          "highlighted_log_evidence_ids": ["test-log-catalog-cache"],
+          "missing_evidence_codes": [],
+          "failed_verification_checks": [],
+          "next_read": "Granska testkvittot."
+        },
+        "action_receipt": {
+          "status": "proposed_only",
+          "read_operations": 3,
+          "write_tools_available": false,
+          "action_executed": false,
+          "human_approval_required": true,
+          "proposed_next_step": "Granska testkvittot.",
+          "summary": "Tre testläsningar och inga åtgärder."
+        }
+      },
+      "en": {
+        "business_response": {
+          "headline": "The root cause is verified in the test fixture",
+          "what_happened": "A synthetic catalogue alarm passed the test contract.",
+          "impact": "Test data shows stale product information.",
+          "what_is_known": ["A test alarm and one test evidence item exist."],
+          "what_remains_unknown": [],
+          "safe_next_step": "Do not make a change based on the test response.",
+          "certainty": "Test contract",
+          "human_approval_required": true
+        },
+        "developer_response": {
+          "summary": "The test receipt connects alarm, log, RAG, and verification.",
+          "root_cause_code": "CATALOG_CACHE_INVALIDATION_FAILURE",
+          "affected_service": "CATALOG_SERVICE",
+          "verified_claims": [
+            {
+              "claim_code": "root_cause",
+              "claim_value_code": "CATALOG_CACHE_INVALIDATION_FAILURE",
+              "evidence_ids": ["test-log-catalog-cache"]
+            }
+          ],
+          "highlighted_log_evidence_ids": ["test-log-catalog-cache"],
+          "missing_evidence_codes": [],
+          "failed_verification_checks": [],
+          "next_read": "Review the test receipt."
+        },
+        "action_receipt": {
+          "status": "proposed_only",
+          "read_operations": 3,
+          "write_tools_available": false,
+          "action_executed": false,
+          "human_approval_required": true,
+          "proposed_next_step": "Review the test receipt.",
+          "summary": "Three test reads and no actions."
+        }
+      }
+    },
+    "plan": {
+      "contract_version": "incident-plan-v1",
+      "incident_family": "catalog_cache_invalidation",
+      "severity": "high",
+      "affected_services": ["catalog_service"],
+      "summary": "Synthetic CATALOG_SERVICE incident with catalog version divergence.",
+      "synthetic_only": true,
+      "write_actions_allowed": false,
+      "human_approval_required": true
+    },
+    "generation_receipt": {
+      "generator_version": "nordly-incident-generator-v2",
+      "seed": 6907494064764568081,
+      "seed_origin": "server_generated",
+      "incident_family": "catalog_cache_invalidation",
+      "evidence_mode": "diagnostic",
+      "noise_level": "low",
+      "scenario_id": "generated-catalog-cache-invalidation-6e8ed80aa67f5ab1",
+      "variant": {
+        "variant_id": "catalog-cache-invalidation-ad6eff707311d3b0",
+        "fingerprint": "ad6eff707311d3b0f9b10cab312ebc460f7374f7e7f5c9f60b7e9180527d3f1b"
+      }
+    },
+    "scenario": {
+      "scenario_id": "generated-catalog-cache-invalidation-6e8ed80aa67f5ab1",
+      "title": "Generated storefront shows stale product information",
+      "description": "A request-local synthetic test incident.",
+      "incident_started_at": "2026-09-12T03:08:00Z",
+      "time_window": {
+        "start": "2026-09-12T03:01:00Z",
+        "end": "2026-09-12T03:21:00Z"
+      },
+      "affected_services": ["STOREFRONT", "CATALOG_SERVICE"],
+      "business_impact_summary": "Test-only synthetic impact.",
+      "initial_symptoms": [
+        {
+          "symptom_code": "CATALOG_VERSION_DIVERGENCE",
+          "summary": "The served test version differs from the source version.",
+          "observed_at": "2026-09-12T03:11:00Z"
+        }
+      ],
+      "version": 1
+    },
+    "backend_logs": [
+      {
+        "evidence_type": "log",
+        "evidence_id": "test-log-catalog-cache",
+        "scenario_id": "generated-catalog-cache-invalidation-6e8ed80aa67f5ab1",
+        "observed_at": "2026-09-12T03:10:08Z",
+        "display_summary": "Test log shows a skipped cache invalidation.",
+        "source_ref": "test/logs/catalog-cache",
+        "content": {
+          "service": "CATALOG_SERVICE",
+          "level": "ERROR",
+          "message": "TestCatalogCacheVersionMismatch",
+          "attributes": {"served_version": "v1", "source_version": "v2"}
+        }
+      }
+    ],
+    "alarm_receipt": {
+      "alarm_id": "test-catalog-alarm",
+      "rule_id": "CATALOG_VERSION_DIVERGENCE_V1",
+      "incident_family": "catalog_cache_invalidation",
+      "scenario_id": "generated-catalog-cache-invalidation-6e8ed80aa67f5ab1",
+      "service": "CATALOG_SERVICE",
+      "triggered_at": "2026-09-12T03:11:00Z",
+      "signal": {
+        "name": "catalog_version_divergence_count",
+        "comparison": "at_least",
+        "threshold_value": 1.0,
+        "observed_value": 2.0,
+        "unit": "versions",
+        "lookback_seconds": null
+      },
+      "evidence_ids": ["test-metric-catalog-version"]
+    },
+    "agent_turn": {
+      "contract_version": "nordly-adk-turn-v4",
+      "run_id": "test-adk-run",
+      "session_id": "test-session",
+      "turn_id": "test-turn",
+      "mode": "adk_live_ai",
+      "truth_label": "Test-only ADK contract fixture — no ADK runtime was called.",
+      "outcome": "completed",
+      "provider_route": null,
+      "scenario": {
+        "scenario_id": "generated-catalog-cache-invalidation-6e8ed80aa67f5ab1",
+        "title": "Generated storefront shows stale product information",
+        "description": "A request-local synthetic test incident.",
+        "incident_started_at": "2026-09-12T03:08:00Z",
+        "time_window": {
+          "start": "2026-09-12T03:01:00Z",
+          "end": "2026-09-12T03:21:00Z"
+        },
+        "affected_services": ["STOREFRONT", "CATALOG_SERVICE"],
+        "business_impact_summary": "Test-only synthetic impact.",
+        "initial_symptoms": [
+          {
+            "symptom_code": "CATALOG_VERSION_DIVERGENCE",
+            "summary": "The served test version differs from the source version.",
+            "observed_at": "2026-09-12T03:11:00Z"
+          }
+        ],
+        "version": 1
+      },
+      "safety": {
+        "decision": "allowed",
+        "reason_code": "none",
+        "summary_sv": "Testfixturen är avgränsad.",
+        "summary_en": "The test fixture is bounded."
+      },
+      "runtime": {
+        "framework": "test_contract",
+        "framework_version": "1",
+        "agent_name": "nordly_incident_agent",
+        "model_id": "test-model",
+        "prompt_version": "test-prompt",
+        "session_service": "test_fixture",
+        "delivery": "synchronous_post_run",
+        "event_source": "test_fixture",
+        "runner_invoked": true,
+        "streamed": false
+      },
+      "workflow": {
+        "type": "sequential_agent",
+        "expected_agent_order": ["nordly_evidence_agent", "nordly_diagnosis_agent"],
+        "observed_agent_order": ["nordly_evidence_agent", "nordly_diagnosis_agent"],
+        "evidence_handoff": "adk_function_response",
+        "final_response_author": "nordly_diagnosis_agent",
+        "completed_in_order": true
+      },
+      "events": [
+        {
+          "sequence": 1,
+          "event_id": "test-event-tool-call",
+          "invocation_id": "test-invocation",
+          "author": "nordly_evidence_agent",
+          "type": "tool_call",
+          "observed_at": "2026-09-12T03:11:01Z",
+          "final_response": false,
+          "content_withheld": false,
+          "text": null,
+          "function_calls": [
+            {"id": "test-call", "name": "inspect_incident_evidence", "arguments": {}}
+          ],
+          "function_responses": [],
+          "token_usage": null,
+          "provider_model_version": null
+        },
+        {
+          "sequence": 2,
+          "event_id": "test-event-tool-result",
+          "invocation_id": "test-invocation",
+          "author": "nordly_evidence_agent",
+          "type": "tool_result",
+          "observed_at": "2026-09-12T03:11:02Z",
+          "final_response": false,
+          "content_withheld": false,
+          "text": null,
+          "function_calls": [],
+          "function_responses": [
+            {"id": "test-call", "name": "inspect_incident_evidence", "response": {"status": "found"}}
+          ],
+          "token_usage": null,
+          "provider_model_version": null
+        },
+        {
+          "sequence": 3,
+          "event_id": "test-event-final",
+          "invocation_id": "test-invocation",
+          "author": "nordly_diagnosis_agent",
+          "type": "final_response",
+          "observed_at": "2026-09-12T03:11:03Z",
+          "final_response": true,
+          "content_withheld": true,
+          "text": null,
+          "function_calls": [],
+          "function_responses": [],
+          "token_usage": null,
+          "provider_model_version": null
+        }
+      ],
+      "tool_events": [
+        {
+          "event_id": "test-tool-metrics",
+          "collection_round": 1,
+          "tool_name": "get_metrics",
+          "arguments": {},
+          "safe_summary": "Returned one bounded test metric.",
+          "evidence": [
+            {
+              "evidence_type": "metric",
+              "evidence_id": "test-metric-catalog-version",
+              "scenario_id": "generated-catalog-cache-invalidation-6e8ed80aa67f5ab1",
+              "observed_at": "2026-09-12T03:11:00Z",
+              "display_summary": "Test divergence reached two versions.",
+              "source_ref": "test/metrics/catalog-version",
+              "content": {
+                "metric_name": "catalog_version_divergence_count",
+                "value": 2.0,
+                "unit": "versions",
+                "labels": {"service": "CATALOG_SERVICE"}
+              }
+            }
+          ],
+          "runbook_retrieval": null
+        },
+        {
+          "event_id": "test-tool-logs",
+          "collection_round": 1,
+          "tool_name": "search_logs",
+          "arguments": {},
+          "safe_summary": "Returned one bounded test log.",
+          "evidence": [
+            {
+              "evidence_type": "log",
+              "evidence_id": "test-log-catalog-cache",
+              "scenario_id": "generated-catalog-cache-invalidation-6e8ed80aa67f5ab1",
+              "observed_at": "2026-09-12T03:10:08Z",
+              "display_summary": "Test log shows a skipped cache invalidation.",
+              "source_ref": "test/logs/catalog-cache",
+              "content": {
+                "service": "CATALOG_SERVICE",
+                "level": "ERROR",
+                "message": "TestCatalogCacheVersionMismatch",
+                "attributes": {"served_version": "v1", "source_version": "v2"}
+              }
+            }
+          ],
+          "runbook_retrieval": null
+        },
+        {
+          "event_id": "test-tool-runbooks",
+          "collection_round": 1,
+          "tool_name": "retrieve_runbooks",
+          "arguments": {"query": "cache invalidation"},
+          "safe_summary": "Returned one bounded test runbook.",
+          "evidence": [
+            {
+              "evidence_type": "runbook",
+              "evidence_id": "test-runbook-cache",
+              "scenario_id": "generated-catalog-cache-invalidation-6e8ed80aa67f5ab1",
+              "display_summary": "Test runbook about cache invalidation.",
+              "source_ref": "test/runbooks/cache",
+              "content": {
+                "document_id": "test-cache-runbook",
+                "chunk_id": "cache-invalidation",
+                "document_version": "1",
+                "text": "Inspect cache versions before a human approves any change."
+              }
+            }
+          ],
+          "runbook_retrieval": {
+            "backend": "pgvector_exact_cosine",
+            "corpus_version": "test-corpus-v1",
+            "embedding_profile": {
+              "model_id": "test-embedding-model",
+              "dimensions": 3,
+              "format_version": "test-v1",
+              "minimum_similarity": 0.5
+            },
+            "query_embedding": {
+              "local_input_characters": 18,
+              "provider_billable_characters": null,
+              "provider_input_tokens": null,
+              "latency_ms": 0
+            },
+            "matches": [
+              {
+                "rank": 1,
+                "evidence_id": "test-runbook-cache",
+                "cosine_similarity": 0.9,
+                "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ]
+          }
+        }
+      ],
+      "diagnostic_probe": null,
+      "diagnosis": null,
+      "verification": {
+        "diagnosis_schema_pass": true,
+        "ground_truth_schema_pass": true,
+        "citation_validity": {"valid": true, "unknown_evidence_ids": []},
+        "evidence_precision": {
+          "applicable": false,
+          "supported_triples": 0,
+          "total_triples": 0,
+          "score": null,
+          "citation_support": []
+        },
+        "claim_coverage": {
+          "applicable": false,
+          "matched_claim_count": 0,
+          "reference_claim_count": 0,
+          "score": null
+        },
+        "diagnosis_correctness": {
+          "evaluated": true,
+          "diagnosis_applicable": true,
+          "root_cause_correct": true,
+          "affected_service_correct": true,
+          "abstention_correct": false
+        },
+        "hard_errors": []
+      },
+      "comparison": null,
+      "verification_event": {
+        "source": "test_contract_verifier",
+        "executed_at": "2026-09-12T03:11:04Z",
+        "schema_valid": true,
+        "citations_valid": true,
+        "direct_evidence_support_valid": true,
+        "factual_result_matches_ground_truth": true,
+        "agent_sequence_valid": true,
+        "evidence_handoff_valid": true,
+        "tool_boundary_valid": true,
+        "final_author_valid": true,
+        "answer_released": true,
+        "summary": "Test contract checks passed."
+      },
+      "receipt": {
+        "model_calls": 2,
+        "adk_tool_calls": 1,
+        "read_operations": 3,
+        "embedding_calls": 1,
+        "write_tools_available": false,
+        "action_executed": false,
+        "human_approval_required": true,
+        "registered_tools": ["inspect_incident_evidence"],
+        "token_usage": null,
+        "estimated_cost_usd": null,
+        "estimated_cost_basis": "Test contract fixture; no provider cost claim.",
+        "total_latency_ms": 0
+      },
+      "limitations": ["Test resource only; no model or ADK runtime was called."]
+    },
+    "limitations": ["Test resource only; it is never packaged as a production golden recording."]
+  }
+}

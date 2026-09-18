@@ -15,6 +15,10 @@ public class RagDatabaseConfiguration {
 
     @Bean(destroyMethod = "close")
     HikariDataSource ragDataSource(RagDatabaseProperties properties) {
+        return new HikariDataSource(hikariConfig(properties));
+    }
+
+    static HikariConfig hikariConfig(RagDatabaseProperties properties) {
         HikariConfig config = new HikariConfig();
         config.setPoolName("incident-detective-rag");
         config.setJdbcUrl(properties.url());
@@ -23,7 +27,19 @@ public class RagDatabaseConfiguration {
         config.setMaximumPoolSize(properties.maximumPoolSize());
         config.setMinimumIdle(0);
         config.setConnectionTimeout(properties.connectionTimeoutMs());
-        return new HikariDataSource(config);
+        if (properties.usesCloudSqlConnector()) {
+            config.addDataSourceProperty(
+                    "socketFactory",
+                    "com.google.cloud.sql.postgres.SocketFactory"
+            );
+            config.addDataSourceProperty(
+                    "cloudSqlInstance",
+                    properties.cloudSqlInstance()
+            );
+            config.addDataSourceProperty("ipTypes", properties.cloudSqlIpType());
+            config.addDataSourceProperty("cloudSqlRefreshStrategy", "lazy");
+        }
+        return config;
     }
 
     @Bean

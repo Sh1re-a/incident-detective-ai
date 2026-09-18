@@ -10,6 +10,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,6 +22,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 class OpenApiNullableReferenceTest {
+
+    private static final Map<String, Set<String>> OPTIONAL_PROPERTIES = Map.of(
+            "GeneratedCaseLiveRequest",
+            Set.of("incident_family")
+    );
 
     @Autowired
     private MockMvc mockMvc;
@@ -36,6 +42,16 @@ class OpenApiNullableReferenceTest {
                         "RetrievalCapability",
                         "active_embedding_profile",
                         "EmbeddingCapability"
+                ))
+                .andExpect(nullableReference(
+                        "LiveInvestigationResult",
+                        "diagnosis",
+                        "Diagnosis"
+                ))
+                .andExpect(nullableReference(
+                        "LiveInvestigationResult",
+                        "comparison",
+                        "ReplayComparison"
                 ))
                 .andExpect(nullableReference(
                         "LiveInvestigationResult",
@@ -65,6 +81,11 @@ class OpenApiNullableReferenceTest {
 
         String[][] nullableFields = {
                 {"ModelCallMetadata", "provider_response_id"},
+                {"ProviderCapability", "location"},
+                {"DeploymentCapability", "revision"},
+                {"DeploymentCapability", "build_git_sha"},
+                {"KnowledgeChunk", "text"},
+                {"KnowledgeChunk", "content_sha256"},
                 {"ModelTokenUsage", "input_tokens"},
                 {"ModelTokenUsage", "cached_input_tokens"},
                 {"ModelTokenUsage", "uncached_input_tokens"},
@@ -97,7 +118,8 @@ class OpenApiNullableReferenceTest {
     }
 
     @Test
-    void marksEverySerializedObjectPropertyAsRequired() throws Exception {
+    void marksEveryNonOptionalSerializedObjectPropertyAsRequired()
+            throws Exception {
         MvcResult result = mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -114,6 +136,10 @@ class OpenApiNullableReferenceTest {
             Set<String> propertyNames = new HashSet<>(
                     properties.propertyNames()
             );
+            propertyNames.removeAll(OPTIONAL_PROPERTIES.getOrDefault(
+                    schemaName,
+                    Set.of()
+            ));
             Set<String> required = new HashSet<>();
             schema.get("required").forEach(
                     node -> required.add(node.asText())

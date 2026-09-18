@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.generated;
 
+import dev.shirwac.incidentdetective.alarm.PaymentTimeoutTelemetry;
 import dev.shirwac.incidentdetective.domain.diagnosis.ClaimCode;
 import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
@@ -33,6 +34,11 @@ public final class PaymentTimeoutGeneratedCaseGenerator {
 
     public GeneratedCase generate(GeneratedCaseRequest request) {
         Objects.requireNonNull(request, "request must not be null");
+        if (request.incidentFamily() != GeneratedIncidentFamily.PAYMENT_TIMEOUT) {
+            throw new IllegalArgumentException(
+                    "Payment timeout generator requires incident_family payment_timeout"
+            );
+        }
 
         Random random = new Random(request.seed());
         String namespace = "%016x".formatted(random.nextLong());
@@ -173,6 +179,10 @@ public final class PaymentTimeoutGeneratedCaseGenerator {
                 windowStart.plusSeconds(5 * 60L + 12),
                 release
         ));
+        evidence.addAll(PaymentTimeoutTelemetry.startingAt(
+                scenarioId,
+                windowStart.plusSeconds(8 * 60L + 23)
+        ).logs());
 
         if (request.evidenceMode() == GeneratedEvidenceMode.DIAGNOSTIC) {
             evidence.add(timeoutConfigLog(
@@ -495,7 +505,10 @@ public final class PaymentTimeoutGeneratedCaseGenerator {
                                     ClaimCode.OBSERVED_SYMPTOM,
                                     "PAYMENT_LATENCY_SPIKE",
                                     ids.paymentP95(),
-                                    ids.timeoutError()
+                                    ids.timeoutError(),
+                                    ids.paymentHttpFailure(4),
+                                    ids.paymentHttpFailure(5),
+                                    ids.paymentHttpFailure(6)
                             ),
                             support(
                                     ClaimCode.MISSING_EVIDENCE,
@@ -531,7 +544,10 @@ public final class PaymentTimeoutGeneratedCaseGenerator {
                                 ClaimCode.AFFECTED_SERVICE,
                                 AFFECTED_SERVICE,
                                 ids.timeoutError(),
-                                ids.failedTrace()
+                                ids.failedTrace(),
+                                ids.paymentHttpFailure(4),
+                                ids.paymentHttpFailure(5),
+                                ids.paymentHttpFailure(6)
                         ),
                         support(
                                 ClaimCode.TRIGGER,
@@ -543,14 +559,20 @@ public final class PaymentTimeoutGeneratedCaseGenerator {
                                 ClaimCode.CUSTOMER_IMPACT,
                                 "CHECKOUT_PAYMENT_FAILURES",
                                 ids.failureRatio(),
-                                ids.failedAttempts()
+                                ids.failedAttempts(),
+                                ids.paymentHttpFailure(4),
+                                ids.paymentHttpFailure(5),
+                                ids.paymentHttpFailure(6)
                         ),
                         support(
                                 ClaimCode.OBSERVED_SYMPTOM,
                                 "PAYMENT_LATENCY_SPIKE",
                                 ids.paymentP95(),
                                 ids.timeoutError(),
-                                ids.failedTrace()
+                                ids.failedTrace(),
+                                ids.paymentHttpFailure(4),
+                                ids.paymentHttpFailure(5),
+                                ids.paymentHttpFailure(6)
                         )
                 ),
                 List.of()
@@ -612,6 +634,10 @@ public final class PaymentTimeoutGeneratedCaseGenerator {
 
         private String missingConfigAudit() {
             return id("log-missing-config-audit");
+        }
+
+        private String paymentHttpFailure(int sequence) {
+            return id("payment-http-%03d".formatted(sequence));
         }
 
         private String inventoryNoise() {

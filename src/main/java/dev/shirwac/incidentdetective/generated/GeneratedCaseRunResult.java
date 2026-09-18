@@ -22,6 +22,8 @@ public record GeneratedCaseRunResult(
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             long seed,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            GeneratedIncidentFamily incidentFamily,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             GeneratedEvidenceMode evidenceMode,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             GeneratedNoiseLevel noiseLevel

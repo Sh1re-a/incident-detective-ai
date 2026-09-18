@@ -1,6 +1,8 @@
 package dev.shirwac.incidentdetective.generated;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.shirwac.incidentdetective.alarm.Http5xxBurstRule;
+import dev.shirwac.incidentdetective.alarm.PaymentTimeoutTelemetry;
 import dev.shirwac.incidentdetective.domain.diagnosis.ClaimCode;
 import dev.shirwac.incidentdetective.domain.diagnosis.DiagnosisStatus;
 import dev.shirwac.incidentdetective.domain.evidence.Evidence;
@@ -100,10 +102,23 @@ class PaymentTimeoutGeneratedCaseGeneratorTest {
                 "PAYMENT_ADAPTER",
                 generated.hiddenGroundTruth().affectedService()
         );
-        assertEquals(7, generated.investigationData().evidenceInventory().size());
+        assertEquals(13, generated.investigationData().evidenceInventory().size());
         assertEquals(3, count(generated, MetricEvidence.class));
-        assertEquals(3, count(generated, LogEvidence.class));
+        assertEquals(9, count(generated, LogEvidence.class));
         assertEquals(1, count(generated, TraceEvidence.class));
+        assertEquals(
+                List.of("200", "200", "200", "504", "504", "504"),
+                generated.investigationData().evidenceInventory().stream()
+                        .filter(LogEvidence.class::isInstance)
+                        .map(LogEvidence.class::cast)
+                        .filter(log -> PaymentTimeoutTelemetry.EVENT_KIND.equals(
+                                log.content().attributes().get("event_kind")
+                        ))
+                        .map(log -> log.content().attributes().get(
+                                Http5xxBurstRule.HTTP_STATUS_ATTRIBUTE
+                        ))
+                        .toList()
+        );
         assertGeneratedIdsAreUniqueAndIsolated(generated);
         assertGroundTruthUsesOnlyGeneratedEvidence(generated);
     }
@@ -197,6 +212,17 @@ class PaymentTimeoutGeneratedCaseGeneratorTest {
                         null
                 )
         );
+    }
+
+    @Test
+    void legacyRequestDefaultsToPaymentTimeoutFamily() {
+        GeneratedCaseRequest request = request(
+                42L,
+                GeneratedEvidenceMode.DIAGNOSTIC,
+                GeneratedNoiseLevel.NONE
+        );
+
+        assertEquals(GeneratedIncidentFamily.PAYMENT_TIMEOUT, request.incidentFamily());
     }
 
     private GeneratedCaseRequest request(

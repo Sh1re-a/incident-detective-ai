@@ -29,7 +29,8 @@ public final class CapabilitiesController {
             summary = "Describe backend capabilities",
             description = "Returns synthetic-data boundaries, investigation modes, read-only "
                     + "tools, enforced live-AI budgets, active retrieval configuration and "
-                    + "prompt-cache policy. Credentials are never returned."
+                    + "current vector-index readiness plus prompt-cache policy. "
+                    + "Credentials are never returned."
     )
     @ApiResponse(
             responseCode = "200",

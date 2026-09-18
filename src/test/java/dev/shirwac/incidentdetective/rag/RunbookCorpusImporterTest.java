@@ -1,5 +1,6 @@
 package dev.shirwac.incidentdetective.rag;
 
+import dev.shirwac.incidentdetective.ai.GoogleGenAiProvider;
 import jakarta.validation.Validation;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.PropertyNamingStrategies;
@@ -22,7 +23,8 @@ class RunbookCorpusImporterTest {
             "gemini-embedding-2",
             768,
             "search-result-v1",
-            0.0
+            0.0,
+            GoogleGenAiProvider.DEVELOPER_API
     );
 
     @Test
@@ -43,10 +45,12 @@ class RunbookCorpusImporterTest {
         RunbookImportReport report = importer.importMissingOrChanged();
 
         assertEquals(12, report.totalChunks());
+        assertEquals("developer_api", report.providerTransport());
         assertEquals(11, report.importedChunks());
         assertEquals(1, report.skippedChunks());
         assertEquals(11, embeddings.inputs.size());
         assertEquals(11, store.upserted.size());
+        assertEquals(1, store.synchronizedMetadata.size());
         assertTrue(report.inputCharacters() > 0);
         assertEquals(110, report.providerBillableCharacters());
         assertEquals(33.0, report.providerInputTokens());
@@ -92,6 +96,7 @@ class RunbookCorpusImporterTest {
 
         private final Set<String> current;
         private final List<String> upserted = new ArrayList<>();
+        private final List<String> synchronizedMetadata = new ArrayList<>();
 
         private FakeStore(Set<String> current) {
             this.current = new HashSet<>(current);
@@ -104,6 +109,15 @@ class RunbookCorpusImporterTest {
                 RagProperties profile
         ) {
             return current.contains(entry.evidenceId());
+        }
+
+        @Override
+        public void synchronizeMetadata(
+                String corpusVersion,
+                RunbookCorpusEntry entry,
+                RagProperties profile
+        ) {
+            synchronizedMetadata.add(entry.evidenceId());
         }
 
         @Override

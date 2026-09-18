@@ -23,6 +23,9 @@ import static org.mockito.Mockito.when;
 
 final class LiveInvestigationTestFixtures {
 
+    static final String WITHHELD_DIAGNOSIS_SENTINEL =
+            "MODEL_PROSE_MUST_NOT_ESCAPE_FAILED_VERIFICATION_74E2";
+
     private LiveInvestigationTestFixtures() {
     }
 
@@ -181,6 +184,65 @@ final class LiveInvestigationTestFixtures {
                 ),
                 new SafeNextStep(
                         "Review the timeout configuration with a human.",
+                        true
+                )
+        );
+    }
+
+    static Diagnosis diagnosisWithUnsupportedCitation() {
+        Diagnosis supported = correctDiagnosis();
+        Claim unsupportedRootCause = new Claim(
+                ClaimCode.ROOT_CAUSE,
+                "PAYMENT_TIMEOUT_CONFIG",
+                "The payment timeout is shorter than observed duration.",
+                List.of("cpt-v1-metric-failed-checkouts")
+        );
+        return new Diagnosis(
+                supported.status(),
+                supported.rootCauseCode(),
+                supported.affectedService(),
+                supported.businessSummary(),
+                supported.technicalSummary(),
+                List.of(
+                        unsupportedRootCause,
+                        supported.claims().get(1),
+                        supported.claims().get(2),
+                        supported.claims().get(3)
+                ),
+                supported.safeNextStep()
+        );
+    }
+
+    static Diagnosis incorrectAbstentionWithSentinel() {
+        return new Diagnosis(
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                WITHHELD_DIAGNOSIS_SENTINEL,
+                WITHHELD_DIAGNOSIS_SENTINEL,
+                List.of(),
+                new SafeNextStep(
+                        WITHHELD_DIAGNOSIS_SENTINEL,
+                        true
+                )
+        );
+    }
+
+    static Diagnosis incorrectAbstentionWithSupportedCitation() {
+        return new Diagnosis(
+                DiagnosisStatus.INSUFFICIENT_EVIDENCE,
+                null,
+                null,
+                "More evidence is required.",
+                "Payment latency reached the timeout boundary.",
+                List.of(new Claim(
+                        ClaimCode.OBSERVED_SYMPTOM,
+                        "PAYMENT_LATENCY_SPIKE",
+                        "Payment latency reached the timeout boundary.",
+                        List.of("cpt-v1-metric-payment-p95")
+                )),
+                new SafeNextStep(
+                        "Collect more evidence after human approval.",
                         true
                 )
         );

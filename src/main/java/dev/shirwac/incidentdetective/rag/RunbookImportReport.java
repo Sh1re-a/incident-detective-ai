@@ -8,6 +8,7 @@ public record RunbookImportReport(
         String embeddingModel,
         int embeddingDimensions,
         String embeddingFormatVersion,
+        String providerTransport,
         int totalChunks,
         int importedChunks,
         int skippedChunks,

@@ -1,8 +1,9 @@
 # Lärspår och verktyg
 
-- **Status:** replay/live-API, bounded function calling, structured output,
-  runbook-RAG, deterministisk verifiering och ett litet opt-in evalspår finns.
-- **Senast verifierad:** 27 augusti 2026
+- **Status:** replay/live-API, Incident Lab med avgränsad Google ADK-
+  orkestrering, bounded function calling, structured output, runbook-RAG,
+  deterministisk verifiering och ett litet opt-in evalspår finns.
+- **Senast verifierad:** 14 september 2026
 
 Målet är inte att läsa allt innan jag bygger. Jag följer samma korta loop:
 
@@ -25,21 +26,25 @@ Maven används i stället för Gradle. Det finns redan på datorn, fungerar dire
 | Nu | Java records, Jakarta Validation och Jackson | Typade kontrakt, JSON och tydliga valideringsfel. |
 | Nu | JUnit och Spring Boot Test | Deterministiska tester av regler och applikationsstart. |
 | Nu | Google Gen AI SDK för Java 1.67.0 | Verklig function calling och structured output bakom en liten intern gateway. |
+| Nu | Google ADK for Java 1.7.0 | Ett fast `SequentialAgent`-flöde med en read-only evidensagent och en tool-fri diagnosagent. |
 | Nu | PostgreSQL och pgvector | Retrieval endast över den fristående syntetiska runbookkorpusen. |
-| Senare | Strukturerade JSON-loggar och OpenTelemetry | Förklara körningar, fel och latency. |
+| Nu, avgränsat | OpenTelemetry | Testade manuella domänspans; lokal export är avstängd och collector/dashboard samt strukturerade JSON-loggar återstår. |
 | Nu | React 19, TypeScript och Vite | Story View, Engineering View och beteendetester mot API-kontraktet. |
-| Senare | Docker och Google Cloud CLI | Containerkontroll och separat godkänd Cloud Run-deploy. |
+| Nu/later | Docker och Google Cloud CLI | Docker kör lokal pgvector; en separat godkänd Cloud Run-/Vertex-deploy återstår. |
 
-Vi använder inte LangChain/LangGraph, multi-agent, MCP eller Assistants API i kärnan. Flödet är den egna, begränsade processen `COLLECT → SYNTHESIZE → VERIFY`.
+Vi använder inte LangChain/LangGraph, MCP eller Assistants API i kärnan. Det
+ursprungliga liveflödet är `COLLECT → SYNTHESIZE → VERIFY`. Incident Lab använder
+dessutom Google ADK som ett fast tvåagentsflöde med exakt en read-only function;
+det är inte en fritt agerande agent.
 
 ## Verifierat på datorn
 
 - Java 21.0.10 LTS, `javac` 21.0.10 och Maven 3.9.12 finns.
 - Projektet använder Spring Boot 4.1.1 och Maven Wrapper 3.3.4 med Maven 3.9.16.
-- IntelliJ IDEA 2025.3.3, Google Cloud CLI och Docker finns. Den lokala PostgreSQL/pgvector-containern var healthy vid kontrollen 26 augusti.
-- Hela den providerfria Maven-testsuiten passerar. Pgvector-integrationerna och fyra Flyway-migrationer passerar separat mot PostgreSQL 17/pgvector 0.8.6. Aktuella testantal ska läsas från CI, inte hårdkodas i projektdokumentationen.
-- Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.1-flash-lite` med `MINIMAL` thinking och `gemini-live-v6`.
-- De senaste två v6-smokesen i RAG-profilen gav rätt diagnos och giltiga citationer på 6,06 respektive 5,51 sekunder. Payment-körningen valde riktig pgvector-retrieval; inventory-körningen valde en trace. Historiken innehåller sämre evidensprecision och provider-timeouts; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
+- IntelliJ IDEA 2025.3.3, Google Cloud CLI och Docker finns. Den lokala PostgreSQL 17/pgvector 0.8.6-containern var healthy vid kontrollen 14 september.
+- Slutgrinden 14 september körde 480 unit/API/contract-tester och 8 databas-integrationstester: 480 + 6 passerade, 2 uttryckliga kostnadsbärande integrationer hoppades över och 6 Flyway-migrationer validerades och applicerades mot PostgreSQL/pgvector.
+- Gemini API-åtkomst är verifierad genom riktiga opt-in-anrop. Standardprofilen är `gemini-3.1-flash-lite` med `MINIMAL` thinking och `gemini-live-v7`.
+- Härdningsrundan innehöll ett planner-anrop som gav ett sanerat HTTP 502-fel utan retry samt en separat HTTP 200 Incident Lab-körning där ADK, två modellsteg, en embedding och pgvector observerades men Java höll inne den felaktiga diagnosen. Historiken innehåller både lyckade och misslyckade provideranrop; accuracy, p95 och stabilitet är därför fortfarande **inte verifierade**.
 - Livevägen har ett första kostnadsskydd: en samtidig körning och fem starter per rullande tio minuter per backendinstans. Cloud Run-instansgräns och budgetlarm är ännu inte konfigurerade.
 - Korpusen innehåller 10 dokument/12 chunks. Retrieval v1 gav development 5/5 och held-out 4/5 Hit@4; den missade frågan behålls som failure case.
 
@@ -109,11 +114,12 @@ Läs:
 1. [Cloud Run: Logging](https://docs.cloud.google.com/run/docs/logging)
 2. [OpenTelemetry: Spring Boot starter](https://opentelemetry.io/docs/zero-code/java/spring-boot-starter/)
 
-Byggresultat hittills: Actuator/Micrometer använder lågkardinalitetstaggar och
-API-resultatet sparar sanerad körmetadata, latency, calls och nullable usage.
-Nästa del är strukturerade körhändelser och
-OpenTelemetry-spans för API, tools och verifiering utan hemligheter eller privat
-tankedja.
+Byggresultat hittills: Actuator/Micrometer använder lågkardinalitetstaggar,
+OpenTelemetry-spans har en explicit allowlist och Incident Lab skriver
+strukturerade, korrelerade livscykelhändelser när `cloud`-profilen är aktiv.
+Händelserna innehåller endast serverkontrollerade ID:n, utfall, räknare,
+latency, tokenmängd och kostnadsestimat när det finns — aldrig prompt,
+kunddata, evidensinnehåll eller privat tankekedja. Se `CLOUD-LOGGING.md`.
 
 ### Pass 7 – container och Cloud Run
 

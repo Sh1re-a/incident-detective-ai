@@ -1,12 +1,10 @@
 import "@testing-library/jest-dom/vitest";
-
-import { cleanup } from "@testing-library/react";
-import { afterEach, vi } from "vitest";
+import { vi } from "vitest";
 
 Object.defineProperty(window, "matchMedia", {
-  configurable: true,
+  writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
-    matches: query === "(prefers-reduced-motion: reduce)",
+    matches: false,
     media: query,
     onchange: null,
     addEventListener: vi.fn(),
@@ -17,13 +15,8 @@ Object.defineProperty(window, "matchMedia", {
   })),
 });
 
-Object.defineProperty(window, "requestAnimationFrame", {
+Object.defineProperty(Element.prototype, "scrollIntoView", {
   configurable: true,
-  value: (callback: FrameRequestCallback) =>
-    window.setTimeout(() => callback(performance.now()), 0),
-});
-
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
+  writable: true,
+  value: vi.fn(),
 });

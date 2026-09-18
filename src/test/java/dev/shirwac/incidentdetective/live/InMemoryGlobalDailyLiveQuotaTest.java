@@ -24,9 +24,9 @@ class InMemoryGlobalDailyLiveQuotaTest {
                 )
         );
 
-        GlobalDailyLiveQuota.Decision first = quota.tryConsume(2);
-        GlobalDailyLiveQuota.Decision second = quota.tryConsume(2);
-        GlobalDailyLiveQuota.Decision rejected = quota.tryConsume(2);
+        GlobalDailyLiveQuota.Decision first = quota.tryConsume(2, 100, 10);
+        GlobalDailyLiveQuota.Decision second = quota.tryConsume(2, 100, 10);
+        GlobalDailyLiveQuota.Decision rejected = quota.tryConsume(2, 100, 10);
 
         assertTrue(first.allowed());
         assertEquals(1, first.consumed());
@@ -36,6 +36,8 @@ class InMemoryGlobalDailyLiveQuotaTest {
         assertFalse(rejected.allowed());
         assertEquals(2, rejected.consumed());
         assertEquals(0, rejected.remaining());
+        assertEquals(20, rejected.consumedMicroUsd());
+        assertEquals(80, rejected.remainingMicroUsd());
         assertEquals(
                 Instant.parse("2026-09-01T00:00:00Z"),
                 rejected.resetsAt()
@@ -49,14 +51,35 @@ class InMemoryGlobalDailyLiveQuotaTest {
         );
         InMemoryGlobalDailyLiveQuota quota = new InMemoryGlobalDailyLiveQuota(clock);
 
-        assertTrue(quota.tryConsume(1).allowed());
-        assertFalse(quota.tryConsume(1).allowed());
+        assertTrue(quota.tryConsume(1, 100, 10).allowed());
+        assertFalse(quota.tryConsume(1, 100, 10).allowed());
         clock.advance(Duration.ofSeconds(1));
 
-        GlobalDailyLiveQuota.Decision nextDay = quota.tryConsume(1);
+        GlobalDailyLiveQuota.Decision nextDay = quota.tryConsume(1, 100, 10);
         assertTrue(nextDay.allowed());
         assertEquals(1, nextDay.consumed());
+        assertEquals(10, nextDay.consumedMicroUsd());
         assertEquals(Instant.parse("2026-09-02T00:00:00Z"), nextDay.resetsAt());
+    }
+
+    @Test
+    void rejectsBeforeTheConservativeCostAllowanceCanBeExceeded() {
+        InMemoryGlobalDailyLiveQuota quota = new InMemoryGlobalDailyLiveQuota(
+                Clock.fixed(
+                        Instant.parse("2026-08-31T12:00:00Z"),
+                        ZoneOffset.UTC
+                )
+        );
+
+        assertTrue(quota.tryConsume(20, 25, 10).allowed());
+        assertTrue(quota.tryConsume(20, 25, 10).allowed());
+        GlobalDailyLiveQuota.Decision rejected = quota.tryConsume(20, 25, 10);
+
+        assertFalse(rejected.allowed());
+        assertEquals(2, rejected.consumed());
+        assertEquals(20, rejected.consumedMicroUsd());
+        assertEquals(5, rejected.remainingMicroUsd());
+        assertFalse(quota.snapshot(20, 25).canConsume(10));
     }
 
     @Test
@@ -65,7 +88,14 @@ class InMemoryGlobalDailyLiveQuotaTest {
                 Clock.systemUTC()
         );
 
-        assertThrows(IllegalArgumentException.class, () -> quota.tryConsume(0));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> quota.tryConsume(0, 100, 10)
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> quota.tryConsume(1, 10, 11)
+        );
     }
 
     private static final class MutableClock extends Clock {

@@ -1,0 +1,241 @@
+package dev.shirwac.incidentdetective.nordly;
+
+import dev.shirwac.incidentdetective.rag.RunbookCorpusEntry;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+@Schema(
+        description = "Read-only view of every synthetic Nordly knowledge document. "
+                + "Eligibility describes which documents may enter public RAG context."
+)
+public record KnowledgeDocumentLibraryResponse(
+        String contractVersion,
+        String mode,
+        String truthLabel,
+        String manifestVersion,
+        String corpusVersion,
+        String corpusContentSha256,
+        boolean syntheticOnly,
+        boolean currentVectorSearch,
+        int documentCount,
+        int chunkCount,
+        int eligibleDocumentCount,
+        int eligibleChunkCount,
+        EligibilityRule eligibilityRule,
+        EmbeddingProfile embeddingProfile,
+        List<KnowledgeDocument> documents
+) {
+    public static final String CONTRACT_VERSION =
+            "nordly-knowledge-document-library-v2";
+    public static final String MODE = "read_only_corpus";
+
+    public KnowledgeDocumentLibraryResponse {
+        documents = List.copyOf(documents);
+    }
+
+    static KnowledgeDocumentLibraryResponse from(
+            KnowledgeCorpusManifest manifest,
+            NordlyKnowledgeCorpus corpus
+    ) {
+        Map<String, String> contentHashes = corpus.entries().stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        RunbookCorpusEntry::evidenceId,
+                        RunbookCorpusEntry::contentSha256
+                ));
+        List<KnowledgeDocument> documents = manifest.documents().stream()
+                .map(document -> document(document, contentHashes))
+                .toList();
+        int eligibleDocumentCount = (int) documents.stream()
+                .filter(item -> item.ragEligibility().eligible())
+                .count();
+        int eligibleChunkCount = documents.stream()
+                .filter(item -> item.ragEligibility().eligible())
+                .mapToInt(item -> item.chunks().size())
+                .sum();
+        int chunkCount = documents.stream()
+                .mapToInt(item -> item.chunks().size())
+                .sum();
+
+        return new KnowledgeDocumentLibraryResponse(
+                CONTRACT_VERSION,
+                MODE,
+                manifest.truthLabel(),
+                corpus.manifestVersion(),
+                manifest.corpusVersion(),
+                corpus.corpusContentSha256(),
+                true,
+                false,
+                documents.size(),
+                chunkCount,
+                eligibleDocumentCount,
+                eligibleChunkCount,
+                new EligibilityRule(
+                        NordlyKnowledgeCorpus.REQUIRED_LIFECYCLE,
+                        NordlyKnowledgeCorpus.REQUIRED_ACCESS_SCOPE
+                ),
+                new EmbeddingProfile(
+                        manifest.embeddingProfile().provider(),
+                        manifest.embeddingProfile().modelId(),
+                        manifest.embeddingProfile().dimensions()
+                ),
+                documents
+        );
+    }
+
+    private static KnowledgeDocument document(
+            KnowledgeCorpusManifest.KnowledgeDocument document,
+            Map<String, String> contentHashes
+    ) {
+        RagEligibility eligibility = eligibility(document);
+        return new KnowledgeDocument(
+                document.id(),
+                document.version(),
+                document.displayFilename(),
+                document.documentType(),
+                document.classification(),
+                document.title(),
+                document.titleSv(),
+                document.summarySv(),
+                document.summaryEn(),
+                document.ownerTeam(),
+                document.lifecycle(),
+                document.effectiveFrom(),
+                document.effectiveUntil(),
+                document.accessScopes(),
+                document.relatedDocumentIds(),
+                eligibility,
+                eligibility.eligible(),
+                document.chunks().stream()
+                        .map(chunk -> new KnowledgeChunk(
+                                chunk.id(),
+                                chunk.sectionHeading(),
+                                chunk.sourceRef(),
+                                chunk.evidenceId(),
+                                chunk.displaySummarySv(),
+                                chunk.displaySummaryEn(),
+                                eligibility.eligible() ? chunk.text() : null,
+                                eligibility.eligible()
+                                        ? Objects.requireNonNull(
+                                                contentHashes.get(
+                                                        chunk.evidenceId()
+                                                ),
+                                                "eligible chunk content hash"
+                                        )
+                                        : null
+                        ))
+                        .toList()
+        );
+    }
+
+    private static RagEligibility eligibility(
+            KnowledgeCorpusManifest.KnowledgeDocument document
+    ) {
+        if (!NordlyKnowledgeCorpus.REQUIRED_LIFECYCLE.equals(
+                document.lifecycle()
+        )) {
+            return new RagEligibility(
+                    false,
+                    "LIFECYCLE_NOT_APPROVED",
+                    "Dokumentet visas i biblioteket men får inte användas av RAG "
+                            + "eftersom livscykeln är " + document.lifecycle() + ".",
+                    "The document is visible in the library but cannot be used by "
+                            + "RAG because its lifecycle is " + document.lifecycle() + "."
+            );
+        }
+        if (!document.accessScopes().contains(
+                NordlyKnowledgeCorpus.REQUIRED_ACCESS_SCOPE
+        )) {
+            return new RagEligibility(
+                    false,
+                    "PUBLIC_DEMO_SCOPE_MISSING",
+                    "Dokumentet saknar åtkomsten public_demo och får därför inte "
+                            + "användas av publik RAG.",
+                    "The document lacks the public_demo access scope and therefore "
+                            + "cannot be used by public RAG."
+            );
+        }
+        return new RagEligibility(
+                true,
+                "APPROVED_PUBLIC_DEMO",
+                "Dokumentet är APPROVED och har public_demo-åtkomst. Det får delta "
+                        + "i semantisk rankning.",
+                "The document is APPROVED and has public_demo access. It may enter "
+                        + "semantic ranking."
+        );
+    }
+
+    public record EligibilityRule(
+            String requiredLifecycle,
+            String requiredAccessScope
+    ) {
+    }
+
+    public record EmbeddingProfile(
+            String provider,
+            String modelId,
+            int dimensions
+    ) {
+    }
+
+    public record KnowledgeDocument(
+            String id,
+            String version,
+            String displayFilename,
+            String documentType,
+            String classification,
+            String title,
+            String titleSv,
+            String summarySv,
+            String summaryEn,
+            String ownerTeam,
+            String lifecycle,
+            String effectiveFrom,
+            @Schema(nullable = true)
+            String effectiveUntil,
+            List<String> accessScopes,
+            List<String> relatedDocumentIds,
+            RagEligibility ragEligibility,
+            boolean contentVisible,
+            List<KnowledgeChunk> chunks
+    ) {
+        public KnowledgeDocument {
+            accessScopes = List.copyOf(accessScopes);
+            relatedDocumentIds = List.copyOf(relatedDocumentIds);
+            chunks = List.copyOf(chunks);
+        }
+    }
+
+    public record RagEligibility(
+            boolean eligible,
+            String reasonCode,
+            String summarySv,
+            String summaryEn
+    ) {
+    }
+
+    public record KnowledgeChunk(
+            String id,
+            String sectionHeading,
+            String sourceRef,
+            String evidenceId,
+            String displaySummarySv,
+            String displaySummaryEn,
+            @Schema(
+                    nullable = true,
+                    description = "Full synthetic body for approved public-demo "
+                            + "documents; null for excluded material."
+            )
+            String text,
+            @Schema(
+                    nullable = true,
+                    description = "SHA-256 of the exact title and chunk body sent "
+                            + "to the embedding importer; null for excluded material."
+            )
+            String contentSha256
+    ) {
+    }
+}

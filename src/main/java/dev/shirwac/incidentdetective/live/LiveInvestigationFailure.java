@@ -4,5 +4,6 @@ public enum LiveInvestigationFailure {
     CONFIRMATION_REQUIRED,
     LIVE_AI_DISABLED,
     API_KEY_MISSING,
+    COST_PROFILE_MISSING,
     DEADLINE_EXCEEDED
 }

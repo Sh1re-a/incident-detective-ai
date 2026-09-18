@@ -43,6 +43,7 @@ public final class RunbookCorpusImporter {
 
         for (RunbookCorpusEntry entry : corpus.entries()) {
             if (store.containsCurrent(corpus.version(), entry, properties)) {
+                store.synchronizeMetadata(corpus.version(), entry, properties);
                 skipped++;
                 items.add(new RunbookImportItem(
                         entry.evidenceId(),
@@ -87,6 +88,7 @@ public final class RunbookCorpusImporter {
                 properties.embeddingModel(),
                 properties.embeddingDimensions(),
                 properties.embeddingFormatVersion(),
+                properties.providerTransport().transport(),
                 corpus.entries().size(),
                 imported,
                 skipped,

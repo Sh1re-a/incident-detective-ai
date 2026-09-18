@@ -52,6 +52,13 @@ class RecordedReplayServiceTest {
         assertEquals(ReplayRunStatus.COMPLETED, result.status());
         assertEquals(4, result.toolEvents().size());
         assertEquals(0, result.latencyMs());
+        assertTrue(result.provenance().synthetic());
+        assertEquals("versioned_recorded_fixture", result.provenance().source());
+        assertFalse(result.provenance().investigationExecutedInThisRun());
+        assertFalse(result.provenance().toolCallsExecutedInThisRun());
+        assertFalse(result.provenance().modelExecutedInThisRun());
+        assertTrue(result.provenance()
+                .deterministicVerificationExecutedInThisRun());
         assertTrue(result.verification().hardErrors().isEmpty());
         assertTrue(result.verification().citationValidity().valid());
         assertEquals(expectedRootCause, result.comparison().expectedRootCauseCode());
