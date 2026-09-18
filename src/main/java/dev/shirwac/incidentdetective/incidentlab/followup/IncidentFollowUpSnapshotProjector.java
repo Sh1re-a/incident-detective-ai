@@ -119,8 +119,8 @@ public final class IncidentFollowUpSnapshotProjector {
                 ? ("sv".equals(locale)
                 ? "Ingen berörd tjänst är verifierad."
                 : "No affected service is verified.")
-                : ("sv".equals(locale) ? "Berörd tjänst: " : "Affected service: ")
-                + humanize(service) + ".";
+                : ("sv".equals(locale) ? "Jag ser problemet i " : "I see the problem in ")
+                + serviceName(service, locale) + ".";
         String cause = answerState == IncidentLabRunResponse.AnswerState.DIAGNOSED
                 ? business.whatIsKnown().stream()
                 .filter(value -> value.toLowerCase(Locale.ROOT)
@@ -172,5 +172,20 @@ public final class IncidentFollowUpSnapshotProjector {
     private String humanize(String code) {
         String value = code.toLowerCase(Locale.ROOT).replace('_', ' ');
         return Character.toUpperCase(value.charAt(0)) + value.substring(1);
+    }
+
+    private String serviceName(String code, String locale) {
+        if (!"sv".equals(locale)) {
+            return humanize(code);
+        }
+        return switch (code) {
+            case "PAYMENT_ADAPTER" -> "betalningsadaptern";
+            case "INVENTORY_SERVICE" -> "lagertjänsten";
+            case "CHECKOUT_API" -> "kassans API";
+            case "CATALOG_SERVICE" -> "katalogtjänsten";
+            case "ORDER_EVENT_CONSUMER" -> "orderkonsumenten";
+            case "ORDER_SERVICE" -> "ordertjänsten";
+            default -> humanize(code).toLowerCase(Locale.ROOT);
+        };
     }
 }

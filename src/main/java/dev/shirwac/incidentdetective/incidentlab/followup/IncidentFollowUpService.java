@@ -516,10 +516,10 @@ public final class IncidentFollowUpService {
                 case KNOWN -> sentences.addAll(report.known());
                 case UNKNOWN -> sentences.addAll(report.unknown());
                 case SOURCES -> sentences.add(local(locale,
-                        "Svaret stöds av " + sourceCount
-                                + " källor i körningens frysta kvitto.",
-                        "The answer is backed by " + sourceCount
-                                + " sources in the frozen run receipt."));
+                        "Jag grundar svaret på " + sourceCount
+                                + " verifierade källor från den här utredningen.",
+                        "I base the answer on " + sourceCount
+                                + " verified sources from this investigation."));
                 case BOUNDARY -> sentences.add(report.boundary());
             }
         }

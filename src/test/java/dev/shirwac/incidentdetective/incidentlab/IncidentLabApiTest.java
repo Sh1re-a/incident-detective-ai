@@ -217,7 +217,7 @@ class IncidentLabApiTest {
                         .value("incident-lab-run-v3"))
                 .andExpect(jsonPath("$.answer_state").value("diagnosed"))
                 .andExpect(jsonPath("$.business_response.headline")
-                        .value("Starkaste förklaringen i det syntetiska fallet"))
+                        .value("Jag har hittat den troligaste förklaringen"))
                 .andExpect(jsonPath("$.developer_response.root_cause_code")
                         .value("CATALOG_CACHE_INVALIDATION_FAILURE"))
                 .andExpect(jsonPath("$.action_receipt.write_tools_available")
@@ -228,10 +228,10 @@ class IncidentLabApiTest {
                         .value(true))
                 .andExpect(jsonPath(
                         "$.localized_presentations.sv.business_response.headline"
-                ).value("Starkaste förklaringen i det syntetiska fallet"))
+                ).value("Jag har hittat den troligaste förklaringen"))
                 .andExpect(jsonPath(
                         "$.localized_presentations.en.business_response.headline"
-                ).value("Strongest explanation in the synthetic case"))
+                ).value("I found the most likely explanation"))
                 .andExpect(jsonPath(
                         "$.localized_presentations.en.developer_response.root_cause_code"
                 ).value("CATALOG_CACHE_INVALIDATION_FAILURE"))

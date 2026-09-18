@@ -247,19 +247,19 @@ final class IncidentLabResponsePresenter {
         return new Presentation(
                 AnswerState.DIAGNOSED,
                 new IncidentLabRunResponse.BusinessResponse(
-                        "Starkaste förklaringen i det syntetiska fallet",
+                        "Jag har hittat den troligaste förklaringen",
                         alarmText,
                         impact(scenario, alarm.incidentFamily()),
                         List.of(
                                 alarmText,
-                                "Stöds av körningens bevis: " + rootCause + " i "
+                                "Den troligaste orsaken är " + rootCause + " i "
                                         + service + "."
                         ),
                         List.of(
-                                "Inte verifierat utanför detta scenario."
+                                "Jag har verifierat sambandet i testfallet, men inte utanför det."
                         ),
                         nextRead,
-                        "Stöds av körningens bevis",
+                        "Stöds av verifierade källor i testfallet",
                         true
                 ),
                 new IncidentLabRunResponse.DeveloperResponse(
@@ -420,19 +420,19 @@ final class IncidentLabResponsePresenter {
         return new Presentation(
                 AnswerState.DIAGNOSED,
                 new IncidentLabRunResponse.BusinessResponse(
-                        "Strongest explanation in the synthetic case",
+                        "I found the most likely explanation",
                         alarmText,
                         impactEnglish(scenario, alarm.incidentFamily()),
                         List.of(
                                 alarmText,
-                                "Supported by this run's evidence: " + rootCause + " in "
+                                "The most likely cause is " + rootCause + " in "
                                         + service + "."
                         ),
                         List.of(
-                                "Not verified outside this scenario."
+                                "I verified the relationship in the test case, but not outside it."
                         ),
                         nextRead,
-                        "Supported by this run's evidence",
+                        "Supported by verified sources in the test case",
                         true
                 ),
                 new IncidentLabRunResponse.DeveloperResponse(
@@ -903,24 +903,24 @@ final class IncidentLabResponsePresenter {
 
     private String rootCause(String code) {
         return switch (code) {
-            case "PAYMENT_TIMEOUT_CONFIG" -> "betalningsadapterns timeoutkonfiguration";
-            case "INVENTORY_SCHEMA_MISMATCH" -> "en schemakrock i lagertjänsten";
-            case "CHECKOUT_DB_POOL_EXHAUSTION" -> "en uttömd databasanslutningspool i kassan";
+            case "PAYMENT_TIMEOUT_CONFIG" -> "en för kort timeoutkonfiguration";
+            case "INVENTORY_SCHEMA_MISMATCH" -> "en schemakrock";
+            case "CHECKOUT_DB_POOL_EXHAUSTION" -> "en uttömd databasanslutningspool";
             case "CATALOG_CACHE_INVALIDATION_FAILURE" -> "utebliven invalidering av katalogcachen";
-            case "ORDER_EVENT_CONSUMER_BACKLOG" -> "köbildning i orderkonsumenten";
-            case "ORDER_IDEMPOTENCY_FAILURE" -> "fel i ordertjänstens idempotenshantering";
+            case "ORDER_EVENT_CONSUMER_BACKLOG" -> "köbildning";
+            case "ORDER_IDEMPOTENCY_FAILURE" -> "bristande idempotenshantering";
             default -> "rotorsakskod " + code;
         };
     }
 
     private String rootCauseEnglish(String code) {
         return switch (code) {
-            case "PAYMENT_TIMEOUT_CONFIG" -> "the payment adapter timeout configuration";
-            case "INVENTORY_SCHEMA_MISMATCH" -> "a schema mismatch in the inventory service";
-            case "CHECKOUT_DB_POOL_EXHAUSTION" -> "an exhausted database connection pool in checkout";
-            case "CATALOG_CACHE_INVALIDATION_FAILURE" -> "a failed catalog cache invalidation";
-            case "ORDER_EVENT_CONSUMER_BACKLOG" -> "a backlog in the order consumer";
-            case "ORDER_IDEMPOTENCY_FAILURE" -> "an order-service idempotency failure";
+            case "PAYMENT_TIMEOUT_CONFIG" -> "a timeout configuration that is too short";
+            case "INVENTORY_SCHEMA_MISMATCH" -> "a schema mismatch";
+            case "CHECKOUT_DB_POOL_EXHAUSTION" -> "an exhausted database connection pool";
+            case "CATALOG_CACHE_INVALIDATION_FAILURE" -> "a missed catalog-cache invalidation";
+            case "ORDER_EVENT_CONSUMER_BACKLOG" -> "a growing event backlog";
+            case "ORDER_IDEMPOTENCY_FAILURE" -> "an idempotency-control failure";
             default -> "root-cause code " + code;
         };
     }

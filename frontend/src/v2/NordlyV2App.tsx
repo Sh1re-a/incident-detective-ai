@@ -181,6 +181,7 @@ const COPY = {
     alarmTrigger: "Det här utlöste larmet",
     humanReport: "Min bedömning",
     strongestFactor: "Starkaste bidragande faktor",
+    teamSuggestion: "Mitt förslag till teamet",
     stillUncertain: "Fortfarande osäkert",
     continueChat: "Jag har inte ändrat något. Du kan fortsätta fråga om tid, påverkan, källor eller osäkerhet.",
     startReplay: "Visa säkerhetsreplay",
@@ -282,6 +283,7 @@ const COPY = {
     alarmTrigger: "This triggered the alert",
     humanReport: "My assessment",
     strongestFactor: "Strongest contributing factor",
+    teamSuggestion: "My suggestion to the team",
     stillUncertain: "Still uncertain",
     continueChat: "I changed nothing. You can keep asking about timing, impact, sources, or uncertainty.",
     startReplay: "View safety replay",
@@ -1762,6 +1764,9 @@ function DriftAgentView({
                     <small className="message-kicker">{copy.humanReport}</small>
                     <p className="message-emphasis">{reportHeadline}</p>
                     <p>{reportBody}</p>
+                    {presentation?.safe_next_step ? (
+                      <p className="report-next-step"><strong>{copy.teamSuggestion}:</strong> {presentation.safe_next_step}</p>
+                    ) : null}
                     <div className="report-uncertainty">
                       <strong>{copy.stillUncertain}</strong>
                       <span>{uncertainty}</span>

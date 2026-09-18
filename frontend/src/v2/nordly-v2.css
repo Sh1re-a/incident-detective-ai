@@ -1246,6 +1246,16 @@ button.agent-identity__badge:hover {
   gap: 3px;
 }
 
+.report-next-step {
+  margin-top: 9px !important;
+  color: #46566f !important;
+}
+
+.report-next-step strong {
+  color: #17223a;
+  font-weight: 690;
+}
+
 .report-uncertainty strong {
   color: #53637b;
   font-size: 10px;
