@@ -1,120 +1,115 @@
-# Incident Detective
+<p align="center">
+  <img src="frontend/public/nordly-og.png" alt="Nordly support and incident agents on desktop and mobile" width="100%" />
+</p>
 
-Incident Detective är en Applied AI-demo i Java och Spring Boot. Demon visar
-hur en LLM kan placeras i ett vanligt mjukvarusystem
-utan att modellen får obegränsad kontroll eller automatiskt betraktas som
-korrekt.
+# Nordly — Controlled Applied AI in Java
 
-Detta är Shirwac Abibs personliga portfolio- och utbildningsprojekt. Nordly
-Commerce AB, dess dokument, kunder och incidenter är helt syntetiska. Projektet
-ska hållas tekniskt separerat från verkliga kundprojekt och kundmiljöer: egen
-repository, egen Google Cloud-konfiguration och inga delade kunddata,
-inloggningsuppgifter eller resurser.
+Nordly is a synthetic commerce environment that shows how I build useful AI
+features inside a conventional software system. A customer-facing support agent
+answers with order data and company policy. An internal operations agent
+investigates incidents and reports what happened, what the evidence supports,
+and what is still uncertain.
 
-> **Kärnan:** Gemini väljer begränsade read-only functions, den aktiva
-> retrieval-backenden kan hämta relevant runbook-evidens och vanlig Java
-> verifierar om det strukturerade svaret stöds av evidensen modellen faktiskt
-> såg.
+The model can interpret and propose. Java owns permissions, tool boundaries,
+source access, validation, and the final release decision.
 
-All incidentdata är syntetisk. Systemet gör aldrig rollback, deploy eller annan
-remediation.
+**[Try the live demo](https://nordly.sh1rre.se)** ·
+**[Read the engineering decisions](docs/DECISIONS.md)** ·
+**[Explore the documentation](docs/README.md)**
 
-## Vad projektet bevisar
+> Nordly, its customers, orders, documents, and incidents are fictional. The
+> application is a portfolio and learning project, not a production commerce or
+> incident-response system.
 
-| Område | Konkret implementation |
+## What you can test
+
+| Experience | What it demonstrates |
 |---|---|
-| LLM | Ett opt-in liveflöde använder Gemini. Recorded replay är ett separat, providerfritt demoläge och märks aldrig som live. |
-| Function calling | Gemini får välja mellan `get_metrics`, `search_logs`, `get_trace` och `retrieve_runbooks`. Alla tools är typade, scenarioavgränsade och read-only. |
-| Bounded orchestration | Flödet är `COLLECT → SYNTHESIZE → VERIFY`, med hårda gränser för rundor, tool calls, model calls och tid. Synthesis får inga tools. |
-| Structured output | Diagnosen måste följa ett strikt JSON-schema och valideras som Java-typer. |
-| RAG och embeddings | Runbooks och Nordlys separat styrda företagskorpus bäddas in med Gemini embeddings och lagras i PostgreSQL/pgvector. Metrics, logs och traces hålls bakom typade tools. Restricted, deprecated och untrusted företagsdokument utesluts före embedding. |
-| Providergräns | Samma Google Gen AI-klientfabrik stödjer Developer API med API-nyckel och Vertex AI med ADC. Providertransport ingår i vektorindexets identitet. |
-| Eval | Varje incidentutredning har en deterministisk release gate för schema, citationer, evidensstöd och korrekt diagnos. Kunskaps-RAG verifierar schema, källmedlemskap, dokumentåtkomst och utdataregler, men påstår inte semantisk entailment. En liten opt-in RAG-eval mäter riktig embedding- och pgvectorretrieval i testspåret. |
-| Observability | Resultatet innehåller latency, model/tool calls, nullable tokenusage, cacheobservation och listprisestimat. Sanerade fel och Micrometer-mått finns. |
+| **Support agent** | Natural multi-turn chat grounded in one synthetic customer's order, allowed read-only tools, and Nordly's company documents. Requests outside its authority are declined without exposing restricted content. |
+| **Operations agent** | A synthetic alert wakes a fixed investigation flow. The agent reads bounded telemetry and runbooks, cites evidence, reports customer impact, and keeps uncertainty visible. |
+| **Document archive** | The exact company sources available to retrieval are inspectable, including lifecycle and access rules. Source links open the passage used in an answer. |
 
-Projektet innehåller medvetet **inte** ett generellt agentramverk eller en stor
-benchmarkplattform. Den tidigare offline diagnosis-evalmotorn togs bort eftersom
-den gjorde projektet svårare att förstå utan att förbättra själva demon.
+Both agents are designed to feel conversational. The technical receipt stays
+available on demand so a non-technical visitor can use the product first and a
+technical reviewer can inspect how the answer was produced.
 
-## Så fungerar Incident Lab
+## System flow
 
-1. Klienten skickar en fri men syntetiskt avgränsad instruktion till
-   `/api/v1/incident-lab/plans` och bekräftar live-AI.
-2. Gemini föreslår ett incidentfall; Java kanoniserar eller avvisar förslaget.
-3. Klienten skickar endast den godkända planen vidare till
-   `/api/v1/incident-lab/runs` med en ny livebekräftelse.
-4. Backend genererar request-lokala loggar, metrics och traces och avgör med en
-   deterministisk regel om ett larm faktiskt har löst ut.
-5. Först efter ett larm kör Google ADK evidensagenten och därefter den tool-fria
-   diagnosagenten. Det enda agentverktyget gör avgränsade read-only-läsningar;
-   runbooksteget kan använda Gemini embeddings och pgvector i `rag`-profilen.
-6. Java verifierar eventordning, anropsräknare, schema, citationer, direkt
-   evidensstöd och syntetiskt facit innan någon diagnos får släppas.
-7. API:t returnerar ett färdigt, synkront post-run-kvitto. Frontend får spela upp
-   det i efterhand, men inte kalla uppspelningen streaming eller hitta på steg
-   medan requesten pågår.
-8. Ett färdigt run får en serverägd 24-timmarsreferens. Följdfrågor kan bara
-   förklara det frysta kvittot: Gemini väljer frågans fokus i live-läge medan
-   Java bygger faktasvaret, binder källorna och förbjuder alla ändringar. Replay
-   använder fasta frågor och gör inga nya provideranrop.
+```mermaid
+flowchart LR
+    A[Customer question<br/>or synthetic alert] --> B[Spring Boot boundary]
+    B --> C[Bounded agent flow]
+    C --> D[Read-only tools]
+    C --> E[Embeddings + pgvector]
+    D --> F[Structured result]
+    E --> F
+    F --> G[Deterministic Java checks]
+    G -->|supported| H[Answer + source receipt]
+    G -->|unsupported| I[Withhold or state uncertainty]
+```
 
-Detta är en observerbar evidence chain, inte modellens privata chain-of-thought.
+### Three deliberate engineering choices
 
-## API
+1. **RAG for governed knowledge; tools for live state.** Policies and runbooks
+   are retrieved semantically from a versioned corpus. Orders, logs, metrics,
+   and traces remain behind typed read-only functions.
+2. **The model never grants itself authority.** A model may select an allowed
+   action or draft a structured response, but application code binds identity,
+   checks access, verifies cited evidence, and decides whether the result may be
+   shown.
+3. **Failure remains visible.** A malformed or unsupported live response is not
+   silently replaced by a successful replay. Recorded replay is a separate,
+   clearly labelled provider-free demo path.
 
-Backendens publika demo-API omfattar:
+## Technical design
 
-| Metod | Path | Syfte |
-|---|---|---|
-| `GET` | `/api/v1/capabilities` | Konfigurerat modellmål, retrieval-, cache-, budget-, deployment- och index-readiness utan credentials. Faktiskt observerad modell hör till ett specifikt run-kvitto. |
-| `GET` | `/api/v1/demo-world` | Nordlys syntetiska företagsvärld och korpusöversikt. |
-| `POST` | `/api/v1/demo-customer/chat/turns` | Fri kunddialog där Gemini väljer exakt en tillåten read-only- eller stoppfunktion; Java binder kundkontext, hämtar aktuell evidens och verifierar svaret. |
-| `GET` | `/api/v1/knowledge/documents` | Read-only dokumentbibliotek med lifecycle, åtkomstbeslut och innehållshashar. |
-| `POST` | `/api/v1/knowledge/questions/runs/rag` | Fri, säkerhetsgrindad fråga genom embeddings, pgvector, avgränsad kontext och Java-verifiering. |
-| `POST` | `/api/v1/knowledge/questions/{questionId}/runs/recorded-replay` | Providerfri kunskapsreplay. |
-| `POST` | `/api/v1/incident-lab/plans` | Säkerhetsgrindad AI-plan som Java avgränsar till ett syntetiskt incidentförslag. |
-| `POST` | `/api/v1/incident-lab/runs` | Genererar syntetisk telemetri, avgör larm och kör det kontrollerade ADK-flödet när larmet löser ut. |
-| `POST` | `/api/v1/incident-lab/follow-ups` | Förklarar ett fryst incidentkvitto med mänsklig rapport, källbundna påståenden och observerbara backendsteg. Live använder Gemini endast för frågefokus; replay är providerfri. |
-| `GET` | `/api/v1/incident-lab/recorded-replay` | Visar om den checksummeverifierade historiska Driftlabb-körningen är tillgänglig. |
-| `POST` | `/api/v1/incident-lab/runs/recorded-replay` | Spelar upp en verklig historisk plan→ADK→RAG-körning utan nya provider-, embedding- eller databas-anrop. |
-| `POST` | `/api/v1/agent/turns` | Lägre teknisk bevisyta för det kontrollerade tvåagentsflödet med Google ADK och post-run-kvitto. |
-| `GET` | `/api/v1/scenarios` | Säkra scenariosammanfattningar utan facit eller evidensinventarium. |
-| `POST` | `/api/v1/scenarios/{scenarioId}/runs/recorded-replay` | Stabil providerfri referenskörning. |
-| `POST` | `/api/v1/scenarios/{scenarioId}/runs/live-ai` | Explicit bekräftad Gemini-utredning. |
-| `POST` | `/api/v1/generated-cases/runs/live-ai` | Genererar och utreder ett reproducerbart syntetiskt fall i samma request. Ingen logguppladdning eller persistens. |
-| `GET` | `/api/v1/proof/evals/retrieval` | Fryst historisk RAG-eval, utan möjlighet att starta en eval. |
+- **Backend:** Java 21, Spring Boot, Maven
+- **Frontend:** React 19, TypeScript, Vite, Motion
+- **AI:** Google Gemini / Vertex AI provider seam, structured outputs, function
+  calling, bounded sequential agent flow
+- **Retrieval:** Gemini embeddings, PostgreSQL, pgvector, versioned corpora
+- **Verification:** schema validation, citation membership, evidence support,
+  access rules, deterministic scenario truth
+- **Testing:** JUnit, Testcontainers, Vitest, recorded checksummed replays,
+  opt-in provider smokes
+- **Observability:** structured events, Micrometer metrics, model/tool counters,
+  nullable token usage and cost estimates
 
-Swagger finns lokalt på `http://localhost:8080/swagger-ui.html` och OpenAPI på
-`http://localhost:8080/v3/api-docs`.
+The operations flow is an observable evidence chain, not a display of private
+model reasoning. The UI replays registered backend events and exposes the
+sources that were actually available to the model.
 
-Frontend ska generera typer från aktuell OpenAPI. Se
-[frontendkontraktet](./docs/FRONTEND-API-HANDOFF.md),
-[backendens verifierade hardening-gate](./docs/BACKEND-HARDENING-GATE-2026-09-14.md) och
-[API-genomgången](./docs/API-WALKTHROUGH.md). Den fiktiva företagssanningen,
-dokumentkartan och säkerhetsgränsen beskrivs i
-[Nordly company knowledge](./docs/NORDLY-COMPANY-KNOWLEDGE.md).
+## Run locally
 
-## Kör lokalt
+### Requirements
 
-Providerfri backend och replay:
+- Java 21
+- Node.js 20.19 or newer
+- Docker only for the pgvector/RAG profile
+
+### Provider-free demo
+
+Start the backend:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-Vanliga verifieringar:
+In a second terminal, start the interface:
 
 ```bash
-./mvnw test
-./mvnw -Pdatabase-it verify
+cd frontend
+npm ci
+npm run dev
 ```
 
-`database-it` använder Testcontainers för PostgreSQL/pgvector. Providerbaserade
-smokes är opt-in och hoppas över i den vanliga sviten.
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Recorded replay works
+without a model key. The frontend proxies API requests to
+`http://127.0.0.1:8080` by default.
 
-## RAG-profil
+### RAG and live AI
 
-Starta lokal pgvector och importera den versionshanterade korpusen explicit:
+Start PostgreSQL/pgvector and explicitly import the versioned corpora:
 
 ```bash
 docker compose up -d
@@ -122,7 +117,7 @@ docker compose up -d
 ./mvnw -q spring-boot:run -Dspring-boot.run.arguments=--import-nordly-knowledge
 ```
 
-Starta sedan backend med RAG och uttryckligen aktiverad live-AI:
+Then enable the RAG profile and live provider deliberately:
 
 ```bash
 SPRING_PROFILES_ACTIVE=rag \
@@ -131,91 +126,64 @@ INCIDENT_DETECTIVE_ADK_ENABLED=true \
 ./mvnw spring-boot:run
 ```
 
-Importen är idempotent och vanlig applikationsstart gör inga embedding-anrop.
-RAG-profilen vägrar retrieval om indexets antal eller innehållshash inte matchar
-den aktuella korpusen.
+Developer API is the local default and uses an ignored Gemini key. Vertex AI
+uses Application Default Credentials with `GOOGLE_GENAI_PROVIDER=vertex_ai`,
+`GOOGLE_CLOUD_PROJECT`, and an optional `GOOGLE_CLOUD_LOCATION`. Every live
+request still requires explicit server and request-level opt-in.
 
-### Liten verklig RAG-eval
-
-Den versionerade sviten innehåller positiva development-/held-out-frågor och
-no-match-fall. Den kör riktiga Gemini embeddings mot en tillfällig pgvector-
-databas, men endast efter explicit opt-in:
+## Verification
 
 ```bash
-./mvnw -Pdatabase-it \
-  -Drun.rag.eval=true \
-  -Dit.test=RunbookRetrievalEvalIT \
-  verify
+# Backend unit and application tests
+./mvnw test
+
+# PostgreSQL and pgvector integration tests
+./mvnw -Pdatabase-it verify
+
+# Frontend behavior and production build
+cd frontend
+npm test
+npm run build
 ```
 
-Det publicerade historiska resultatet är development 5/5 och held-out 4/5
-Hit@4, med 3/3 no-match. Det missade held-out-fallet är kvar som failure case.
-Det bevisar retrieval på en liten syntetisk korpus — inte storskalig vector
-search eller full systemsäkerhet.
+Provider smokes and retrieval evaluations are opt-in so ordinary CI never
+spends model credits. The published small historical retrieval set reached 5/5
+development and 4/5 held-out Hit@4, with 3/3 no-match cases. The missed
+held-out case is retained as a failure case; this is evidence from a small
+synthetic corpus, not a general quality claim.
 
-## Live Google Gen AI
+## Repository map
 
-Developer API är standard och kräver en ignorerad lokal Gemini-nyckel. Vertex
-AI väljs med `GOOGLE_GENAI_PROVIDER=vertex_ai` och kräver
-`GOOGLE_CLOUD_PROJECT` samt fungerande ADC. `GOOGLE_CLOUD_LOCATION` kan
-åsidosätta standardvärdet `global`. Båda vägarna kräver serverflaggan
-`INCIDENT_DETECTIVE_LIVE_AI_ENABLED=true` och
-`confirm_live_ai: true` i varje request. Ett livefel ersätts aldrig tyst av
-replay. Lokal konfiguration bevisar inte provider-reachability.
-
-Det separata opt-in-smoketestet kör en verklig utredning:
-
-```bash
-INCIDENT_DETECTIVE_LIVE_AI_ENABLED=true \
-./mvnw -Pdatabase-it \
-  -Drun.gemini.smoke=true \
-  -Dit.test=GeminiLiveSmokeIT \
-  verify
+```text
+frontend/                         React product experience and UI tests
+src/main/java/                    Spring Boot application and bounded AI flows
+src/main/resources/ai/            Prompts, schemas, and tool contracts
+src/main/resources/knowledge/     Versioned Nordly company corpus and replays
+src/main/resources/runbooks/      Versioned operations corpus
+src/test/                         Behavioral, safety, and integration tests
+docs/                             Architecture, decisions, system card, evidence
 ```
 
-En smoke visar att ett flöde kan fungera. Den är inte accuracy, p95 eller ett
-stabilitetsbevis.
+Start with the [documentation index](docs/README.md). For a deeper review, the
+most useful files are:
 
-## Viktiga sanningsgränser
+- [Engineering decisions](docs/DECISIONS.md)
+- [AI system card](docs/AI-SYSTEM-CARD.md)
+- [Nordly company knowledge](docs/NORDLY-COMPANY-KNOWLEDGE.md)
+- [Frontend/backend contract](docs/FRONTEND-API-HANDOFF.md)
+- [Cloud logging](docs/CLOUD-LOGGING.md)
+- [Latest dated private-cloud smoke report](docs/PRIVATE-VPC-VERTEX-CLOUD-SQL-SMOKE-2026-09-16.md)
 
-- Replay: `Simulated incident — recorded deterministic replay.`
-- Live: `Simulated incident — real AI investigation.`
-- I replay betyder `null` för modell/usage/kostnad att ingen modell kördes. I
-  live- och providertelemetri betyder `null` **Not reported** eller att ett
-  tillförlitligt estimat saknas, aldrig noll.
-- Provider implicit cachetelemetri betyder inte att explicit prompt caching är
-  implementerat eller att en cache hit observerades.
-- Den frysta retrievalrapporten beskriver en historisk körning. Capabilities och
-  aktuella tool events beskriver den process som kör nu.
-- Lokal concurrency/rate limiting är per instans och är inte distribuerat
-  missbruksskydd.
-- Capabilities visar om dygnstaket är `process_local` eller
-  `database_global`; endast det senare är beständigt och delat mellan
-  instanser.
-- Projektet är en syntetisk portfolio-/utbildningsdemo, inte production incident
-  response.
+## Scope and limitations
 
-## Vad frontenden ska göra tydligt
+- All business and incident data is synthetic.
+- Tools are read-only; the system does not deploy, roll back, refund, cancel,
+  or otherwise mutate an external environment.
+- Replay and live AI are separate modes and are labelled separately.
+- Historical smoke and evaluation reports describe dated runs, not permanent
+  production readiness.
+- Authentication, distributed abuse protection, and multi-instance production
+  operations are outside this portfolio demo's current scope.
 
-Huvudresan är:
-
-`AI-plan → syntetiskt larm → avgränsad ADK-utredning → verifierat kvitto`
-
-Tekniska fördjupningar visar RAG/retrieval samt runtime/tokens/cache/fel. UI:t
-ska skilja mellan **Current run**, **Current backend** och **Historical eval**.
-Det ska aldrig skapa egna loggar, larm, modellnamn, agentsteg, budgetar,
-confidence scores, deploymentstatus eller chain-of-thought.
-
-## Möjliga senare utbyggnader
-
-- Fler incidentfamiljer endast om de förbättrar demon; generatorn stödjer redan
-  både diagnostic och `insufficient_evidence`.
-- Explicit prompt caching först efter mätning av återanvändbar promptstorlek och
-  faktisk kostnadsnytta.
-- Persistenta/async runs, auth och distribuerad rate limiting inför publik
-  flerinstansdrift.
-- Större eller approximate vector search först när korpusstorleken kräver det.
-- En liten framtida model-quality eval i test/CI, aldrig som ett ramverk i
-  webbappens runtime.
-
-Ingen deploy eller extern publicering sker automatiskt från dessa kommandon.
+The repository is public for portfolio review. It intentionally does not grant
+an open-source license.
