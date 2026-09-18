@@ -1026,6 +1026,135 @@ button.agent-identity__badge:hover {
   height: 16px;
 }
 
+.drift-case-start {
+  display: flex;
+  width: min(100%, 610px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 24px 0;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.drift-case-start__intro {
+  margin-bottom: 10px;
+}
+
+.drift-case-start__intro .message-bubble {
+  max-width: min(100%, 560px);
+}
+
+.incident-family-list {
+  display: grid;
+  width: min(100%, 560px);
+  gap: 7px;
+}
+
+.incident-family-option {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px 8px 10px;
+  border: 1px solid #e0e7f1;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 6px 18px rgba(25, 46, 75, 0.035);
+  color: var(--n-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.incident-family-option:hover {
+  border-color: rgba(20, 108, 255, 0.24);
+  background: #fbfdff;
+  box-shadow: 0 9px 24px rgba(24, 76, 150, 0.07);
+  transform: translateY(-1px);
+}
+
+.incident-family-option:focus-visible {
+  outline: 3px solid rgba(20, 108, 255, 0.2);
+  outline-offset: 2px;
+}
+
+.incident-family-option__icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: #fff7e8;
+  color: #b06d00;
+}
+
+.incident-family-option__icon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
+}
+
+.incident-family-option__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.incident-family-option__copy strong {
+  font-size: 13px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.incident-family-option__copy small {
+  color: var(--n-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.incident-family-option > svg {
+  width: 16px;
+  height: 16px;
+  color: #8b98aa;
+}
+
+.drift-case-start__footer {
+  display: flex;
+  width: min(100%, 560px);
+  min-height: 38px;
+  padding: 9px 3px 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #77859b;
+  font-size: 10.5px;
+}
+
+.drift-case-start__footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drift-case-start__footer svg {
+  width: 14px;
+  height: 14px;
+  color: var(--n-green);
+}
+
+.drift-case-start__footer button {
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: #637694;
+  font: inherit;
+  font-weight: 610;
+  cursor: pointer;
+}
+
 .end-conversation-button {
   display: inline-flex;
   align-items: center;
@@ -1064,12 +1193,77 @@ button.agent-identity__badge:hover {
 
 .drift-requesting {
   display: flex;
+  width: 100%;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100%;
-  padding: 32px 20px;
-  text-align: center;
+  align-items: stretch;
+  padding: 12px 0;
+}
+
+.drift-requesting .message-row--assistant {
+  margin-top: 2px;
+}
+
+.message-kicker {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--n-blue);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.incident-trigger {
+  display: flex;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(172, 111, 0, 0.12);
+  flex-direction: column;
+  gap: 3px;
+}
+
+.incident-trigger small {
+  color: #9a6816;
+  font-size: 10px;
+  font-weight: 690;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.incident-trigger span {
+  color: #53627a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.report-uncertainty {
+  display: flex;
+  margin-top: 11px;
+  padding: 10px 11px;
+  border-radius: 11px;
+  background: #f5f7fa;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.report-uncertainty strong {
+  color: #53637b;
+  font-size: 10px;
+  font-weight: 690;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.report-uncertainty span {
+  color: #62718a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.report-closure {
+  margin-top: 10px !important;
+  color: #56667e !important;
+  font-size: 12px;
 }
 
 .drift-requesting__signal {
@@ -2285,6 +2479,30 @@ button.agent-identity__badge:hover {
   .agent-idle-state__actions .button-primary,
   .agent-idle-state__actions .button-secondary {
     width: 100%;
+  }
+
+  .drift-case-start {
+    width: 100%;
+    padding: 8px 0 16px;
+    justify-content: flex-start;
+  }
+
+  .drift-case-start__intro .message-bubble,
+  .incident-family-list,
+  .drift-case-start__footer {
+    width: 100%;
+    max-width: none;
+  }
+
+  .incident-family-option {
+    min-height: 60px;
+    border-radius: 16px;
+  }
+
+  .drift-case-start__footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .agent-session-header {

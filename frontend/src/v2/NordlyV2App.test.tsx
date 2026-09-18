@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import NordlyV2App from "./NordlyV2App";
 import type {
+  CapabilitiesResponse,
   DemoCustomerChatTurnResponse,
   KnowledgeDocumentLibraryResponse,
   LiveAiStatusResponse,
@@ -77,6 +78,74 @@ const availableStatus: LiveAiStatusResponse = {
   resets_at: null,
   retry_after_seconds: null,
 };
+
+const incidentFamilies = [
+  {
+    id: "payment_timeout",
+    label: { sv: "Betalningar svarar för sent", en: "Payments time out" },
+    description: {
+      sv: "Betalningsadaptern får en koncentrerad serie HTTP 504-svar i ett syntetiskt köpflöde.",
+      en: "The payment adapter receives a concentrated series of HTTP 504 responses in a synthetic checkout flow.",
+    },
+    customer_impact: {
+      sv: "Kunder kan inte slutföra betalningen.",
+      en: "Customers may be unable to complete payment.",
+    },
+    service: "payment_adapter",
+    alarm_signal: "http_5xx_response_count",
+    alarm_signal_concept: { sv: "Antal HTTP 5xx-svar.", en: "Number of HTTP 5xx responses." },
+  },
+  {
+    id: "catalog_cache_invalidation",
+    label: { sv: "Katalogen visar gammal information", en: "Catalog data is stale" },
+    description: {
+      sv: "Katalogtjänstens cacheversion avviker från den aktuella katalogversionen.",
+      en: "The catalog service cache version diverges from the current catalog version.",
+    },
+    customer_impact: {
+      sv: "Kunder kan se inaktuellt pris eller lagersaldo.",
+      en: "Customers may see an outdated price or stock level.",
+    },
+    service: "catalog_service",
+    alarm_signal: "catalog_version_divergence_count",
+    alarm_signal_concept: { sv: "Antal avvikande katalogversioner.", en: "Number of divergent catalog versions." },
+  },
+  {
+    id: "order_event_backlog",
+    label: { sv: "Orderhändelser behandlas för sent", en: "Order events are delayed" },
+    description: {
+      sv: "Orderkonsumenten har en växande kö av händelser som väntar på behandling.",
+      en: "The order event consumer has a growing queue of events waiting to be processed.",
+    },
+    customer_impact: {
+      sv: "Orderstatus och lageruppdateringar kan bli fördröjda.",
+      en: "Order status and inventory updates may be delayed.",
+    },
+    service: "order_event_consumer",
+    alarm_signal: "order_consumer_lag_seconds",
+    alarm_signal_concept: { sv: "Hur många sekunder orderkonsumenten ligger efter.", en: "Consumer lag in seconds." },
+  },
+  {
+    id: "order_idempotency_failure",
+    label: { sv: "Samma order skapas flera gånger", en: "An order is created more than once" },
+    description: {
+      sv: "Ordertjänsten skapar dubbletter när samma köpbegäran behandlas igen.",
+      en: "The order service creates duplicates when the same purchase request is processed again.",
+    },
+    customer_impact: {
+      sv: "Kunden kan få dubbla orderbekräftelser och behöva manuell hjälp.",
+      en: "The customer may receive duplicate order confirmations and need manual assistance.",
+    },
+    service: "order_service",
+    alarm_signal: "duplicate_order_creation_count",
+    alarm_signal_concept: { sv: "Antal extra order.", en: "Number of extra orders." },
+  },
+] as const;
+
+const capabilitiesResponse = {
+  contract_version: "capabilities-v5",
+  incident_lab: { incident_families: incidentFamilies },
+} as unknown as CapabilitiesResponse;
 
 const noReplayStatus: LiveAiStatusResponse = {
   ...offlineStatus,
@@ -169,6 +238,53 @@ const liveIncidentRun = {
   run_reference: "ilr_live_test",
   answer_state: "withheld",
 };
+
+function planResponseFor(family: (typeof incidentFamilies)[number]["id"]) {
+  const plan = { ...approvedPlan, incident_family: family };
+  return {
+    ...incidentPlanResponse,
+    java_validation: { ...incidentPlanResponse.java_validation, plan },
+  };
+}
+
+function liveRunFor(family: (typeof incidentFamilies)[number]["id"]) {
+  const selected = incidentFamilies.find((item) => item.id === family) ?? incidentFamilies[0];
+  return {
+    ...liveIncidentRun,
+    answer_state: "diagnosed",
+    plan: { ...approvedPlan, incident_family: family },
+    generation_receipt: { incident_family: family },
+    alarm_receipt: {
+      ...incidentReplay.recorded_run.alarm_receipt,
+      incident_family: family,
+      signal: {
+        ...incidentReplay.recorded_run.alarm_receipt.signal,
+        unit: family === "catalog_cache_invalidation" ? "versions" : "count",
+      },
+    },
+    developer_response: { highlighted_log_evidence_ids: [] },
+    localized_presentations: {
+      sv: {
+        business_response: {
+          headline: "Jag hittade ett tydligt spår.",
+          what_happened: selected.description.sv,
+          impact: selected.customer_impact.sv,
+          what_is_known: ["Det här är den starkaste bidragande faktorn i underlaget."],
+          what_remains_unknown: ["Den slutliga rotorsaken är ännu inte verifierad."],
+        },
+      },
+      en: {
+        business_response: {
+          headline: "I found a clear lead.",
+          what_happened: selected.description.en,
+          impact: selected.customer_impact.en,
+          what_is_known: ["This is the strongest contributing factor in the evidence."],
+          what_remains_unknown: ["The final root cause has not yet been verified."],
+        },
+      },
+    },
+  };
+}
 
 const runbookEvidence = {
   evidence_type: "runbook",
@@ -444,12 +560,12 @@ describe("Nordly v2", () => {
     expect(screen.queryByText("När syns pengarna efter en återbetalning?")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Driftagent" }));
-    expect(await screen.findByRole("heading", { name: "Driftagenten väntar på en signal." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Vilket problem vill du att jag undersöker?" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Visa säkerhetsreplay" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kontrollera AI igen" })).toBeInTheDocument();
     expect(screen.queryByText("Live-AI pausad · se replay")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
-    expect(screen.getByText(/Starta ett syntetiskt larm/)).toBeInTheDocument();
+    expect(screen.getByText(/Välj ett syntetiskt kundproblem/)).toBeInTheDocument();
     expect(screen.getByText(
       "Historisk säkerhetskörning · osäkert svar stoppas · 0 nya AI-anrop",
     )).toBeInTheDocument();
@@ -462,7 +578,7 @@ describe("Nordly v2", () => {
     expect(screen.queryByText("Vet du varför?")).not.toBeInTheDocument();
     expect(screen.queryByText("Live-AI pausad · se replay")).not.toBeInTheDocument();
     await user.click(driftEndButton);
-    expect(await screen.findByRole("heading", { name: "Driftagenten väntar på en signal." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Vilket problem vill du att jag undersöker?" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Avsluta samtal" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
   });
@@ -481,8 +597,67 @@ describe("Nordly v2", () => {
     expect(screen.getByText(/Varken Live-AI eller replay är tillgänglig/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Driftagent" }));
-    expect(await screen.findByRole("heading", { name: "Driftagenten väntar på en signal." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Vilket problem vill du att jag undersöker?" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Replay är inte tillgänglig" })).toBeDisabled();
+    expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
+  });
+
+  it("offers four backend-owned investigations and sends the chosen case to the planner", async () => {
+    const family = incidentFamilies[1];
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/v1/capabilities")) return Promise.resolve(jsonResponse(capabilitiesResponse));
+      if (url.includes("/live-ai/status")) return Promise.resolve(jsonResponse(availableStatus));
+      if (url.includes("/incident-lab/plans")) return Promise.resolve(jsonResponse(planResponseFor(family.id)));
+      if (url.endsWith("/api/v1/incident-lab/runs")) return Promise.resolve(jsonResponse(liveRunFor(family.id)));
+      return Promise.resolve(jsonResponse(documentLibrary));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<NordlyV2App />);
+    await user.click(screen.getByRole("button", { name: "Driftagent" }));
+    const choices = await screen.findAllByRole("button", { name: /^Undersök:/ });
+    expect(choices).toHaveLength(4);
+    expect(choices.map((button) => button.getAttribute("aria-label"))).toEqual(
+      incidentFamilies.map((item) => `Undersök: ${item.customer_impact.sv.replace(/[.]$/, "")}`),
+    );
+
+    await user.click(screen.getByRole("button", {
+      name: `Undersök: ${family.customer_impact.sv.replace(/[.]$/, "")}`,
+    }));
+    expect(await screen.findByRole("textbox", { name: "Fråga om rapporten…" }, { timeout: 4_500 })).toBeEnabled();
+
+    const planRequest = fetchMock.mock.calls.find(([url]) => String(url).includes("/incident-lab/plans"));
+    const body = JSON.parse(String((planRequest?.[1] as RequestInit | undefined)?.body));
+    expect(body.confirm_live_ai).toBe(true);
+    expect(body.instruction).toContain(family.description.sv);
+    expect(body.instruction).toContain(family.customer_impact.sv);
+  });
+
+  it("stops before the paid run when the planner returns another incident family", async () => {
+    const family = incidentFamilies[1];
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/v1/capabilities")) return Promise.resolve(jsonResponse(capabilitiesResponse));
+      if (url.includes("/live-ai/status")) return Promise.resolve(jsonResponse(availableStatus));
+      if (url.includes("/incident-lab/plans")) return Promise.resolve(jsonResponse(incidentPlanResponse));
+      if (url.includes("/incident-lab/runs/recorded-replay")) return Promise.resolve(jsonResponse(incidentReplay));
+      if (url.endsWith("/api/v1/incident-lab/runs")) return Promise.resolve(jsonResponse(liveRunFor(family.id)));
+      return Promise.resolve(jsonResponse(documentLibrary));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<NordlyV2App />);
+    await user.click(screen.getByRole("button", { name: "Driftagent" }));
+    await user.click(await screen.findByRole("button", {
+      name: `Undersök: ${family.customer_impact.sv.replace(/[.]$/, "")}`,
+    }));
+
+    expect(await screen.findByRole("heading", { name: "Live-utredningen kunde inte slutföras." })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/api/v1/incident-lab/runs"))).toHaveLength(0);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/runs/recorded-replay"))).toHaveLength(0);
     expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
   });
 
@@ -515,7 +690,7 @@ describe("Nordly v2", () => {
     const runRequest = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/v1/incident-lab/runs"));
     const followUpRequest = fetchMock.mock.calls.find(([url]) => String(url).includes("/incident-lab/follow-ups"));
     expect(String((planRequest?.[1] as RequestInit | undefined)?.body)).toContain('"confirm_live_ai":true');
-    expect(String((planRequest?.[1] as RequestInit | undefined)?.body)).toContain("tre tidsgränsöverskridna betalningar");
+    expect(String((planRequest?.[1] as RequestInit | undefined)?.body)).toContain("tre betalningar får HTTP 504");
     expect(String((runRequest?.[1] as RequestInit | undefined)?.body)).toContain('"confirm_live_ai":true');
     expect(String((followUpRequest?.[1] as RequestInit | undefined)?.body)).toContain('"confirm_live_ai":true');
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/runs/recorded-replay"))).toHaveLength(0);
