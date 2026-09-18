@@ -231,16 +231,16 @@ public final class KnowledgeRagSafetyGate {
                 || matches(PII_REQUESTS, normalized)) {
             return Decision.block(
                     ReasonCode.PII_REQUEST,
-                    "Frågan stoppades före AI eftersom den ber om eller innehåller persondata.",
-                    "The question was stopped before AI because it requests or contains personal data."
+                    "Den råa frågan skickades inte till AI eftersom den ber om eller innehåller persondata.",
+                    "The raw question was not sent to AI because it requests or contains personal data."
             );
         }
         if (matches(EMPLOYEE_COMPENSATION_REQUESTS, normalized)) {
             return Decision.block(
                     ReasonCode.EMPLOYEE_COMPENSATION_REQUEST,
-                    "Frågan stoppades före AI eftersom en persons lön eller "
+                    "Den råa frågan skickades inte till AI eftersom en persons lön eller "
                             + "ersättning är privat personalinformation.",
-                    "The question was stopped before AI because an individual's "
+                    "The raw question was not sent to AI because an individual's "
                             + "salary or compensation is private employee information."
             );
         }
@@ -248,16 +248,16 @@ public final class KnowledgeRagSafetyGate {
                 || matches(SECRET_REQUESTS, normalized)) {
             return Decision.block(
                     ReasonCode.SECRET_REQUEST,
-                    "Frågan stoppades före AI eftersom den ber om hemligheter eller inloggningsuppgifter.",
-                    "The question was stopped before AI because it requests secrets or credentials."
+                    "Den råa frågan skickades inte till AI eftersom den ber om hemligheter eller inloggningsuppgifter.",
+                    "The raw question was not sent to AI because it requests secrets or credentials."
             );
         }
         String promptNormalized = normalized.replace('0', 'o');
         if (matches(PROMPT_INJECTIONS, promptNormalized)) {
             return Decision.block(
                     ReasonCode.PROMPT_INJECTION,
-                    "Frågan försöker ändra säkerhetsreglerna och stoppades före AI.",
-                    "The question attempts to override safety rules and was stopped before AI."
+                    "Den råa frågan skickades inte till AI eftersom den försöker ändra säkerhetsreglerna.",
+                    "The raw question was not sent to AI because it attempts to override safety rules."
             );
         }
         if (matches(FINANCIAL_ACTIONS, normalized)) {

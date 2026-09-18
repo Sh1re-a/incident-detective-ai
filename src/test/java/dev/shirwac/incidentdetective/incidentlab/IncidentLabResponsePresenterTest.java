@@ -121,7 +121,7 @@ class IncidentLabResponsePresenterTest {
         IncidentLabRunResponse.LocalizedPresentation english =
                 result.localizedPresentations().en();
         assertEquals(
-                "The root cause is verified in the synthetic case",
+                "Strongest explanation in the synthetic case",
                 english.businessResponse().headline()
         );
         assertEquals(

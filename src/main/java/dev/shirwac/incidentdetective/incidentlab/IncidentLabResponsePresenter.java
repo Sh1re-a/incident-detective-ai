@@ -247,19 +247,19 @@ final class IncidentLabResponsePresenter {
         return new Presentation(
                 AnswerState.DIAGNOSED,
                 new IncidentLabRunResponse.BusinessResponse(
-                        "Rotorsaken är verifierad i det syntetiska fallet",
+                        "Starkaste förklaringen i det syntetiska fallet",
                         alarmText,
                         impact(scenario, alarm.incidentFamily()),
                         List.of(
                                 alarmText,
-                                "Verifierad orsak: " + rootCause + " i "
+                                "Stöds av körningens bevis: " + rootCause + " i "
                                         + service + "."
                         ),
                         List.of(
-                                "Om samma mönster finns utanför det syntetiska fallet är inte undersökt."
+                                "Inte verifierat utanför detta scenario."
                         ),
                         nextRead,
-                        "Verifierad i det syntetiska fallet",
+                        "Stöds av körningens bevis",
                         true
                 ),
                 new IncidentLabRunResponse.DeveloperResponse(
@@ -420,19 +420,19 @@ final class IncidentLabResponsePresenter {
         return new Presentation(
                 AnswerState.DIAGNOSED,
                 new IncidentLabRunResponse.BusinessResponse(
-                        "The root cause is verified in the synthetic case",
+                        "Strongest explanation in the synthetic case",
                         alarmText,
                         impactEnglish(scenario, alarm.incidentFamily()),
                         List.of(
                                 alarmText,
-                                "Verified cause: " + rootCause + " in "
+                                "Supported by this run's evidence: " + rootCause + " in "
                                         + service + "."
                         ),
                         List.of(
-                                "Whether the same pattern exists outside the synthetic case has not been investigated."
+                                "Not verified outside this scenario."
                         ),
                         nextRead,
-                        "Verified in the synthetic case",
+                        "Supported by this run's evidence",
                         true
                 ),
                 new IncidentLabRunResponse.DeveloperResponse(
