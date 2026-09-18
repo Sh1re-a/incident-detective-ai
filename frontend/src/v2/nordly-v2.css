@@ -1799,6 +1799,15 @@ button.agent-identity__badge:hover {
   color: var(--n-green);
 }
 
+.evidence-result--conclusion {
+  display: block;
+  text-align: left;
+}
+
+.evidence-result--conclusion.evidence-result--safe {
+  color: var(--n-ink);
+}
+
 .evidence-result--safe svg {
   width: 19px;
   height: 19px;

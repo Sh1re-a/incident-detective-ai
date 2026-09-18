@@ -2095,7 +2095,7 @@ function DriftEvidence({
           />
         </div>
       </div>
-      <div className={`evidence-result${released ? " evidence-result--safe" : " evidence-result--amber"}`}>
+      <div className={`evidence-result evidence-result--conclusion${released ? " evidence-result--safe" : " evidence-result--amber"}`}>
         <span className="eyebrow">{localized(locale, "Rapporterad slutsats", "Reported conclusion")}</span>
         <strong>{conclusion}</strong>
         <p>{released
