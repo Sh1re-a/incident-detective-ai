@@ -34,6 +34,15 @@
             "value": "no-cache"
           }
         ]
+      },
+      {
+        "source": "/*.@(png|svg|ico|json|txt|xml)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
       }
     ],
     "rewrites": [
@@ -46,23 +55,7 @@
         }
       },
       {
-        "source": "/v3/**",
-        "run": {
-          "serviceId": "incident-detective",
-          "region": "europe-west1",
-          "pinTag": false
-        }
-      },
-      {
-        "source": "/swagger-ui.html",
-        "run": {
-          "serviceId": "incident-detective",
-          "region": "europe-west1",
-          "pinTag": false
-        }
-      },
-      {
-        "source": "/swagger-ui/**",
+        "source": "/actuator/health",
         "run": {
           "serviceId": "incident-detective",
           "region": "europe-west1",
