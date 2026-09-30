@@ -600,6 +600,24 @@ button.agent-identity__badge:hover {
   font-size: 13px;
 }
 
+.typing-indicator__signal {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid rgba(20, 108, 255, 0.12);
+  border-radius: 50%;
+  background: #f5f9ff;
+  color: var(--n-blue);
+  animation: nordly-breathe 2.2s var(--n-ease) infinite;
+}
+
+.typing-indicator__signal svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2.15;
+}
+
 .typing-indicator__dots {
   display: inline-flex;
   align-items: center;
@@ -612,7 +630,7 @@ button.agent-identity__badge:hover {
   height: 6px;
   border-radius: 50%;
   background: var(--n-blue);
-  animation: nordly-dot 1.1s ease-in-out infinite;
+  animation: nordly-dot 1.6s ease-in-out infinite;
 }
 
 .typing-indicator__dots i:nth-child(2) {
@@ -625,7 +643,7 @@ button.agent-identity__badge:hover {
 
 @keyframes nordly-dot {
   0%, 60%, 100% { opacity: 0.32; transform: translateY(0); }
-  30% { opacity: 1; transform: translateY(-2px); }
+  30% { opacity: 0.82; transform: translateY(-1px); }
 }
 
 .chat-composer-wrap {
@@ -648,6 +666,27 @@ button.agent-identity__badge:hover {
   width: min(100%, 590px);
   margin: -3px 0 15px;
   padding-bottom: 0;
+}
+
+.suggestion-row--followup {
+  width: min(100%, 590px);
+  margin: -5px 0 15px 4px;
+  padding-bottom: 0;
+}
+
+.suggestion-row--followup button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-color: rgba(20, 108, 255, 0.14);
+  background: rgba(246, 250, 255, 0.9);
+  color: #506b95;
+}
+
+.suggestion-row--followup button svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0.72;
 }
 
 .connection-status {
@@ -2601,6 +2640,15 @@ button.evidence-runbook {
 
   .suggestion-row button {
     min-height: 36px;
+  }
+
+  .suggestion-row--followup {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .suggestion-row--followup button {
+    min-height: 44px;
   }
 
   .order-strip,

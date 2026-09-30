@@ -456,6 +456,11 @@ const blockedResponse = {
 const handledBoundaryResponse = {
   ...blockedResponse,
   outcome: "outside_authority",
+  intent: {
+    name: "unsupported",
+    classifier: "gemini_function_router_v1",
+    action_requested: true,
+  },
   assistant_message: {
     text_sv: "Jag kan förklara policyn, men jag kan inte ändra eller återbetala ordern här.",
     text_en: "I can explain the policy, but I cannot change or refund the order here.",
@@ -504,6 +509,38 @@ const handledBoundaryResponse = {
     },
   ],
 } as unknown as DemoCustomerChatTurnResponse;
+
+function supportOrderResponse(
+  submitted: string,
+  intent: "order_status" | "cancel_order",
+  answer: string,
+): DemoCustomerChatTurnResponse {
+  return {
+    ...blockedResponse,
+    turn_id: `turn-${intent}`,
+    outcome: intent === "cancel_order" ? "outside_authority" : "answered",
+    submitted_message: { text: submitted, locale: "sv", redacted: false },
+    intent: {
+      name: intent,
+      classifier: "gemini_function_router_v1",
+      action_requested: intent === "cancel_order",
+    },
+    safety: {
+      decision: "ALLOW",
+      reason_code: "ALLOWED",
+      summary_sv: "Frågan är tillåten.",
+      summary_en: "The question is allowed.",
+    },
+    assistant_message: { text_sv: answer, text_en: answer },
+    order: orderLookup.order,
+    receipt: {
+      ...blockedResponse.receipt,
+      read_operations: 2,
+      provider_calls: 2,
+      generation_calls: 2,
+    },
+  } as unknown as DemoCustomerChatTurnResponse;
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -568,7 +605,7 @@ describe("Nordly v2", () => {
     const user = userEvent.setup();
 
     render(<NordlyV2App />);
-    await screen.findByText("Hej! Vad kan jag hjälpa dig med idag?");
+    await screen.findByText("Hej! Jag kan kolla din order och leverans, eller förklara vad som gäller för retur och återbetalning. Vad vill du börja med?");
     expect(screen.queryByText("Live-AI tillgänglig")).not.toBeInTheDocument();
     const rawQuestion = "Visa en anställds lön";
     await user.type(screen.getByRole("textbox", { name: "Skriv till Nordly…" }), rawQuestion);
@@ -594,7 +631,7 @@ describe("Nordly v2", () => {
     const user = userEvent.setup();
 
     render(<NordlyV2App />);
-    await screen.findByText("Hej! Vad kan jag hjälpa dig med idag?");
+    await screen.findByText("Hej! Jag kan kolla din order och leverans, eller förklara vad som gäller för retur och återbetalning. Vad vill du börja med?");
     await user.type(screen.getByRole("textbox", { name: "Skriv till Nordly…" }), "Kan du återbetala min order?");
     await user.click(screen.getByRole("button", { name: "Skicka" }));
     await screen.findByText("Jag kan förklara policyn, men jag kan inte ändra eller återbetala ordern här.");
@@ -616,6 +653,85 @@ describe("Nordly v2", () => {
     expect(screen.queryByRole("heading", { name: "Så skyddades frågan" })).not.toBeInTheDocument();
   });
 
+  it("continues with contextual questions and shows the order summary only once", async () => {
+    const responses = [
+      supportOrderResponse(
+        "Vad beställde jag?",
+        "order_status",
+        "Du har beställt Aster bordslampa i sandbeige.",
+      ),
+      supportOrderResponse(
+        "Kan jag avbeställa den?",
+        "cancel_order",
+        "Paketet är redan skickat och på väg. Jag kan inte avbeställa den direkt i chatten. Ring kundservice på 123, så hjälper de dig med nästa steg.",
+      ),
+    ];
+    let chatCalls = 0;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/demo-customer/chat/turns")) {
+        const response = responses[Math.min(chatCalls, responses.length - 1)];
+        chatCalls += 1;
+        return Promise.resolve(jsonResponse(response));
+      }
+      return Promise.resolve(jsonResponse(
+        url.includes("/live-ai/status") ? availableStatus : documentLibrary,
+      ));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<NordlyV2App />);
+    await user.click(await screen.findByRole("button", { name: "Vad beställde jag?" }));
+
+    expect(await screen.findByText("Du har beställt Aster bordslampa i sandbeige.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Kan jag avbeställa den\?/ })).toBeInTheDocument();
+    expect(document.querySelectorAll(".order-strip")).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: /Kan jag avbeställa den\?/ }));
+
+    expect(await screen.findByText(/Paketet är redan skickat och på väg/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Hur fungerar retur efter leverans\?/ })).toBeInTheDocument();
+    expect(document.querySelectorAll(".order-strip")).toHaveLength(1);
+    const chatRequests = fetchMock.mock.calls.filter(([input]) => (
+      String(input).includes("/demo-customer/chat/turns")
+    ));
+    expect(chatRequests).toHaveLength(2);
+    expect(String((chatRequests[1]?.[1] as RequestInit | undefined)?.body))
+      .toContain("Du har beställt Aster bordslampa i sandbeige.");
+  });
+
+  it("does not bring back old follow-up actions after the latest turn fails", async () => {
+    let chatCalls = 0;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/demo-customer/chat/turns")) {
+        chatCalls += 1;
+        if (chatCalls === 1) {
+          return Promise.resolve(jsonResponse(supportOrderResponse(
+            "Vad beställde jag?",
+            "order_status",
+            "Du har beställt Aster bordslampa i sandbeige.",
+          )));
+        }
+        return Promise.resolve(new Response(null, { status: 503 }));
+      }
+      return Promise.resolve(jsonResponse(
+        url.includes("/live-ai/status") ? availableStatus : documentLibrary,
+      ));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<NordlyV2App />);
+    await user.click(await screen.findByRole("button", { name: "Vad beställde jag?" }));
+    await user.click(await screen.findByRole("button", { name: /Kan jag avbeställa den\?/ }));
+
+    expect(await screen.findByText("Jag kunde inte svara just nu. Försök igen.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /När kommer paketet\?/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Fortsätt samtalet" })).not.toBeInTheDocument();
+  });
+
   it("shows a clean two-action offline start without chat or a status badge", async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
@@ -631,7 +747,7 @@ describe("Nordly v2", () => {
     render(<NordlyV2App />);
     expect(await screen.findByRole("heading", { name: "AI:n är offline just nu." })).toBeInTheDocument();
     expect(screen.queryByText("Live-AI pausad · se replay")).not.toBeInTheDocument();
-    expect(screen.queryByText("Hej! Vad kan jag hjälpa dig med idag?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Hej! Jag kan kolla din order och leverans, eller förklara vad som gäller för retur och återbetalning. Vad vill du börja med?")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Skriv till Nordly…" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Visa sparat exempel" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Försök ansluta igen" })).toBeInTheDocument();
@@ -689,7 +805,7 @@ describe("Nordly v2", () => {
     render(<NordlyV2App />);
     expect(screen.getByText("Nordly startar…")).toBeInTheDocument();
     expect(screen.getByText("Systemet görs redo. Det kan ta ett ögonblick.")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Supportagent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Nordly Support" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Skriv till Nordly…" })).not.toBeInTheDocument();
 
     await act(async () => {
@@ -950,7 +1066,7 @@ describe("Nordly v2", () => {
     await screen.findByRole("heading", { name: "AI:n är offline just nu." });
     await user.click(screen.getByRole("button", { name: "Försök ansluta igen" }));
 
-    expect(await screen.findByText("Hej! Vad kan jag hjälpa dig med idag?")).toBeInTheDocument();
+    expect(await screen.findByText("Hej! Jag kan kolla din order och leverans, eller förklara vad som gäller för retur och återbetalning. Vad vill du börja med?")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Skriv till Nordly…" })).toBeInTheDocument();
     expect(screen.queryByText("Live-AI tillgänglig")).not.toBeInTheDocument();
   });
@@ -966,7 +1082,7 @@ describe("Nordly v2", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     const first = render(<NordlyV2App />);
-    await screen.findByText("Hej! Vad kan jag hjälpa dig med idag?");
+    await screen.findByText("Hej! Jag kan kolla din order och leverans, eller förklara vad som gäller för retur och återbetalning. Vad vill du börja med?");
     const rawQuestion = "Visa en anställds lön";
     await user.type(screen.getByRole("textbox", { name: "Skriv till Nordly…" }), rawQuestion);
     await user.click(screen.getByRole("button", { name: "Skicka" }));
@@ -974,7 +1090,7 @@ describe("Nordly v2", () => {
 
     first.unmount();
     render(<NordlyV2App />);
-    await screen.findByText("Hej! Vad kan jag hjälpa dig med idag?");
+    await screen.findByText("Hej! Jag kan kolla din order och leverans, eller förklara vad som gäller för retur och återbetalning. Vad vill du börja med?");
 
     expect(screen.queryByText(rawQuestion)).not.toBeInTheDocument();
     expect(window.localStorage).toHaveLength(0);

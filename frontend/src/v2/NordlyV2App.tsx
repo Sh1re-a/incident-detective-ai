@@ -144,12 +144,12 @@ function driftPlanInstruction(family: IncidentFamilyCapability, locale: Locale) 
 
 const COPY = {
   sv: {
-    modes: { drift: "Driftagent", support: "Supportagent", documents: "Dokumentarkiv" },
+    modes: { drift: "Driftagent", support: "Nordly Support", documents: "Dokumentarkiv" },
     footer: "Verifierade källor · Endast läsning · Interaktiv AI-demo",
     synthetic: "Demo med syntetisk data · Live-läget har en begränsad dagskvot",
-    supportIdentity: "Hjälper dig med order och villkor",
+    supportIdentity: "Order, leverans, retur och villkor",
     driftIdentity: "Rapporterar vad som händer i Nordlys köpflöde",
-    greeting: "Hej! Vad kan jag hjälpa dig med idag?",
+    greeting: "Hej! Jag kan kolla din order och leverans, eller förklara vad som gäller för retur och återbetalning. Vad vill du börja med?",
     supportPlaceholder: "Skriv till Nordly…",
     driftPlaceholder: "Fråga om rapporten…",
     send: "Skicka",
@@ -252,12 +252,12 @@ const COPY = {
     changesZero: "0 ändringar",
   },
   en: {
-    modes: { drift: "Operations agent", support: "Support agent", documents: "Document archive" },
+    modes: { drift: "Operations agent", support: "Nordly Support", documents: "Document archive" },
     footer: "Verified sources · Read only · Interactive AI demo",
     synthetic: "Demo with synthetic data · Live mode has a limited daily quota",
-    supportIdentity: "Here to help with orders and policies",
+    supportIdentity: "Orders, delivery, returns and policies",
     driftIdentity: "Reports what is happening in Nordly's checkout flow",
-    greeting: "Hi! How can I help today?",
+    greeting: "Hi! I can check your order and delivery, or explain returns and refunds. Where would you like to start?",
     supportPlaceholder: "Message Nordly…",
     driftPlaceholder: "Ask about the report…",
     send: "Send",
@@ -417,6 +417,53 @@ function shortDate(value: string, locale: Locale) {
 
 function localized(locale: Locale, sv: string, en: string) {
   return locale === "sv" ? sv : en;
+}
+
+function supportFollowUps(
+  response: DemoCustomerChatTurnResponse,
+  locale: Locale,
+): string[] {
+  if (!["answered", "outside_authority"].includes(response.outcome)) return [];
+  const questions = (() => {
+    switch (response.intent.name) {
+      case "order_status":
+        return [
+          ["När kommer paketet?", "When will the parcel arrive?"],
+          ["Kan jag avbeställa den?", "Can I cancel it?"],
+        ];
+      case "cancellation_policy":
+      case "cancel_order":
+        return [
+          ["Hur fungerar retur efter leverans?", "How do returns work after delivery?"],
+          ["När kommer paketet?", "When will the parcel arrive?"],
+        ];
+      case "return_policy":
+      case "return_order":
+        return [
+          ["Hur lång tid tar återbetalningen?", "How long does the refund take?"],
+          ["Vad beställde jag?", "What did I order?"],
+        ];
+      case "refund_policy":
+      case "refund_order":
+        return [
+          ["Vad gäller för retur?", "What is the return policy?"],
+          ["När kommer paketet?", "When will the parcel arrive?"],
+        ];
+      case "change_delivery_address":
+        return [
+          ["När kommer paketet?", "When will the parcel arrive?"],
+          ["Vad gäller för retur?", "What is the return policy?"],
+        ];
+      case "purchase_item":
+        return [
+          ["Vad beställde jag?", "What did I order?"],
+          ["När kommer paketet?", "When will the parcel arrive?"],
+        ];
+      default:
+        return [];
+    }
+  })();
+  return questions.map(([sv, en]) => localized(locale, sv, en));
 }
 
 function useMediaQuery(query: string) {
@@ -1327,6 +1374,14 @@ function SupportAgentView({
     : offlineReplayState === "error"
       ? localized(locale, "Försök hämta exemplet igen", "Try loading the example again")
       : copy.startReplay;
+  const firstOrderTurnId = turns.find((turn) => (
+    turn.response?.order
+    && ["answered", "outside_authority"].includes(turn.response.outcome)
+  ))?.clientId ?? null;
+  const latestTurn = turns.at(-1);
+  const latestCompletedTurnId = latestTurn?.response && !latestTurn.errorCode
+    ? latestTurn.clientId
+    : null;
 
   return (
     <section className="chat-stage" aria-label={copy.modes.support}>
@@ -1367,6 +1422,9 @@ function SupportAgentView({
               locale={locale}
               pending={pendingId === turn.clientId}
               slow={slow && pendingId === turn.clientId}
+              showOrderSummary={turn.clientId === firstOrderTurnId}
+              showFollowUps={pendingId === null && turn.clientId === latestCompletedTurnId}
+              onFollowUp={(question) => void submit(question)}
               onConfirm={() => void submit(turn.question, true, turn.clientId)}
               onCancel={() => cancel(turn.clientId)}
               openEvidence={openEvidence}
@@ -1490,6 +1548,9 @@ function SupportTurn({
   locale,
   pending,
   slow,
+  showOrderSummary,
+  showFollowUps,
+  onFollowUp,
   onConfirm,
   onCancel,
   openEvidence,
@@ -1499,6 +1560,9 @@ function SupportTurn({
   locale: Locale;
   pending: boolean;
   slow: boolean;
+  showOrderSummary: boolean;
+  showFollowUps: boolean;
+  onFollowUp: (question: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
   openEvidence: (response: DemoCustomerChatTurnResponse) => void;
@@ -1510,6 +1574,12 @@ function SupportTurn({
   const text = response
     ? locale === "sv" ? response.assistant_message.text_sv : response.assistant_message.text_en
     : null;
+  const followUps = response ? supportFollowUps(response, locale) : [];
+  const showEvidenceDisclosure = Boolean(response) && (
+    response?.outcome === "refused"
+    || response?.outcome === "outside_authority"
+    || !["conversation", "unsupported"].includes(response?.intent.name ?? "")
+  );
   return (
     <div className="chat-turn">
       <MessageBubble side="user"><p>{turn.question}</p></MessageBubble>
@@ -1539,18 +1609,47 @@ function SupportTurn({
       ) : (
         <MessageBubble side="assistant">
           <p>{text}</p>
-          {response.order ? <OrderStrip response={response} locale={locale} /> : null}
+          {response.order && showOrderSummary ? <OrderStrip response={response} locale={locale} /> : null}
           {documentSources.length > 0 ? (
             <SourceChips sources={documentSources} locale={locale} onOpen={openDocument} />
           ) : null}
           {response.outcome === "refused" ? (
             <div className="protected-inline"><LockIcon /><span>{localized(locale, "Jag öppnade inga privata uppgifter.", "I did not open any private information.")}</span></div>
           ) : null}
-          <button type="button" className="disclosure-row" onClick={() => openEvidence(response)}>
-            <span>{copy.behindAnswer}</span><ChevronRightIcon />
-          </button>
+          {showEvidenceDisclosure ? (
+            <button type="button" className="disclosure-row" onClick={() => openEvidence(response)}>
+              <span>{copy.behindAnswer}</span><ChevronRightIcon />
+            </button>
+          ) : null}
         </MessageBubble>
       )}
+      {response && showFollowUps && followUps.length > 0 ? (
+        <motion.div
+          className="suggestion-row suggestion-row--followup"
+          role="group"
+          aria-label={localized(locale, "Fortsätt samtalet", "Continue the conversation")}
+          initial="hidden"
+          animate="visible"
+          variants={{
+            hidden: { opacity: 0, y: 4 },
+            visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.035 } },
+          }}
+        >
+          {followUps.map((question) => (
+            <motion.button
+              key={question}
+              type="button"
+              onClick={() => onFollowUp(question)}
+              variants={{
+                hidden: { opacity: 0, y: 4 },
+                visible: { opacity: 1, y: 0 },
+              }}
+            >
+              {question}<ChevronRightIcon />
+            </motion.button>
+          ))}
+        </motion.div>
+      ) : null}
     </div>
   );
 }
@@ -2033,10 +2132,18 @@ function MessageBubble({
   return (
     <motion.div
       className={`message-row message-row--${side} ${className}`}
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.24 }}
+      layout="position"
+      initial={{
+        opacity: 0,
+        y: side === "assistant" ? 7 : 4,
+        scale: side === "assistant" ? 0.99 : 0.995,
+      }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        duration: side === "assistant" ? 0.21 : 0.15,
+        ease: [0.16, 1, 0.3, 1],
+      }}
+      style={{ transformOrigin: side === "assistant" ? "bottom left" : "bottom right" }}
     >
       <div className={`message-bubble message-bubble--${side} message-bubble--${tone}`}>{children}</div>
       {timestamp ? <time>{timestamp}</time> : null}
@@ -2047,8 +2154,21 @@ function MessageBubble({
 function TypingIndicator({ label }: { label: string }) {
   return (
     <div className="typing-indicator" role="status">
+      <span className="typing-indicator__signal" aria-hidden="true"><NordlySignal /></span>
       <span className="typing-indicator__dots" aria-hidden="true"><i /><i /><i /></span>
-      {label ? <span>{label}</span> : null}
+      <AnimatePresence mode="popLayout" initial={false}>
+        {label ? (
+          <motion.span
+            key={label}
+            initial={{ opacity: 0, y: 3 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -3 }}
+            transition={{ duration: 0.16 }}
+          >
+            {label}
+          </motion.span>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
