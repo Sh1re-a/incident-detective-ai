@@ -368,7 +368,8 @@ function modeFromHash(): Mode {
   const hash = window.location.hash.replace(/^#/, "");
   if (["drift", "incident-lab", "incident-detective"].includes(hash)) return "drift";
   if (["documents", "knowledge-room"].includes(hash)) return "documents";
-  return "support";
+  if (hash === "support") return "support";
+  return "drift";
 }
 
 function hashForMode(mode: Mode) {

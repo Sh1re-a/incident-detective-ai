@@ -568,6 +568,20 @@ afterEach(() => {
 });
 
 describe("Nordly v2", () => {
+  it("opens the evidence-led operations demo from the unhashed recruiter URL", async () => {
+    window.history.replaceState(null, "", "/");
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => Promise.resolve(
+      String(input).includes("/live-ai/status")
+        ? jsonResponse(offlineStatus)
+        : jsonResponse(documentLibrary),
+    )));
+
+    render(<NordlyV2App />);
+
+    expect(await screen.findByRole("heading", { name: "Driftagent" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Visa sparat exempel" })).toBeInTheDocument();
+  });
+
   it("opens the backend-driven archive and keeps protected documents metadata-only", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => Promise.resolve(
       String(input).includes("/live-ai/status")

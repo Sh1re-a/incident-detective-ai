@@ -13,7 +13,7 @@ and what is still uncertain.
 The model can interpret and propose. Java owns permissions, tool boundaries,
 source access, validation, and the final release decision.
 
-**[Try the live demo](https://nordly.sh1rre.se)** ·
+**[Try the live demo](https://nordly.sh1rre.se/#drift)** ·
 **[Read the engineering decisions](docs/DECISIONS.md)** ·
 **[Explore the documentation](docs/README.md)**
 
