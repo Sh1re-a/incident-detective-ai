@@ -352,7 +352,7 @@ class DemoCustomerChatServiceTest {
     }
 
     @Test
-    void factualAnswerUsesHistoryForRoutingButNotAsAnswerEvidence() {
+    void factualAnswerUsesSafeHistoryForContinuityButReadsFreshEvidence() {
         CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
         when(router.route(any())).thenReturn(modelRoute(
                 CustomerChatModelRouter.Tool.GET_CURRENT_ORDER,
@@ -381,7 +381,12 @@ class DemoCustomerChatServiceTest {
         ArgumentCaptor<CustomerChatAnswerGateway.Input> answerInput =
                 ArgumentCaptor.forClass(CustomerChatAnswerGateway.Input.class);
         verify(answerGateway).generate(eq(true), answerInput.capture());
-        assertTrue(answerInput.getValue().recentConversation().isEmpty());
+        assertEquals(List.of(history),
+                answerInput.getValue().recentConversation());
+        assertTrue(answerInput.getValue().evidence().stream()
+                .noneMatch(item -> item.text().contains(
+                        history.assistantMessage()
+                )));
     }
 
     @Test
@@ -421,7 +426,7 @@ class DemoCustomerChatServiceTest {
 
         assertEquals("clarification_required", response.outcome());
         assertTrue(response.assistantMessage().textSv().contains(
-                "Jag vill inte gissa vad du menar"
+                "inte helt säker på vad du syftar på"
         ));
         assertTrue(response.toolEvents().stream().noneMatch(event ->
                 "compose_customer_answer".equals(event.name())));
@@ -441,7 +446,7 @@ class DemoCustomerChatServiceTest {
 
         assertEquals("unsupported", response.outcome());
         assertTrue(response.assistantMessage().textSv().contains(
-                "Jag vill inte gissa utanför det området"
+                "Jag är Nordly Support"
         ));
         assertTrue(response.toolEvents().stream().noneMatch(event ->
                 "compose_customer_answer".equals(event.name())));
@@ -618,6 +623,15 @@ class DemoCustomerChatServiceTest {
         assertEquals("cancel_order", response.intent().name());
         assertEquals("BLOCK", response.safety().decision());
         assertEquals("WRITE_ACTION", response.safety().reasonCode());
+        assertTrue(response.assistantMessage().textSv().contains(
+                "Paketet är redan skickat och på väg."
+        ));
+        assertTrue(response.assistantMessage().textSv().contains(
+                "Ring kundservice på 123"
+        ));
+        assertFalse(response.assistantMessage().textSv().contains(
+                "ingen ändring har gjorts"
+        ));
         assertTrue(response.toolEvents().stream()
                 .anyMatch(event -> event.modelSelected()
                         && "deny_business_action".equals(event.name())));
@@ -744,6 +758,44 @@ class DemoCustomerChatServiceTest {
                         event.name()
                 ) && "failed".equals(event.status())));
         verifyNoInteractions(ragService);
+        assertControlledAiInvariant(response);
+    }
+
+    @Test
+    void withholdsAnActionReplyThatOmitsTheAuthorityBoundary() {
+        CustomerChatModelRouter router = mock(CustomerChatModelRouter.class);
+        when(router.route(any())).thenReturn(modelRoute(
+                CustomerChatModelRouter.Tool.DENY_BUSINESS_ACTION,
+                CustomerChatModelRouter.DeniedAction.CANCEL_ORDER
+        ));
+        doAnswer(invocation -> {
+            CustomerChatAnswerGateway.Input input = invocation.getArgument(1);
+            CustomerChatAnswerGateway.Claim orderStatus =
+                    input.verifiedClaims().getFirst();
+            CustomerChatAnswerGateway.Result valid = composedAnswer(input);
+            return new CustomerChatAnswerGateway.Result(
+                    new CustomerChatAnswerGateway.Answer(
+                            orderStatus.textSv(),
+                            orderStatus.textEn(),
+                            List.of(orderStatus)
+                    ),
+                    valid.provider(),
+                    valid.costEstimate()
+            );
+        }).when(answerGateway).generate(eq(true), any());
+
+        DemoCustomerChatTurnResponse response = aiService(router)
+                .run(request("Kan du avbeställa min order?", true));
+
+        assertEquals("unavailable", response.outcome());
+        assertEquals(
+                "CUSTOMER_CHAT_ANSWER_MODEL_RESPONSE_REJECTED",
+                response.error().code()
+        );
+        assertTrue(response.verifiedClaims().isEmpty());
+        assertFalse(response.assistantMessage().textSv().contains(
+                "Paketet är redan skickat"
+        ));
         assertControlledAiInvariant(response);
     }
 
@@ -1036,7 +1088,7 @@ class DemoCustomerChatServiceTest {
         assertFalse(response.intent().actionRequested());
         assertNull(response.order());
         assertTrue(response.assistantMessage().textEn().contains(
-                "do not want to guess"
+                "not completely sure what you mean"
         ));
         assertEquals(0, response.receipt().readOperations());
         assertEquals(0, response.receipt().providerCalls());
@@ -1061,7 +1113,7 @@ class DemoCustomerChatServiceTest {
         assertEquals(0, response.receipt().providerCalls());
         assertFalse(response.rag().requested());
         assertTrue(response.assistantMessage().textSv().contains(
-                "vill inte gissa"
+                "inte helt säker på vad du syftar på"
         ));
         assertHumanBubble(response);
         verifyNoInteractions(ragService);

@@ -1,6 +1,7 @@
 package dev.shirwac.incidentdetective.nordly;
 
 import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -9,6 +10,23 @@ import java.util.regex.Pattern;
 
 /** Deterministic release check for model prose against backend-verified claims. */
 final class CustomerChatAnswerClaimCoverage {
+
+    private static final List<String> SWEDISH_FACTUAL_SOCIAL_SENTENCES =
+            List.of(
+                    "bra att du fragar",
+                    "vi tar det steg for steg",
+                    "jag forstar att du vill losa det har direkt",
+                    "jag forstar att det har kanns frustrerande",
+                    "jag hjalper dig garna med nasta steg"
+            );
+    private static final List<String> ENGLISH_FACTUAL_SOCIAL_SENTENCES =
+            List.of(
+                    "good question",
+                    "we can take this step by step",
+                    "i understand that you want to sort this out now",
+                    "i understand that this feels frustrating",
+                    "i'm happy to help with the next step"
+            );
 
     private static final Pattern SENTENCE_BREAK = Pattern.compile(
             "(?<=[.!?])\\s+|\\R+"
@@ -21,6 +39,11 @@ final class CustomerChatAnswerClaimCoverage {
                     + "vad vill du (?:ha hjalp med|att jag hjalper dig med)"
                     + "(?: idag)?|"
                     + "absolut vad vill du att jag hjalper dig med|"
+                    + "bra att du fragar|"
+                    + "vi tar det steg for steg|"
+                    + "jag forstar att du vill losa det har direkt|"
+                    + "jag forstar att det har kanns frustrerande|"
+                    + "jag hjalper dig garna med nasta steg|"
                     + "jag forstar att vantan kanns frustrerande|"
                     + "jag forstar att det ar frustrerande att vanta)$"
     );
@@ -32,6 +55,11 @@ final class CustomerChatAnswerClaimCoverage {
                     + "what would you like (?:help with|me to help you with)"
                     + "(?: today)?|"
                     + "of course what would you like help with|"
+                    + "good question|"
+                    + "we can take this step by step|"
+                    + "i understand that you want to sort this out now|"
+                    + "i understand that this feels frustrating|"
+                    + "i(?: am|'m) happy to help with the next step|"
                     + "i understand that waiting is frustrating)$"
     );
     private static final Pattern SWEDISH_PROTECTED_BOUNDARY = Pattern.compile(
@@ -81,6 +109,93 @@ final class CustomerChatAnswerClaimCoverage {
         return answer.claims().stream().allMatch(generated ->
                 verifiedClaims.stream().anyMatch(verified ->
                         equivalent(generated, verified)));
+    }
+
+    /**
+     * Keeps the model's ordering and at most one approved social sentence,
+     * while projecting every factual sentence back to backend-owned text.
+     * Unsupported prose is never released.
+     */
+    static String projectGroundedText(
+            String modelText,
+            List<String> canonicalClaimTexts,
+            boolean swedish,
+            boolean allowSocialSentence
+    ) {
+        List<String> remainingClaims = canonicalClaimTexts.stream()
+                .flatMap(text -> SENTENCE_BREAK.splitAsStream(text))
+                .map(String::strip)
+                .filter(text -> !text.isBlank())
+                .collect(java.util.stream.Collectors.toCollection(
+                        ArrayList::new
+                ));
+        List<String> projected = new ArrayList<>();
+        Pattern socialPattern = swedish
+                ? SWEDISH_SOCIAL_SENTENCE
+                : ENGLISH_SOCIAL_SENTENCE;
+        boolean socialAdded = false;
+
+        for (String sentence : SENTENCE_BREAK.split(modelText)) {
+            String candidate = sentence.strip();
+            if (candidate.isBlank()) {
+                continue;
+            }
+            int claimIndex = matchingClaimIndex(
+                    candidate,
+                    remainingClaims
+            );
+            if (claimIndex >= 0) {
+                projected.add(remainingClaims.remove(claimIndex));
+                continue;
+            }
+            if (allowSocialSentence && !socialAdded
+                    && matchesSocial(candidate, socialPattern)) {
+                projected.add(candidate);
+                socialAdded = true;
+            }
+        }
+        projected.addAll(remainingClaims);
+        return String.join(" ", projected);
+    }
+
+    static boolean hasMatchingFactualSocialPair(
+            String swedishText,
+            String englishText
+    ) {
+        int swedishIndex = factualSocialIndex(
+                swedishText,
+                SWEDISH_FACTUAL_SOCIAL_SENTENCES
+        );
+        int englishIndex = factualSocialIndex(
+                englishText,
+                ENGLISH_FACTUAL_SOCIAL_SENTENCES
+        );
+        return swedishIndex >= 0 && swedishIndex == englishIndex;
+    }
+
+    private static int factualSocialIndex(
+            String text,
+            List<String> approvedSentences
+    ) {
+        return SENTENCE_BREAK.splitAsStream(text)
+                .map(CustomerChatAnswerClaimCoverage::normalizePolicySentence)
+                .mapToInt(approvedSentences::indexOf)
+                .filter(index -> index >= 0)
+                .findFirst()
+                .orElse(-1);
+    }
+
+    private static int matchingClaimIndex(
+            String sentence,
+            List<String> claims
+    ) {
+        String normalized = normalizeSentence(sentence);
+        for (int index = 0; index < claims.size(); index++) {
+            if (normalized.equals(normalizeSentence(claims.get(index)))) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     static boolean protectedBoundarySafe(CustomerChatAnswerGateway.Answer answer) {

@@ -189,6 +189,7 @@ public final class DemoCustomerIntentClassifier {
             "(?:min|mitt|mina|my).{0,20}(?:order|bestallning|paket|varor|items)"
     );
     private static final List<Pattern> COMPANY_KNOWLEDGE = patterns(
+            "^(?:vem ar du|who are you)[.!?]*$",
             "(?:vad|vem|vilka).{0,30}(?:ar )?(?:nordly|ni)",
             "(?:what|who).{0,30}(?:is|are) (?:nordly|you)",
             "(?:oppettider|oppet(?:tider)?|opening hours|support hours)",

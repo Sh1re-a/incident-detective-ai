@@ -543,9 +543,9 @@ public final class DemoCustomerChatService {
                         request.locale(),
                         routedIntent,
                         response.outcome(),
-                        "conversation".equals(routedIntent)
-                                ? recentConversation
-                                : List.of(),
+                        "protected_boundary".equals(routedIntent)
+                                ? List.of()
+                                : recentConversation,
                         evidence,
                         verifiedClaims
                 )
@@ -559,6 +559,10 @@ public final class DemoCustomerChatService {
                 && !verifiedClaims.isEmpty();
         boolean groundedStandardAnswer = !protectedBoundary
                 && (!claimsRequired || !generated.answer().claims().isEmpty())
+                && includesRequiredAuthorityBoundary(
+                response,
+                generated.answer()
+        )
                 && CustomerChatAnswerClaimCoverage.covers(generated.answer())
                 && CustomerChatAnswerClaimCoverage.claimsWithinVerifiedSet(
                 generated.answer(),
@@ -639,6 +643,23 @@ public final class DemoCustomerChatService {
                 receipt,
                 response.error()
         );
+    }
+
+    private boolean includesRequiredAuthorityBoundary(
+            DemoCustomerChatTurnResponse response,
+            CustomerChatAnswerGateway.Answer answer
+    ) {
+        if (!"outside_authority".equals(response.outcome())) {
+            return true;
+        }
+        Set<String> authorityEvidenceIds = response.toolEvents().stream()
+                .filter(event -> "read_approved_policy".equals(event.name()))
+                .flatMap(event -> event.evidenceIds().stream())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        return !authorityEvidenceIds.isEmpty()
+                && answer.claims().stream()
+                .flatMap(claim -> claim.citationIds().stream())
+                .anyMatch(authorityEvidenceIds::contains);
     }
 
     private DemoCustomerChatTurnResponse boundedSafetyResponse(
@@ -1559,8 +1580,8 @@ public final class DemoCustomerChatService {
                 safety,
                 "clarification_required",
                 new DemoCustomerChatTurnResponse.AssistantMessage(
-                        "Jag vill inte gissa vad du menar. Vill du att jag kontrollerar leveransen, förklarar returreglerna eller förklarar hur avbeställning fungerar?",
-                        "I do not want to guess what you mean. Would you like me to check the delivery, explain the return rules, or explain how cancellation works?"
+                        "Jag är inte helt säker på vad du syftar på ännu. Gäller det leveransen, en retur eller något annat med ordern?",
+                        "I'm not completely sure what you mean yet. Is it about the delivery, a return, or something else with the order?"
                 ),
                 null,
                 events,
@@ -1782,8 +1803,8 @@ public final class DemoCustomerChatService {
                 safety,
                 "unsupported",
                 new DemoCustomerChatTurnResponse.AssistantMessage(
-                        "Jag kan hjälpa dig med din order, leverans, retur eller återbetalningsregler. Jag vill inte gissa utanför det området.",
-                        "I can help with your order, delivery, return or refund rules. I will not guess outside that area."
+                        "Jag är Nordly Support och hjälper till med order, leverans, retur och återbetalning. Fråga gärna om någon av dem.",
+                        "I'm Nordly Support and can help with orders, delivery, returns and refunds. Feel free to ask about any of those."
                 ),
                 null,
                 events,
@@ -1938,30 +1959,30 @@ public final class DemoCustomerChatService {
     ) {
         String actionSv = switch (intent.intent()) {
             case CANCEL_ORDER ->
-                    "Jag kan inte avbeställa eller ändra ordern här; ingen ändring har gjorts.";
+                    "Jag kan inte avbeställa den direkt i chatten, men jag kan hjälpa dig att förstå returalternativet efter leverans.";
             case RETURN_ORDER ->
-                    "Jag kan inte skapa eller godkänna en retur här; ingen ändring har gjorts.";
+                    "Jag kan förklara returreglerna, men jag kan inte starta returen direkt i chatten.";
             case REFUND_ORDER ->
-                    "Jag kan inte godkänna eller genomföra en återbetalning här; ingen ändring har gjorts.";
+                    "Jag kan förklara vad som gäller, men jag kan inte hantera återbetalningen direkt i chatten.";
             case PURCHASE_ITEM ->
-                    "Jag kan inte skapa köp eller lägga till varor här; ingen ändring har gjorts.";
+                    "Jag kan inte lägga till en ny vara i den befintliga ordern, men jag kan fortfarande hjälpa dig med ordern som redan finns.";
             case CHANGE_DELIVERY_ADDRESS ->
-                    "Jag kan inte ändra leveransadressen här; ingen ändring har gjorts.";
+                    "Jag kan inte ändra leveransadressen direkt i chatten.";
             default -> throw new IllegalArgumentException(
                     "No authority claim for " + intent.intent()
             );
         };
         String actionEn = switch (intent.intent()) {
             case CANCEL_ORDER ->
-                    "I cannot cancel or change the order here; no change was made.";
+                    "I cannot cancel it directly in this chat, but I can help you understand the return option after delivery.";
             case RETURN_ORDER ->
-                    "I cannot create or approve a return here; no change was made.";
+                    "I can explain the return policy, but I cannot start the return directly in this chat.";
             case REFUND_ORDER ->
-                    "I cannot approve or issue a refund here; no change was made.";
+                    "I can explain what applies, but I cannot handle the refund directly in this chat.";
             case PURCHASE_ITEM ->
-                    "I cannot create purchases or add items here; no change was made.";
+                    "I cannot add a new item to the existing order, but I can still help with the order you already have.";
             case CHANGE_DELIVERY_ADDRESS ->
-                    "I cannot change the delivery address here; no change was made.";
+                    "I cannot change the delivery address directly in this chat.";
             default -> throw new IllegalArgumentException(
                     "No authority claim for " + intent.intent()
             );
@@ -1969,10 +1990,8 @@ public final class DemoCustomerChatService {
         List<DemoCustomerChatTurnResponse.VerifiedClaim> claims =
                 new ArrayList<>();
         claims.add(new DemoCustomerChatTurnResponse.VerifiedClaim(
-                "Din order " + order.orderId() + " har statusen "
-                        + order.statusSv() + ".",
-                "Your order " + order.orderId() + " has status "
-                        + order.statusEn() + ".",
+                naturalOrderStatusSv(order),
+                naturalOrderStatusEn(order),
                 List.of(order.evidenceId())
         ));
         claims.add(new DemoCustomerChatTurnResponse.VerifiedClaim(
@@ -1982,12 +2001,30 @@ public final class DemoCustomerChatService {
         ));
         if (supportPolicy != null) {
             claims.add(new DemoCustomerChatTurnResponse.VerifiedClaim(
-                    "Du kan ringa 123 så hjälper kundservice dig vidare.",
-                    "You can call 123 and customer service will help you further.",
+                    "Ring kundservice på 123, så hjälper de dig med nästa steg.",
+                    "Call customer service on 123 and they will help you with the next step.",
                     List.of(supportPolicy.evidenceId())
             ));
         }
         return List.copyOf(claims);
+    }
+
+    private String naturalOrderStatusSv(DemoOrderSnapshot order) {
+        return switch (order.statusCode()) {
+            case "shipped" -> "Paketet är redan skickat och på väg.";
+            case "packing" -> "Lagret packar fortfarande din order.";
+            case "confirmed" -> "Ordern är bekräftad men har inte börjat packas än.";
+            default -> "Ordern har statusen " + order.statusSv() + ".";
+        };
+    }
+
+    private String naturalOrderStatusEn(DemoOrderSnapshot order) {
+        return switch (order.statusCode()) {
+            case "shipped" -> "The parcel has already shipped and is on its way.";
+            case "packing" -> "The warehouse is still packing your order.";
+            case "confirmed" -> "The order is confirmed but packing has not started yet.";
+            default -> "The order status is " + order.statusEn() + ".";
+        };
     }
 
     private List<DemoCustomerChatTurnResponse.VerifiedClaim> verifiedClaims(

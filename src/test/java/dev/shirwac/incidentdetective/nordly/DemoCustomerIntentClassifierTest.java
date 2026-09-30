@@ -109,6 +109,16 @@ class DemoCustomerIntentClassifierTest {
                         false
                 ),
                 Arguments.of(
+                        "Vem är du?",
+                        DemoCustomerIntentClassifier.Intent.COMPANY_KNOWLEDGE,
+                        false
+                ),
+                Arguments.of(
+                        "Who are you?",
+                        DemoCustomerIntentClassifier.Intent.COMPANY_KNOWLEDGE,
+                        false
+                ),
+                Arguments.of(
                         "When is customer service open?",
                         DemoCustomerIntentClassifier.Intent.COMPANY_KNOWLEDGE,
                         false

@@ -235,7 +235,7 @@ public final class GeminiCustomerChatAnswerGateway
                     response.text(),
                     Answer.class
             );
-            Answer answer = projectCanonicalFactualAnswer(modelAnswer, input);
+            Answer answer = projectGroundedFactualAnswer(modelAnswer, input);
             verifyAnswer(answer, input);
             String modelVersion = response.modelVersion()
                     .filter(value -> !value.isBlank())
@@ -271,7 +271,7 @@ public final class GeminiCustomerChatAnswerGateway
         }
     }
 
-    private Answer projectCanonicalFactualAnswer(
+    private Answer projectGroundedFactualAnswer(
             Answer modelAnswer,
             Input input
     ) {
@@ -294,13 +294,24 @@ public final class GeminiCustomerChatAnswerGateway
                         .orElse(selected))
                 .distinct()
                 .toList();
+        boolean allowSocialSentence = CustomerChatAnswerClaimCoverage
+                .hasMatchingFactualSocialPair(
+                        modelAnswer.textSv(),
+                        modelAnswer.textEn()
+                );
         return new Answer(
-                canonicalClaims.stream()
-                        .map(Claim::textSv)
-                        .collect(java.util.stream.Collectors.joining(" ")),
-                canonicalClaims.stream()
-                        .map(Claim::textEn)
-                        .collect(java.util.stream.Collectors.joining(" ")),
+                CustomerChatAnswerClaimCoverage.projectGroundedText(
+                        modelAnswer.textSv(),
+                        canonicalClaims.stream().map(Claim::textSv).toList(),
+                        true,
+                        allowSocialSentence
+                ),
+                CustomerChatAnswerClaimCoverage.projectGroundedText(
+                        modelAnswer.textEn(),
+                        canonicalClaims.stream().map(Claim::textEn).toList(),
+                        false,
+                        allowSocialSentence
+                ),
                 canonicalClaims
         );
     }

@@ -75,7 +75,8 @@ class GeminiCustomerChatAnswerGatewayTest {
                         + "to help with another ordinary order question."
         ));
         assertTrue(prompt.contains("Do not invent or suggest a contact route"));
-        assertTrue(prompt.contains("Build text_sv by joining only the selected"));
+        assertTrue(prompt.contains("at most one claim-free social sentence"));
+        assertTrue(prompt.contains("Use recent conversation to resolve follow-ups"));
         assertTrue(prompt.contains("Never add a tracking link"));
     }
 
@@ -369,8 +370,8 @@ class GeminiCustomerChatAnswerGatewayTest {
         )).decodeResponse(
                 response("""
                         {
-                          "text_sv": "Hej! Jag förstår att väntan känns frustrerande. Order NORD-2051 är skickad. Jag hjälper dig gärna vidare.",
-                          "text_en": "Hi! I understand that waiting is frustrating. Order NORD-2051 has shipped. I am happy to help further.",
+                          "text_sv": "Jag förstår att det här känns frustrerande. Order NORD-2051 är skickad.",
+                          "text_en": "I understand that this feels frustrating. Order NORD-2051 has shipped.",
                           "claims": [{
                             "text_sv": "Order NORD-2051 är skickad.",
                             "text_en": "Order NORD-2051 has shipped.",
@@ -382,8 +383,29 @@ class GeminiCustomerChatAnswerGatewayTest {
                 3
         );
 
+        assertEquals(
+                "Jag förstår att det här känns frustrerande. Order NORD-2051 är skickad.",
+                result.answer().textSv());
+    }
+
+    @Test
+    void dropsSocialWordingWhenTheLanguagePairDoesNotMatch() {
+        CustomerChatAnswerGateway.Result result = decode("""
+                {
+                  "text_sv": "Bra att du frågar. Order NORD-2051 är skickad.",
+                  "text_en": "I understand that this feels frustrating. Order NORD-2051 has shipped.",
+                  "claims": [{
+                    "text_sv": "Order NORD-2051 är skickad.",
+                    "text_en": "Order NORD-2051 has shipped.",
+                    "citation_ids": ["nordly-demo-order-2051-snapshot"]
+                  }]
+                }
+                """, answeredInput());
+
         assertEquals("Order NORD-2051 är skickad.",
                 result.answer().textSv());
+        assertEquals("Order NORD-2051 has shipped.",
+                result.answer().textEn());
     }
 
     @Test
