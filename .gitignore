@@ -15,6 +15,7 @@ node_modules/
 dist/
 coverage/
 .vite/
+.firebase/
 *.tsbuildinfo
 
 # Java, Maven and IntelliJ
