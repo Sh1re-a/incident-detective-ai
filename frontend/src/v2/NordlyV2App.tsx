@@ -11,7 +11,6 @@ import {
   LayoutGroup,
   MotionConfig,
   motion,
-  useIsPresent,
 } from "motion/react";
 import {
   createIncidentLabPlan,
@@ -552,36 +551,6 @@ function runbookDocumentSource(
   };
 }
 
-function SceneTransition({ children }: { children: ReactNode }) {
-  const isPresent = useIsPresent();
-  return (
-    <motion.div
-      className="nordly-scene"
-      aria-hidden={!isPresent}
-      inert={!isPresent}
-      style={{ pointerEvents: isPresent ? "auto" : "none" }}
-      initial={{ opacity: 0.64, x: 9, scale: 0.997 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0.38, x: -7, scale: 0.997 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-function SystemStartup({ locale }: { locale: Locale }) {
-  return (
-    <section className="system-startup" role="status" aria-live="polite">
-      <div className="system-startup__content">
-        <span className="system-startup__signal"><NordlySignal /></span>
-        <strong>{localized(locale, "Nordly startar…", "Nordly is starting…")}</strong>
-        <span>{localized(locale, "Systemet görs redo. Det kan ta ett ögonblick.", "The system is getting ready. This may take a moment.")}</span>
-      </div>
-    </section>
-  );
-}
-
 export default function NordlyV2App() {
   const [locale, setLocale] = useState<Locale>("sv");
   const [mode, setModeState] = useState<Mode>(() => modeFromHash());
@@ -593,7 +562,6 @@ export default function NordlyV2App() {
   const [liveAiStatus, setLiveAiStatus] = useState<LiveAiStatusResponse | null>(null);
   const [liveAiStatusResolved, setLiveAiStatusResolved] = useState(false);
   const [supportTurns, setSupportTurns] = useState<CustomerChatTurn[]>([]);
-  const [supportDraft, setSupportDraft] = useState("");
   const [supportPendingId, setSupportPendingId] = useState<string | null>(null);
   const [driftSession, setDriftSession] = useState<DriftSession | null>(null);
   const [driftState, setDriftState] = useState<"idle" | "requesting" | "playing" | "ready" | "error">("idle");
@@ -634,7 +602,6 @@ export default function NordlyV2App() {
   }, []);
 
   const refreshLiveAiStatus = useCallback(async (signal?: AbortSignal) => {
-    setLiveAiStatusResolved(false);
     try {
       const status = await getLiveAiStatus(signal);
       if (!signal?.aborted) setLiveAiStatus(status);
@@ -668,6 +635,11 @@ export default function NordlyV2App() {
 
   useEffect(() => {
     if (driftState !== "playing") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setPlaybackStage(3);
+      setDriftState("ready");
+      return;
+    }
     if (playbackStage >= 3) {
       setDriftState("ready");
       return;
@@ -721,7 +693,6 @@ export default function NordlyV2App() {
     supportRequestRef.current?.abort();
     supportRequestRef.current = null;
     setSupportTurns([]);
-    setSupportDraft("");
     setSupportPendingId(null);
     setEvidence(null);
   }, []);
@@ -1013,21 +984,22 @@ export default function NordlyV2App() {
           />
 
           <main className="nordly-main">
-            <AnimatePresence mode="sync" initial={false}>
-              {!liveAiStatusResolved && mode !== "documents" ? (
-                <SceneTransition key="system-startup">
-                  <SystemStartup locale={locale} />
-                </SceneTransition>
-              ) : <SceneTransition key={mode}>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={mode}
+                className="nordly-scene"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              >
                 {mode === "support" ? (
                   <SupportAgentView
                     locale={locale}
                     liveAiStatus={liveAiStatus}
                     liveAiStatusResolved={liveAiStatusResolved}
                     turns={supportTurns}
-                    draft={supportDraft}
                     pendingId={supportPendingId}
-                    setDraft={setSupportDraft}
                     submit={submitSupport}
                     cancel={cancelSupportTurn}
                     resetConversation={resetSupportConversation}
@@ -1073,7 +1045,7 @@ export default function NordlyV2App() {
                     }}
                   />
                 )}
-              </SceneTransition>}
+              </motion.div>
             </AnimatePresence>
           </main>
 
@@ -1235,9 +1207,7 @@ function SupportAgentView({
   liveAiStatus,
   liveAiStatusResolved,
   turns,
-  draft,
   pendingId,
-  setDraft,
   submit,
   cancel,
   resetConversation,
@@ -1249,9 +1219,7 @@ function SupportAgentView({
   liveAiStatus: LiveAiStatusResponse | null;
   liveAiStatusResolved: boolean;
   turns: CustomerChatTurn[];
-  draft: string;
   pendingId: string | null;
-  setDraft: (value: string) => void;
   submit: (message: string, confirm?: boolean, existingId?: string) => Promise<void>;
   cancel: (id: string) => void;
   resetConversation: () => void;
@@ -1262,6 +1230,7 @@ function SupportAgentView({
   const copy = COPY[locale];
   const bottomRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
+  const [draft, setDraft] = useState("");
   const [slow, setSlow] = useState(false);
   const [offlineReplay, setOfflineReplay] = useState<SupportReplayBundle | null>(null);
   const [offlineReplayState, setOfflineReplayState] = useState<"idle" | "requesting" | "playing" | "ready" | "error">("idle");
@@ -1274,8 +1243,9 @@ function SupportAgentView({
   const replayAvailable = liveAiStatus?.replay_available !== false;
   useEffect(() => {
     if (!autoScrollRef.current) return;
+    const stagedReplay = offlineReplayState === "playing";
     bottomRef.current?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      behavior: stagedReplay || window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
       block: "nearest",
     });
   }, [turns.length, pendingId, offlineReplayStage, offlineReplayState]);
@@ -1291,6 +1261,11 @@ function SupportAgentView({
 
   useEffect(() => {
     if (offlineReplayState !== "playing") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setOfflineReplayStage(6);
+      setOfflineReplayState("ready");
+      return;
+    }
     if (offlineReplayStage >= 6) {
       setOfflineReplayState("ready");
       return;
@@ -1336,6 +1311,7 @@ function SupportAgentView({
     setOfflineReplay(null);
     setOfflineReplayStage(0);
     setOfflineReplayState("idle");
+    setDraft("");
     setSlow(false);
     resetConversation();
   }, [resetConversation]);
@@ -1777,9 +1753,12 @@ function DriftAgentView({
   const pending = turns.some((turn) => turn.pending);
   const liveChat = session?.mode === "live_ai";
   const canChat = ready && liveChat && Boolean(session?.runReference) && !pending;
-  const runbooks = run?.agent_turn?.tool_events
-    .flatMap((event) => event.evidence)
-    .filter((item): item is RunbookEvidence => item.evidence_type === "runbook") ?? [];
+  const runbooks = useMemo(
+    () => run?.agent_turn?.tool_events
+      .flatMap((event) => event.evidence)
+      .filter((item): item is RunbookEvidence => item.evidence_type === "runbook") ?? [],
+    [run?.agent_turn?.tool_events],
+  );
   const runbookSources = useMemo(
     () => {
       const unique = new Map<string, DemoCustomerChatSource>();
@@ -1799,8 +1778,9 @@ function DriftAgentView({
   const replayExplicitlyUnavailable = liveAiStatus?.replay_available === false;
   useEffect(() => {
     if (!autoScrollRef.current) return;
+    const stagedReplay = sessionState === "playing";
     bottomRef.current?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      behavior: stagedReplay || window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
       block: "nearest",
     });
   }, [playbackStage, sessionState, turns.length]);
@@ -2133,18 +2113,9 @@ function MessageBubble({
   return (
     <motion.div
       className={`message-row message-row--${side} ${className}`}
-      layout="position"
-      initial={{
-        opacity: 0,
-        y: side === "assistant" ? 7 : 4,
-        scale: side === "assistant" ? 0.99 : 0.995,
-      }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{
-        duration: side === "assistant" ? 0.21 : 0.15,
-        ease: [0.16, 1, 0.3, 1],
-      }}
-      style={{ transformOrigin: side === "assistant" ? "bottom left" : "bottom right" }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
     >
       <div className={`message-bubble message-bubble--${side} message-bubble--${tone}`}>{children}</div>
       {timestamp ? <time>{timestamp}</time> : null}
@@ -2155,21 +2126,8 @@ function MessageBubble({
 function TypingIndicator({ label }: { label: string }) {
   return (
     <div className="typing-indicator" role="status">
-      <span className="typing-indicator__signal" aria-hidden="true"><NordlySignal /></span>
       <span className="typing-indicator__dots" aria-hidden="true"><i /><i /><i /></span>
-      <AnimatePresence mode="popLayout" initial={false}>
-        {label ? (
-          <motion.span
-            key={label}
-            initial={{ opacity: 0, y: 3 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -3 }}
-            transition={{ duration: 0.16 }}
-          >
-            {label}
-          </motion.span>
-        ) : null}
-      </AnimatePresence>
+      {label ? <span>{label}</span> : null}
     </div>
   );
 }
@@ -2275,7 +2233,10 @@ function DocumentReader({
   useEffect(() => {
     if (!selection?.chunkId || !document) return;
     const frame = window.requestAnimationFrame(() => {
-      window.document.getElementById(`chunk-${selection.chunkId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      window.document.getElementById(`chunk-${selection.chunkId}`)?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "center",
+      });
     });
     return () => window.cancelAnimationFrame(frame);
   }, [document, selection?.chunkId]);
@@ -2345,6 +2306,7 @@ function EvidenceSheet({
   const closeRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
   const isModal = useMediaQuery("(max-width: 1279px)");
+  const isBottomSheet = useMediaQuery("(max-width: 767px)");
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
@@ -2389,10 +2351,10 @@ function EvidenceSheet({
         role={isModal ? "dialog" : "complementary"}
         aria-modal={isModal ? "true" : undefined}
         aria-labelledby="evidence-title"
-        initial={{ opacity: 0, x: 24 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 18 }}
-        transition={{ duration: 0.38 }}
+        initial={isBottomSheet ? { opacity: 0, y: 26 } : { opacity: 0, x: 24 }}
+        animate={isBottomSheet ? { opacity: 1, y: 0 } : { opacity: 1, x: 0 }}
+        exit={isBottomSheet ? { opacity: 0, y: 20 } : { opacity: 0, x: 18 }}
+        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
       >
         <button ref={closeRef} type="button" className="evidence-sheet__close" onClick={close} aria-label={copy.close}><CloseIcon /></button>
         {state.kind === "support" ? (

@@ -591,8 +591,6 @@ describe("Nordly v2", () => {
     const user = userEvent.setup();
 
     render(<NordlyV2App />);
-    expect(screen.getByText("Nordly startar…")).toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: "Dokumentarkiv" }));
     const protectedEntry = await screen.findByRole("button", {
       name: /Syntetiskt register över individuell ersättning/,
@@ -803,7 +801,7 @@ describe("Nordly v2", () => {
     expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
   });
 
-  it("shows the branded startup while status is pending and offers an example when status is unknown", async () => {
+  it("renders the current agent immediately while status resolves and offers an example when status is unknown", async () => {
     const status = deferred<Response>();
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
@@ -817,10 +815,10 @@ describe("Nordly v2", () => {
     const user = userEvent.setup();
 
     render(<NordlyV2App />);
-    expect(screen.getByText("Nordly startar…")).toBeInTheDocument();
-    expect(screen.getByText("Systemet görs redo. Det kan ta ett ögonblick.")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Nordly Support" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Skriv till Nordly…" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nordly Support" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Skriv till Nordly…" })).toBeDisabled();
+    expect(screen.getByPlaceholderText("Startar chatten…")).toBeInTheDocument();
+    expect(screen.queryByText("Nordly startar…")).not.toBeInTheDocument();
 
     await act(async () => {
       status.reject(new Error("status unavailable"));
