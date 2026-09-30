@@ -45,29 +45,45 @@ export class IncidentApiError extends Error {
 async function getJson<T>(
   path: string,
   init: RequestInit = {},
+  timeoutMs?: number,
 ): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
 
-  const response = await fetch(path, {
-    ...init,
-    headers,
-  });
+  const requestController = timeoutMs ? new AbortController() : null;
+  const sourceSignal = init.signal;
+  const forwardAbort = () => requestController?.abort(sourceSignal?.reason);
+  if (sourceSignal?.aborted) forwardAbort();
+  else sourceSignal?.addEventListener("abort", forwardAbort, { once: true });
+  const timeout = requestController
+    ? window.setTimeout(() => requestController.abort(), timeoutMs)
+    : null;
 
-  if (!response.ok) {
-    const problem = (await response.json().catch(() => null)) as
-      | ApiProblemResponse
-      | null;
+  try {
+    const response = await fetch(path, {
+      ...init,
+      headers,
+      signal: requestController?.signal ?? sourceSignal,
+    });
 
-    throw new IncidentApiError(
-      problem?.detail ?? `Request failed with status ${response.status}.`,
-      response.status,
-      problem?.code,
-      parseRetryAfter(response.headers?.get?.("Retry-After") ?? null),
-    );
+    if (!response.ok) {
+      const problem = (await response.json().catch(() => null)) as
+        | ApiProblemResponse
+        | null;
+
+      throw new IncidentApiError(
+        problem?.detail ?? `Request failed with status ${response.status}.`,
+        response.status,
+        problem?.code,
+        parseRetryAfter(response.headers?.get?.("Retry-After") ?? null),
+      );
+    }
+
+    return response.json() as Promise<T>;
+  } finally {
+    if (timeout !== null) window.clearTimeout(timeout);
+    sourceSignal?.removeEventListener("abort", forwardAbort);
   }
-
-  return response.json() as Promise<T>;
 }
 
 function parseRetryAfter(value: string | null) {
@@ -77,11 +93,11 @@ function parseRetryAfter(value: string | null) {
 }
 
 export function getCapabilities(signal?: AbortSignal) {
-  return getJson<CapabilitiesResponse>("/api/v1/capabilities", { signal });
+  return getJson<CapabilitiesResponse>("/api/v1/capabilities", { signal }, 18_000);
 }
 
 export function getLiveAiStatus(signal?: AbortSignal) {
-  return getJson<LiveAiStatusResponse>("/api/v1/live-ai/status", { signal });
+  return getJson<LiveAiStatusResponse>("/api/v1/live-ai/status", { signal }, 15_000);
 }
 
 export function getIncidentLabReplayAvailability(signal?: AbortSignal) {
@@ -179,6 +195,7 @@ export function getKnowledgeDocuments(signal?: AbortSignal) {
   return getJson<KnowledgeDocumentLibraryResponse>(
     "/api/v1/knowledge/documents",
     { signal },
+    18_000,
   );
 }
 

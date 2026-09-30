@@ -220,8 +220,59 @@ summary:focus-visible {
 }
 
 .nordly-scene {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+}
+
+.system-startup {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(20, 108, 255, 0.055), transparent 26%),
+    #fff;
+}
+
+.system-startup__content {
+  display: grid;
+  max-width: 340px;
+  justify-items: center;
+  gap: 8px;
+  padding: 28px;
+  color: #697892;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.system-startup__content strong {
+  margin-top: 16px;
+  color: var(--n-ink);
+  font-size: 16px;
+  font-weight: 690;
+  letter-spacing: -0.01em;
+}
+
+.system-startup__signal {
+  display: grid;
+  width: 78px;
+  height: 78px;
+  place-items: center;
+  border: 1px solid rgba(20, 108, 255, 0.13);
+  border-radius: 50%;
+  background: #f8fbff;
+  color: var(--n-blue);
+  box-shadow: 0 0 0 14px rgba(20, 108, 255, 0.035), 0 0 0 28px rgba(20, 108, 255, 0.018);
+  animation: nordly-breathe 2.4s var(--n-ease) infinite;
+}
+
+.system-startup__signal svg {
+  width: 32px;
+  height: 32px;
+  stroke-width: 1.9;
 }
 
 .nordly-footer {
@@ -593,6 +644,28 @@ button.agent-identity__badge:hover {
   scrollbar-width: none;
 }
 
+.suggestion-row--welcome {
+  width: min(100%, 590px);
+  margin: -3px 0 15px;
+  padding-bottom: 0;
+}
+
+.connection-status {
+  display: flex;
+  width: fit-content;
+  min-height: 34px;
+  margin: 2px 0 12px;
+  padding: 0 11px;
+  align-items: center;
+  border: 1px solid var(--n-line);
+  border-radius: 999px;
+  background: #f7f9fc;
+}
+
+.connection-status .typing-indicator {
+  font-size: 11px;
+}
+
 .suggestion-row::-webkit-scrollbar {
   display: none;
 }
@@ -781,8 +854,10 @@ button.agent-identity__badge:hover {
   color: var(--n-blue-hover);
 }
 
-.source-chips button:disabled {
-  cursor: default;
+.source-chip--evidence {
+  border-style: dashed !important;
+  background: #f8fafc !important;
+  color: #64758f !important;
 }
 
 .source-chips svg {
@@ -810,6 +885,17 @@ button.agent-identity__badge:hover {
   font-size: 12px;
   font-weight: 620;
   cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 120ms ease;
+}
+
+.disclosure-row:hover {
+  border-color: rgba(20, 108, 255, 0.26);
+  background: #f7faff;
+  color: var(--n-blue-hover);
+}
+
+.disclosure-row:active {
+  transform: scale(0.99);
 }
 
 .disclosure-row svg {
@@ -927,6 +1013,27 @@ button.agent-identity__badge:hover {
   background: var(--n-blue);
   box-shadow: 0 7px 16px rgba(20, 108, 255, 0.22);
   color: #fff;
+}
+
+.button-primary,
+.button-secondary {
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 120ms ease, box-shadow 160ms ease;
+}
+
+.button-primary:hover:not(:disabled) {
+  background: var(--n-blue-hover);
+  border-color: var(--n-blue-hover);
+}
+
+.button-secondary:hover:not(:disabled) {
+  border-color: rgba(20, 108, 255, 0.25);
+  background: #f7faff;
+  color: var(--n-blue-hover);
+}
+
+.button-primary:active:not(:disabled),
+.button-secondary:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .button-primary:disabled {
@@ -1925,6 +2032,26 @@ button.agent-identity__badge:hover {
   background: #fff;
   text-align: left;
   cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 120ms ease;
+}
+
+button.evidence-source:hover {
+  border-color: rgba(20, 108, 255, 0.26);
+  background: #f7faff;
+}
+
+button.evidence-source:active {
+  transform: scale(0.99);
+}
+
+.evidence-source--static {
+  border-style: dashed;
+  background: #f8fafc;
+  cursor: default;
+}
+
+.evidence-source--static > svg:last-child {
+  color: #7a899f;
 }
 
 .evidence-source + .evidence-source {
@@ -2121,11 +2248,24 @@ button.agent-identity__badge:hover {
 }
 
 .evidence-runbook {
+  width: 100%;
   padding: 12px;
   border: 1px solid var(--n-line);
   border-radius: 11px;
   background: #f8faff;
+  color: inherit;
+  text-align: left;
   transition: background 180ms ease, box-shadow 180ms ease;
+}
+
+button.evidence-runbook {
+  cursor: pointer;
+}
+
+.evidence-runbook--link:hover {
+  border-color: rgba(20, 108, 255, 0.28);
+  background: #f3f8ff;
+  box-shadow: 0 7px 18px rgba(24, 76, 150, 0.07);
 }
 
 .evidence-runbook.is-focused {
@@ -2148,9 +2288,16 @@ button.agent-identity__badge:hover {
 
 .evidence-runbook__meta span {
   display: flex;
+  flex: 1 1 auto;
   min-width: 0;
   flex-direction: column;
   gap: 2px;
+}
+
+.evidence-runbook__meta > svg:last-child:not(:first-child) {
+  width: 15px;
+  height: 15px;
+  color: #6c7d97;
 }
 
 .evidence-runbook__meta strong {

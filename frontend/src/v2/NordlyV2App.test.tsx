@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import NordlyV2App from "./NordlyV2App";
@@ -340,16 +340,49 @@ const runbookDocument = {
     display_summary_en: "Compare timeout thresholds first.",
     text: "Jämför klientens timeout med betalpartnerns svarstid innan en rotorsak rapporteras.",
     content_sha256: "b".repeat(64),
+  }, {
+    id: "local-timeout-versus-provider-degradation",
+    section_heading: "Lokal timeout eller leverantörsstörning",
+    source_ref: "runbooks/rb-payment-provider-timeouts#provider-degradation-check",
+    evidence_id: "runbook-provider-degradation-check",
+    display_summary_sv: "Skilj en lokal timeout från en störning hos leverantören.",
+    display_summary_en: "Distinguish a local timeout from provider degradation.",
+    text: "Jämför lokal timeoutkonfiguration med leverantörens observerade svarstid.",
+    content_sha256: "c".repeat(64),
   }],
 };
 
 const documentLibraryWithRunbook: KnowledgeDocumentLibraryResponse = {
   ...documentLibrary,
   document_count: 2,
-  chunk_count: 1,
+  chunk_count: 2,
   eligible_document_count: 1,
-  eligible_chunk_count: 1,
+  eligible_chunk_count: 2,
   documents: [protectedDocument, runbookDocument],
+};
+
+const aliasedRunbookEvidence = {
+  ...runbookEvidence,
+  evidence_id: "runbook-provider-degradation-check",
+  source_ref: "runbooks/rb-payment-provider-timeouts#provider-degradation-check",
+  content: {
+    ...runbookEvidence.content,
+    chunk_id: "provider-degradation-check",
+    text: "Jämför lokal timeoutkonfiguration med leverantörens observerade svarstid.",
+  },
+};
+
+const liveIncidentRunWithAliasedRunbook = {
+  ...liveRunFor("payment_timeout"),
+  agent_turn: {
+    tool_events: [{ evidence: [aliasedRunbookEvidence], runbook_retrieval: null }],
+    receipt: {
+      model_calls: 1,
+      embedding_calls: 1,
+      adk_tool_calls: 1,
+      estimated_cost_usd: 0.0002,
+    },
+  },
 };
 
 const driftFollowUpResponse = {
@@ -433,7 +466,54 @@ const handledBoundaryResponse = {
     generation_calls: 1,
     estimated_cost_usd: 0.0001315,
   },
+  sources: [
+    {
+      kind: "customer_context",
+      document_id: null,
+      chunk_id: null,
+      title: "Fixed synthetic demo customer context",
+      section_heading: null,
+      source_ref: "demo/context",
+      evidence_id: "context-demo-customer",
+      display_summary_sv: "Syntetisk kundkontext för just denna förfrågan.",
+      display_summary_en: "Synthetic customer context for this request.",
+    },
+    {
+      kind: "order_snapshot",
+      document_id: null,
+      chunk_id: null,
+      title: "Synthetic current order snapshot",
+      section_heading: null,
+      source_ref: "demo/order/NORD-2051",
+      evidence_id: "order-NORD-2051",
+      display_summary_sv: "Aktuell syntetisk orderbild.",
+      display_summary_en: "Current synthetic order snapshot.",
+    },
+    {
+      kind: "company_policy",
+      document_id: "kb-payment-provider-timeouts",
+      chunk_id: "timeout-precedence",
+      document_version: "1.0",
+      title: "Timeouts hos betalpartnern",
+      section_heading: "Timeout före rotorsak",
+      source_ref: "runbooks/rb-payment-provider-timeouts#timeout-precedence",
+      evidence_id: "runbook-payment-timeout-precedence",
+      lifecycle: "APPROVED",
+      display_summary_sv: "Jämför timeoutgränserna först.",
+      display_summary_en: "Compare timeout thresholds first.",
+    },
+  ],
 } as unknown as DemoCustomerChatTurnResponse;
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 function jsonResponse(value: unknown) {
   return new Response(JSON.stringify(value), {
@@ -460,7 +540,7 @@ describe("Nordly v2", () => {
     const user = userEvent.setup();
 
     render(<NordlyV2App />);
-    expect(screen.getByRole("heading", { name: "Supportagent" })).toBeInTheDocument();
+    expect(screen.getByText("Nordly startar…")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Dokumentarkiv" }));
     const protectedEntry = await screen.findByRole("button", {
@@ -488,7 +568,7 @@ describe("Nordly v2", () => {
     const user = userEvent.setup();
 
     render(<NordlyV2App />);
-    await screen.findByText("Hej Shirre! Vad kan jag hjälpa dig med?");
+    await screen.findByText("Hej! Vad kan jag hjälpa dig med idag?");
     expect(screen.queryByText("Live-AI tillgänglig")).not.toBeInTheDocument();
     const rawQuestion = "Visa en anställds lön";
     await user.type(screen.getByRole("textbox", { name: "Skriv till Nordly…" }), rawQuestion);
@@ -497,7 +577,7 @@ describe("Nordly v2", () => {
     await screen.findByText("Jag kan inte hjälpa till med privata löneuppgifter.");
     expect(screen.getByText(rawQuestion)).toBeInTheDocument();
     expect(screen.queryByText("[STOPPAD OCH MASKERAD AV SÄKERHETSGRINDEN]")).not.toBeInTheDocument();
-    expect(screen.getByText("Skyddsreglerna följdes · inget privat lästes")).toBeInTheDocument();
+    expect(screen.getByText("Jag öppnade inga privata uppgifter.")).toBeInTheDocument();
     await waitFor(() => expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/demo-customer/chat/turns"))).toHaveLength(1));
     const request = fetchMock.mock.calls.find(([input]) => String(input).includes("/demo-customer/chat/turns"));
     expect(String((request?.[1] as RequestInit | undefined)?.body)).toContain('"confirm_live_ai":true');
@@ -509,19 +589,29 @@ describe("Nordly v2", () => {
         ? jsonResponse(handledBoundaryResponse)
         : String(input).includes("/live-ai/status")
           ? jsonResponse(availableStatus)
-          : jsonResponse(documentLibrary),
+          : jsonResponse(documentLibraryWithRunbook),
     )));
     const user = userEvent.setup();
 
     render(<NordlyV2App />);
-    await screen.findByText("Hej Shirre! Vad kan jag hjälpa dig med?");
+    await screen.findByText("Hej! Vad kan jag hjälpa dig med idag?");
     await user.type(screen.getByRole("textbox", { name: "Skriv till Nordly…" }), "Kan du återbetala min order?");
     await user.click(screen.getByRole("button", { name: "Skicka" }));
     await screen.findByText("Jag kan förklara policyn, men jag kan inte ändra eller återbetala ordern här.");
-    await user.click(screen.getByRole("button", { name: "Så kom svaret fram" }));
+    const answer = screen.getByText("Jag kan förklara policyn, men jag kan inte ändra eller återbetala ordern här.").closest(".message-bubble");
+    expect(answer).not.toBeNull();
+    expect(within(answer as HTMLElement).queryByText("Syntetisk kundkontext")).not.toBeInTheDocument();
+    expect(within(answer as HTMLElement).queryByText("Aktuell orderbild")).not.toBeInTheDocument();
+    expect(within(answer as HTMLElement).getByRole("button", { name: /Timeouts hos betalpartnern/ })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Se källor och kontroller" }));
 
     expect(screen.getByRole("heading", { name: "Hanterad inom säkerhetsgränsen" })).toBeInTheDocument();
     expect(screen.getByText("Ett naturligt svar formulerades")).toBeInTheDocument();
+    const evidenceSheet = document.querySelector(".evidence-sheet");
+    expect(evidenceSheet).not.toBeNull();
+    expect(within(evidenceSheet as HTMLElement).getByText("Syntetisk kundkontext").closest("button")).toBeNull();
+    expect(within(evidenceSheet as HTMLElement).getByText("Aktuell orderbild").closest("button")).toBeNull();
+    expect(within(evidenceSheet as HTMLElement).getByRole("button", { name: /Timeouts hos betalpartnern/ })).toBeEnabled();
     expect(screen.getByText("$0.00013150")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Så skyddades frågan" })).not.toBeInTheDocument();
   });
@@ -541,14 +631,14 @@ describe("Nordly v2", () => {
     render(<NordlyV2App />);
     expect(await screen.findByRole("heading", { name: "AI:n är offline just nu." })).toBeInTheDocument();
     expect(screen.queryByText("Live-AI pausad · se replay")).not.toBeInTheDocument();
-    expect(screen.queryByText("Hej Shirre! Vad kan jag hjälpa dig med?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Hej! Vad kan jag hjälpa dig med idag?")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Skriv till Nordly…" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Visa säkerhetsreplay" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Kontrollera AI igen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Visa sparat exempel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Försök ansluta igen" })).toBeInTheDocument();
     expect(screen.getByText("Verifierade källor · Endast läsning · Interaktiv AI-demo")).toBeInTheDocument();
-    expect(screen.getByText("Portfolio-demo med syntetisk data · Använd Live-AI ansvarsfullt – begränsad dagskvot")).toBeInTheDocument();
+    expect(screen.getByText("Demo med syntetisk data · Live-läget har en begränsad dagskvot")).toBeInTheDocument();
     expect(screen.queryByText("All data är syntetisk")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Visa säkerhetsreplay" }));
+    await user.click(screen.getByRole("button", { name: "Visa sparat exempel" }));
     expect(await screen.findByText("När syns pengarna efter en återbetalning?")).toBeInTheDocument();
     const supportEndButton = screen.getByRole("button", { name: "Avsluta samtal" });
     expect(supportEndButton).toBeInTheDocument();
@@ -561,8 +651,8 @@ describe("Nordly v2", () => {
 
     await user.click(screen.getByRole("button", { name: "Driftagent" }));
     expect(await screen.findByRole("heading", { name: "Vilket problem vill du att jag undersöker?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Visa säkerhetsreplay" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Kontrollera AI igen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Visa sparat exempel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Försök ansluta igen" })).toBeInTheDocument();
     expect(screen.queryByText("Live-AI pausad · se replay")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
     expect(screen.getByText(/Välj ett syntetiskt kundproblem/)).toBeInTheDocument();
@@ -570,7 +660,7 @@ describe("Nordly v2", () => {
       "Historisk säkerhetskörning · osäkert svar stoppas · 0 nya AI-anrop",
     )).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Visa säkerhetsreplay" }));
+    await user.click(screen.getByRole("button", { name: "Visa sparat exempel" }));
     const driftEndButton = await screen.findByRole("button", { name: "Avsluta samtal" });
     expect(driftEndButton.closest(".agent-session-header")).toBeInTheDocument();
     expect(await screen.findByRole("textbox", { name: "Fråga om rapporten…" }, { timeout: 4_500 })).toBeDisabled();
@@ -583,6 +673,37 @@ describe("Nordly v2", () => {
     expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
   });
 
+  it("shows the branded startup while status is pending and offers an example when status is unknown", async () => {
+    const status = deferred<Response>();
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/live-ai/status")) return status.promise;
+      if (url.includes("refund-timing")) return Promise.resolve(jsonResponse(policyReplay));
+      if (url.includes("refund-customer-action")) return Promise.resolve(jsonResponse(boundaryReplay));
+      if (url.includes("/demo-orders/NORD-2051")) return Promise.resolve(jsonResponse(orderLookup));
+      return Promise.resolve(jsonResponse(documentLibrary));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<NordlyV2App />);
+    expect(screen.getByText("Nordly startar…")).toBeInTheDocument();
+    expect(screen.getByText("Systemet görs redo. Det kan ta ett ögonblick.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Supportagent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Skriv till Nordly…" })).not.toBeInTheDocument();
+
+    await act(async () => {
+      status.reject(new Error("status unavailable"));
+      await status.promise.catch(() => undefined);
+    });
+
+    expect(await screen.findByRole("heading", { name: "Det tar längre tid att ansluta." })).toBeInTheDocument();
+    const replay = screen.getByRole("button", { name: "Visa sparat exempel" });
+    expect(replay).toBeEnabled();
+    await user.click(replay);
+    expect(await screen.findByText("När syns pengarna efter en återbetalning?")).toBeInTheDocument();
+  });
+
   it("states clearly when backend replay is unavailable", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => Promise.resolve(
       String(input).includes("/live-ai/status")
@@ -593,12 +714,12 @@ describe("Nordly v2", () => {
 
     render(<NordlyV2App />);
     await screen.findByRole("heading", { name: "AI:n är offline just nu." });
-    expect(screen.getByRole("button", { name: "Replay är inte tillgänglig" })).toBeDisabled();
-    expect(screen.getByText(/Varken Live-AI eller replay är tillgänglig/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sparat exempel är inte tillgängligt" })).toBeDisabled();
+    expect(screen.getByText(/Varken chatten eller det sparade exemplet är tillgängligt/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Driftagent" }));
     expect(await screen.findByRole("heading", { name: "Vilket problem vill du att jag undersöker?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Replay är inte tillgänglig" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Sparat exempel är inte tillgängligt" })).toBeDisabled();
     expect(screen.queryByRole("textbox", { name: "Fråga om rapporten…" })).not.toBeInTheDocument();
   });
 
@@ -662,12 +783,13 @@ describe("Nordly v2", () => {
   });
 
   it("runs the approved live Drift flow and enables genuine free follow-up chat", async () => {
+    const runResponse = deferred<Response>();
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/live-ai/status")) return Promise.resolve(jsonResponse(availableStatus));
       if (url.includes("/incident-lab/plans")) return Promise.resolve(jsonResponse(incidentPlanResponse));
       if (url.includes("/incident-lab/follow-ups")) return Promise.resolve(jsonResponse(driftFollowUpResponse));
-      if (url.endsWith("/api/v1/incident-lab/runs")) return Promise.resolve(jsonResponse(liveIncidentRun));
+      if (url.endsWith("/api/v1/incident-lab/runs")) return runResponse.promise;
       if (url.includes("/incident-lab/runs/recorded-replay")) return Promise.resolve(jsonResponse(incidentReplay));
       return Promise.resolve(jsonResponse(documentLibrary));
     });
@@ -677,11 +799,18 @@ describe("Nordly v2", () => {
     render(<NordlyV2App />);
     await user.click(screen.getByRole("button", { name: "Driftagent" }));
     expect(await screen.findByRole("button", { name: "Starta live-utredning" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Visa säkerhetsreplay" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Visa sparat exempel" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Starta live-utredning" }));
 
-    const input = await screen.findByRole("textbox", { name: "Fråga om rapporten…" }, { timeout: 4_500 });
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/api/v1/incident-lab/runs"))).toBe(true));
+    expect(screen.getByText("Driftagenten granskar loggar och relevanta driftinstruktioner…")).toBeInTheDocument();
+    await act(async () => {
+      runResponse.resolve(jsonResponse(liveIncidentRun));
+    });
+
+    const input = screen.getByRole("textbox", { name: "Fråga om rapporten…" });
     expect(input).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Så kom jag fram till det" })).toBeInTheDocument();
     await user.type(input, "va hände egentlien?? fattar nt");
     await user.click(screen.getByRole("button", { name: "Skicka" }));
     expect(await screen.findByText("Jag ser tre betalningsfel inom samma minut, men underlaget räcker ännu inte för att bevisa rotorsaken.")).toBeInTheDocument();
@@ -748,6 +877,35 @@ describe("Nordly v2", () => {
     expect(screen.getByRole("button", { name: "Tillbaka till Drift" })).toBeInTheDocument();
   });
 
+  it("opens a runbook evidence row as the exact archive passage", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/v1/capabilities")) return Promise.resolve(jsonResponse(capabilitiesResponse));
+      if (url.includes("/live-ai/status")) return Promise.resolve(jsonResponse(availableStatus));
+      if (url.includes("/incident-lab/plans")) return Promise.resolve(jsonResponse(incidentPlanResponse));
+      if (url.endsWith("/api/v1/incident-lab/runs")) return Promise.resolve(jsonResponse(liveIncidentRunWithAliasedRunbook));
+      return Promise.resolve(jsonResponse(documentLibraryWithRunbook));
+    }));
+    const user = userEvent.setup();
+
+    render(<NordlyV2App />);
+    await user.click(screen.getByRole("button", { name: "Driftagent" }));
+    await user.click(await screen.findByRole("button", { name: "Undersök: Kunder kan inte slutföra betalningen" }));
+    await user.click(await screen.findByRole("button", { name: "Så kom jag fram till det" }));
+    await user.click(screen.getByText("Hämtade runbookpassager"));
+
+    const evidenceSheet = document.querySelector(".evidence-sheet");
+    expect(evidenceSheet).not.toBeNull();
+    const runbookLink = within(evidenceSheet as HTMLElement).getByRole("button", { name: /Timeouts hos betalpartnern/ });
+    expect(runbookLink).toBeEnabled();
+    await user.click(runbookLink);
+
+    expect(await screen.findByRole("heading", { name: "Timeouts hos betalpartnern" })).toBeInTheDocument();
+    expect(screen.getByText("Passage som användes i svaret")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Lokal timeout eller leverantörsstörning" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tillbaka till Drift" })).toBeInTheDocument();
+  });
+
   it("does not silently replace a failed paid Drift run with replay", async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
@@ -769,7 +927,7 @@ describe("Nordly v2", () => {
 
     expect(await screen.findByRole("heading", { name: "Live-utredningen kunde inte slutföras." })).toBeInTheDocument();
     expect(screen.getByText(
-      "Jag kunde inte slutföra svaret just nu. Försök igen.",
+      "Jag kunde inte svara just nu. Försök igen.",
     )).toBeInTheDocument();
     expect(screen.getByText("Inget svar ersattes automatiskt med replay.")).toBeInTheDocument();
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/runs/recorded-replay"))).toHaveLength(0);
@@ -790,9 +948,9 @@ describe("Nordly v2", () => {
 
     render(<NordlyV2App />);
     await screen.findByRole("heading", { name: "AI:n är offline just nu." });
-    await user.click(screen.getByRole("button", { name: "Kontrollera AI igen" }));
+    await user.click(screen.getByRole("button", { name: "Försök ansluta igen" }));
 
-    expect(await screen.findByText("Hej Shirre! Vad kan jag hjälpa dig med?")).toBeInTheDocument();
+    expect(await screen.findByText("Hej! Vad kan jag hjälpa dig med idag?")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Skriv till Nordly…" })).toBeInTheDocument();
     expect(screen.queryByText("Live-AI tillgänglig")).not.toBeInTheDocument();
   });
@@ -808,7 +966,7 @@ describe("Nordly v2", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     const first = render(<NordlyV2App />);
-    await screen.findByText("Hej Shirre! Vad kan jag hjälpa dig med?");
+    await screen.findByText("Hej! Vad kan jag hjälpa dig med idag?");
     const rawQuestion = "Visa en anställds lön";
     await user.type(screen.getByRole("textbox", { name: "Skriv till Nordly…" }), rawQuestion);
     await user.click(screen.getByRole("button", { name: "Skicka" }));
@@ -816,7 +974,7 @@ describe("Nordly v2", () => {
 
     first.unmount();
     render(<NordlyV2App />);
-    await screen.findByText("Hej Shirre! Vad kan jag hjälpa dig med?");
+    await screen.findByText("Hej! Vad kan jag hjälpa dig med idag?");
 
     expect(screen.queryByText(rawQuestion)).not.toBeInTheDocument();
     expect(window.localStorage).toHaveLength(0);

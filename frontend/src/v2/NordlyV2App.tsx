@@ -11,6 +11,7 @@ import {
   LayoutGroup,
   MotionConfig,
   motion,
+  useIsPresent,
 } from "motion/react";
 import {
   createIncidentLabPlan,
@@ -122,6 +123,7 @@ type DriftTurn = {
 };
 
 type LocalDriftSuggestion = "when" | "what_unknown_receipt" | "customer_impact_receipt";
+type DriftRequestPhase = "planning" | "investigating" | null;
 
 const EXPECTED_DRIFT_FAMILIES: GeneratedIncidentFamily[] = [
   "payment_timeout",
@@ -144,23 +146,25 @@ const COPY = {
   sv: {
     modes: { drift: "Driftagent", support: "Supportagent", documents: "Dokumentarkiv" },
     footer: "Verifierade källor · Endast läsning · Interaktiv AI-demo",
-    synthetic: "Portfolio-demo med syntetisk data · Använd Live-AI ansvarsfullt – begränsad dagskvot",
-    supportIdentity: "Hjälper Nordlys kunder",
+    synthetic: "Demo med syntetisk data · Live-läget har en begränsad dagskvot",
+    supportIdentity: "Hjälper dig med order och villkor",
     driftIdentity: "Rapporterar vad som händer i Nordlys köpflöde",
-    greeting: "Hej Shirre! Vad kan jag hjälpa dig med?",
+    greeting: "Hej! Vad kan jag hjälpa dig med idag?",
     supportPlaceholder: "Skriv till Nordly…",
     driftPlaceholder: "Fråga om rapporten…",
     send: "Skicka",
     supportSuggestions: ["Vad beställde jag?", "När har kundservice öppet?", "Kan jag få pengarna tillbaka?"],
-    waiting: "Nordly undersöker…",
-    slow: "Det tar lite längre än vanligt. Jag arbetar fortfarande med ditt svar.",
+    waiting: "Ett ögonblick – jag kollar det åt dig…",
+    slow: "Det tar lite längre än vanligt, men jag är kvar.",
+    connecting: "Startar chatten…",
     retry: "Försök igen",
-    confirmTitle: "Sök i Nordlys godkända dokument?",
-    confirmBody: "För att svara behöver jag göra en live-sökning i företagets policydokument.",
-    noProviderYet: "Ingen sökning har startat ännu.",
+    confirmTitle: "Vill du att jag kollar vad som gäller?",
+    confirmBody: "Jag behöver läsa Nordlys godkända villkor för att ge dig ett korrekt svar.",
+    noProviderYet: "Jag har inte sökt ännu.",
     cancel: "Avbryt",
-    searchDocuments: "Sök i dokumenten",
-    behindAnswer: "Så kom svaret fram",
+    searchDocuments: "Ja, kolla",
+    checking: "Kollar…",
+    behindAnswer: "Se källor och kontroller",
     behindReport: "Så kom jag fram till det",
     source: "Källa",
     order: "Order",
@@ -184,7 +188,7 @@ const COPY = {
     teamSuggestion: "Mitt förslag till teamet",
     stillUncertain: "Fortfarande osäkert",
     continueChat: "Jag har inte ändrat något. Du kan fortsätta fråga om tid, påverkan, källor eller osäkerhet.",
-    startReplay: "Visa säkerhetsreplay",
+    startReplay: "Visa sparat exempel",
     startDriftAlarm: "Starta live-utredning",
     liveAvailable: "Live-AI tillgänglig",
     livePaused: "Live-AI pausad · se replay",
@@ -193,8 +197,10 @@ const COPY = {
     replayTruth: "Historisk säkerhetskörning · osäkert svar stoppas · 0 nya AI-anrop",
     liveTruth: "Ny AI-körning · syntetisk data · endast läsning",
     replayChatPlaceholder: "Fri chatt kräver Live-AI",
-    replayNotAvailable: "Replay är inte tillgänglig",
+    replayNotAvailable: "Sparat exempel är inte tillgängligt",
     receiptWaiting: "Jag har tagit emot larmet. Jag granskar testmiljöns loggar och relevanta driftinstruktioner…",
+    planning: "Planeringsagenten avgränsar det syntetiska fallet…",
+    investigating: "Driftagenten granskar loggar och relevanta driftinstruktioner…",
     receiptReady: "Driftagenten granskar loggar och relevanta driftinstruktioner…",
     showNow: "Visa rapporten",
     replayUnavailable: "Larmdemot kunde inte laddas.",
@@ -236,6 +242,8 @@ const COPY = {
     reportEyebrow: "Bakom rapporten",
     registeredNotThoughts: "Registrerade steg — inte AI:ns dolda tankar.",
     sourcesAndEvidence: "Källor och bevis",
+    customerContextSource: "Syntetisk kundkontext",
+    orderSnapshotSource: "Aktuell orderbild",
     technicalReceipt: "Tekniskt kvitto",
     close: "Stäng",
     safetyReceipt: "Säkerhetskvitto",
@@ -246,23 +254,25 @@ const COPY = {
   en: {
     modes: { drift: "Operations agent", support: "Support agent", documents: "Document archive" },
     footer: "Verified sources · Read only · Interactive AI demo",
-    synthetic: "Portfolio demo with synthetic data · Please use Live AI responsibly — limited daily quota",
-    supportIdentity: "Helps Nordly customers",
+    synthetic: "Demo with synthetic data · Live mode has a limited daily quota",
+    supportIdentity: "Here to help with orders and policies",
     driftIdentity: "Reports what is happening in Nordly's checkout flow",
-    greeting: "Hi Shirre! How can I help?",
+    greeting: "Hi! How can I help today?",
     supportPlaceholder: "Message Nordly…",
     driftPlaceholder: "Ask about the report…",
     send: "Send",
     supportSuggestions: ["What did I order?", "When is customer service open?", "Can I get my money back?"],
-    waiting: "Nordly is checking…",
-    slow: "This is taking a little longer. We are still waiting for the backend's complete receipt.",
+    waiting: "One moment — I’m checking that for you…",
+    slow: "This is taking a little longer than usual, but I’m still here.",
+    connecting: "Starting chat…",
     retry: "Try again",
-    confirmTitle: "Search Nordly's approved documents?",
-    confirmBody: "To answer, I need to run a live search across the company's approved policy documents.",
-    noProviderYet: "No provider calls have been made yet.",
+    confirmTitle: "Would you like me to check what applies?",
+    confirmBody: "I need to read Nordly's approved terms to give you an accurate answer.",
+    noProviderYet: "I haven’t searched yet.",
     cancel: "Cancel",
-    searchDocuments: "Search documents",
-    behindAnswer: "How this answer was made",
+    searchDocuments: "Yes, check",
+    checking: "Checking…",
+    behindAnswer: "See sources and checks",
     behindReport: "How I reached this",
     source: "Source",
     order: "Order",
@@ -286,7 +296,7 @@ const COPY = {
     teamSuggestion: "My suggestion to the team",
     stillUncertain: "Still uncertain",
     continueChat: "I changed nothing. You can keep asking about timing, impact, sources, or uncertainty.",
-    startReplay: "View safety replay",
+    startReplay: "View saved example",
     startDriftAlarm: "Start live investigation",
     liveAvailable: "Live AI available",
     livePaused: "Live AI paused · view replay",
@@ -295,8 +305,10 @@ const COPY = {
     replayTruth: "Historical safety run · unsupported answer withheld · 0 new AI calls",
     liveTruth: "New AI run · synthetic data · read only",
     replayChatPlaceholder: "Free chat requires Live AI",
-    replayNotAvailable: "Replay is unavailable",
+    replayNotAvailable: "Saved example is unavailable",
     receiptWaiting: "I received the alert. I am reviewing the test environment's logs and relevant operating guides…",
+    planning: "The planning agent is bounding the synthetic case…",
+    investigating: "The Operations agent is reviewing logs and relevant operating guides…",
     receiptReady: "The Operations agent is reviewing logs and relevant operating guides…",
     showNow: "Show the report",
     replayUnavailable: "The alert demo could not be loaded.",
@@ -338,6 +350,8 @@ const COPY = {
     reportEyebrow: "Behind the report",
     registeredNotThoughts: "Registered steps — not the AI's hidden thoughts.",
     sourcesAndEvidence: "Sources and evidence",
+    customerContextSource: "Synthetic customer context",
+    orderSnapshotSource: "Current order snapshot",
     technicalReceipt: "Technical receipt",
     close: "Close",
     safetyReceipt: "Safety receipt",
@@ -347,8 +361,8 @@ const COPY = {
   },
 } as const;
 
-const REPLAY_STEP_DELAYS = [550, 1350, 1550] as const;
-const SUPPORT_REPLAY_STEP_DELAYS = [450, 750, 1250, 850, 750, 1350] as const;
+const REPLAY_STEP_DELAYS = [180, 280, 360] as const;
+const SUPPORT_REPLAY_STEP_DELAYS = [120, 200, 240, 180, 220, 260] as const;
 
 function modeFromHash(): Mode {
   const hash = window.location.hash.replace(/^#/, "");
@@ -371,8 +385,8 @@ function clientId(prefix: string) {
 function apiErrorText(error: unknown, locale: Locale) {
   void error;
   return locale === "sv"
-    ? "Jag kunde inte slutföra svaret just nu. Försök igen."
-    : "I could not complete the answer right now. Please try again.";
+    ? "Jag kunde inte svara just nu. Försök igen."
+    : "I couldn’t answer right now. Please try again.";
 }
 
 function clock(value: string) {
@@ -440,6 +454,16 @@ function titleForDocument(document: KnowledgeDocumentLibraryDocument, locale: Lo
   return locale === "sv" ? document.title_sv : document.title;
 }
 
+function sourceLabel(source: DemoCustomerChatSource, locale: Locale) {
+  if (source.kind === "customer_context") return COPY[locale].customerContextSource;
+  if (source.kind === "order_snapshot") return COPY[locale].orderSnapshotSource;
+  return source.title;
+}
+
+function sourceIcon(source: DemoCustomerChatSource) {
+  return source.kind === "order_snapshot" ? <BoxIcon /> : <DocumentIcon />;
+}
+
 function runbookDocumentSource(
   runbook: RunbookEvidence,
   library: KnowledgeDocumentLibraryResponse | null,
@@ -451,11 +475,19 @@ function runbookDocumentSource(
     "rb-cache-invalidation": "kb-catalog-cache-invalidation",
     "rb-message-queue-backlog": "kb-order-event-backlog",
   };
+  const chunkAliases: Record<string, string> = {
+    "rb-payment-provider-timeouts:provider-degradation-check": "local-timeout-versus-provider-degradation",
+    "rb-service-contract-compatibility:provider-response-breaking-change": "response-schema-change",
+    "rb-cache-invalidation:stale-checkout-data": "stale-catalog-data",
+    "rb-message-queue-backlog:order-events-lag": "consumer-lag-and-dead-letter",
+    "rb-order-idempotency:duplicate-submit": "duplicate-order-after-retry",
+  };
   const document = library.documents.find((item) => item.id === sourceId)
     ?? library.documents.find((item) => item.id === aliases[sourceId])
     ?? library.documents.find((item) => item.id === sourceId.replace(/^rb-/, "kb-"));
   if (!document) return null;
-  const chunk = document.chunks.find((item) => item.id === runbook.content.chunk_id) ?? null;
+  const chunkId = chunkAliases[`${sourceId}:${runbook.content.chunk_id}`] ?? runbook.content.chunk_id;
+  const chunk = document.chunks.find((item) => item.id === chunkId) ?? null;
   return {
     kind: "company_policy",
     document_id: document.id,
@@ -472,25 +504,34 @@ function runbookDocumentSource(
   };
 }
 
-function supportOutcomeLabel(response: DemoCustomerChatTurnResponse, locale: Locale) {
-  switch (response.outcome) {
-    case "answered":
-      return COPY[locale].verifiedNoChange;
-    case "refused":
-      return COPY[locale].safetyWon;
-    case "outside_authority":
-      return localized(locale, "Utanför agentens befogenhet · inget ändrat", "Outside the agent's authority · nothing changed");
-    case "clarification_required":
-      return localized(locale, "Behöver ett förtydligande · inget ändrat", "Needs clarification · nothing changed");
-    case "insufficient_evidence":
-      return localized(locale, "Otillräckligt underlag · inget ändrat", "Insufficient evidence · nothing changed");
-    case "unsupported":
-      return localized(locale, "Kan inte utföras av agenten · inget ändrat", "The agent cannot perform this · nothing changed");
-    case "unavailable":
-      return localized(locale, "Tillfälligt otillgänglig · inget ändrat", "Temporarily unavailable · nothing changed");
-    default:
-      return localized(locale, "Väntar på bekräftelse · inget ändrat", "Awaiting confirmation · nothing changed");
-  }
+function SceneTransition({ children }: { children: ReactNode }) {
+  const isPresent = useIsPresent();
+  return (
+    <motion.div
+      className="nordly-scene"
+      aria-hidden={!isPresent}
+      inert={!isPresent}
+      style={{ pointerEvents: isPresent ? "auto" : "none" }}
+      initial={{ opacity: 0.64, x: 9, scale: 0.997 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0.38, x: -7, scale: 0.997 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function SystemStartup({ locale }: { locale: Locale }) {
+  return (
+    <section className="system-startup" role="status" aria-live="polite">
+      <div className="system-startup__content">
+        <span className="system-startup__signal"><NordlySignal /></span>
+        <strong>{localized(locale, "Nordly startar…", "Nordly is starting…")}</strong>
+        <span>{localized(locale, "Systemet görs redo. Det kan ta ett ögonblick.", "The system is getting ready. This may take a moment.")}</span>
+      </div>
+    </section>
+  );
 }
 
 export default function NordlyV2App() {
@@ -508,6 +549,7 @@ export default function NordlyV2App() {
   const [supportPendingId, setSupportPendingId] = useState<string | null>(null);
   const [driftSession, setDriftSession] = useState<DriftSession | null>(null);
   const [driftState, setDriftState] = useState<"idle" | "requesting" | "playing" | "ready" | "error">("idle");
+  const [driftRequestPhase, setDriftRequestPhase] = useState<DriftRequestPhase>(null);
   const [driftFailureMode, setDriftFailureMode] = useState<DriftSession["mode"] | null>(null);
   const [driftError, setDriftError] = useState<string | null>(null);
   const [playbackStage, setPlaybackStage] = useState(0);
@@ -515,6 +557,8 @@ export default function NordlyV2App() {
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const supportSessionVersionRef = useRef(0);
   const driftSessionVersionRef = useRef(0);
+  const supportRequestRef = useRef<AbortController | null>(null);
+  const driftRequestRef = useRef<AbortController | null>(null);
   const copy = COPY[locale];
 
   useEffect(() => {
@@ -525,7 +569,7 @@ export default function NordlyV2App() {
         if (!controller.signal.aborted) setDocumentError(apiErrorText(error, locale));
       });
     return () => controller.abort();
-  }, [locale]);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -558,6 +602,11 @@ export default function NordlyV2App() {
     void refreshLiveAiStatus(controller.signal);
     return () => controller.abort();
   }, [refreshLiveAiStatus]);
+
+  useEffect(() => () => {
+    supportRequestRef.current?.abort();
+    driftRequestRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -611,11 +660,18 @@ export default function NordlyV2App() {
   }, [setMode]);
 
   const cancelSupportTurn = useCallback((id: string) => {
+    if (supportPendingId === id) {
+      supportRequestRef.current?.abort();
+      supportRequestRef.current = null;
+      setSupportPendingId(null);
+    }
     setSupportTurns((current) => current.filter((turn) => turn.clientId !== id));
-  }, []);
+  }, [supportPendingId]);
 
   const resetSupportConversation = useCallback(() => {
     supportSessionVersionRef.current += 1;
+    supportRequestRef.current?.abort();
+    supportRequestRef.current = null;
     setSupportTurns([]);
     setSupportDraft("");
     setSupportPendingId(null);
@@ -628,7 +684,7 @@ export default function NordlyV2App() {
     existingId?: string,
   ) => {
     const message = rawMessage.trim();
-    if (!message || supportPendingId) return;
+    if (!message || supportPendingId || supportRequestRef.current) return;
     const id = existingId ?? clientId("support");
     const sessionVersion = supportSessionVersionRef.current;
     const priorTurns = supportTurns.filter((turn) => turn.clientId !== id);
@@ -642,13 +698,15 @@ export default function NordlyV2App() {
       }]);
     }
     setSupportPendingId(id);
+    const controller = new AbortController();
+    supportRequestRef.current = controller;
     try {
       const response = await runDemoCustomerChatTurn({
         message,
         locale,
         confirm_live_ai: confirmLiveAi,
         recent_conversation: buildCustomerChatConversation(priorTurns),
-      });
+      }, controller.signal);
       if (supportSessionVersionRef.current !== sessionVersion) return;
       setSupportTurns((current) => current.map((turn) => turn.clientId === id
         ? {
@@ -665,21 +723,27 @@ export default function NordlyV2App() {
         ? { ...turn, errorCode: apiErrorText(error, locale) }
         : turn));
     } finally {
-      if (supportSessionVersionRef.current === sessionVersion) setSupportPendingId(null);
+      if (supportRequestRef.current === controller) {
+        supportRequestRef.current = null;
+        if (supportSessionVersionRef.current === sessionVersion) setSupportPendingId(null);
+      }
     }
   }, [locale, supportPendingId, supportTurns]);
 
   const startReplay = useCallback(async () => {
-    if (driftState === "requesting") return;
+    if (driftState === "requesting" || driftRequestRef.current) return;
     const sessionVersion = driftSessionVersionRef.current;
     setDriftFailureMode("recorded_replay");
     setDriftError(null);
     setDriftSession(null);
     setDriftState("requesting");
+    setDriftRequestPhase(null);
     setPlaybackStage(0);
     setDriftTurns([]);
+    const controller = new AbortController();
+    driftRequestRef.current = controller;
     try {
-      const response = await runIncidentLabReplay();
+      const response = await runIncidentLabReplay(controller.signal);
       if (driftSessionVersionRef.current !== sessionVersion) return;
       setDriftSession({
         mode: "recorded_replay",
@@ -692,18 +756,23 @@ export default function NordlyV2App() {
       if (driftSessionVersionRef.current !== sessionVersion) return;
       setDriftError(apiErrorText(error, locale));
       setDriftState("error");
+    } finally {
+      if (driftRequestRef.current === controller) driftRequestRef.current = null;
     }
   }, [driftState, locale]);
 
   const startLiveInvestigation = useCallback(async (family: IncidentFamilyCapability | null) => {
-    if (driftState === "requesting") return;
+    if (driftState === "requesting" || driftRequestRef.current) return;
     const sessionVersion = driftSessionVersionRef.current;
     setDriftFailureMode("live_ai");
     setDriftError(null);
     setDriftSession(null);
     setDriftState("requesting");
+    setDriftRequestPhase("planning");
     setPlaybackStage(0);
     setDriftTurns([]);
+    const controller = new AbortController();
+    driftRequestRef.current = controller;
     try {
       const plan = await createIncidentLabPlan({
         instruction: family
@@ -712,9 +781,9 @@ export default function NordlyV2App() {
             locale,
             "Skapa ett syntetiskt Nordly-fall där tre betalningar får HTTP 504 inom ett kort tidsfönster. Utred endast med läsverktyg och kräv mänskligt godkännande för nästa steg.",
             "Create a synthetic Nordly case where three payments receive HTTP 504 within a short window. Investigate only with read tools and require human approval for the next step.",
-          ),
+        ),
         confirm_live_ai: true,
-      });
+      }, controller.signal);
       if (driftSessionVersionRef.current !== sessionVersion) return;
       const approvedPlan = plan.outcome === "plan_ready" ? plan.java_validation?.plan : null;
       if (!approvedPlan) {
@@ -734,11 +803,12 @@ export default function NordlyV2App() {
           "PLAN_FAMILY_MISMATCH",
         );
       }
+      setDriftRequestPhase("investigating");
       const run = await runIncidentLab({
         plan: approvedPlan,
         evidence_mode: "diagnostic",
         confirm_live_ai: true,
-      });
+      }, controller.signal);
       if (driftSessionVersionRef.current !== sessionVersion) return;
       if (family && (
         run.plan.incident_family !== family.id
@@ -756,18 +826,27 @@ export default function NordlyV2App() {
         );
       }
       setDriftSession({ mode: "live_ai", run, runReference: run.run_reference, plan });
-      setDriftState("playing");
+      setPlaybackStage(3);
+      setDriftState("ready");
     } catch (error) {
       if (driftSessionVersionRef.current !== sessionVersion) return;
       setDriftError(apiErrorText(error, locale));
       setDriftState("error");
+    } finally {
+      if (driftRequestRef.current === controller) {
+        driftRequestRef.current = null;
+        setDriftRequestPhase(null);
+      }
     }
   }, [driftState, locale]);
 
   const resetDriftConversation = useCallback(() => {
     driftSessionVersionRef.current += 1;
+    driftRequestRef.current?.abort();
+    driftRequestRef.current = null;
     setDriftSession(null);
     setDriftState("idle");
+    setDriftRequestPhase(null);
     setDriftFailureMode(null);
     setDriftError(null);
     setPlaybackStage(0);
@@ -780,7 +859,7 @@ export default function NordlyV2App() {
     suggestionId?: IncidentLabFollowUpSuggestionId | LocalDriftSuggestion,
   ) => {
     const question = rawQuestion.trim();
-    if (!question || !driftSession) return;
+    if (!question || !driftSession || driftRequestRef.current) return;
     const sessionVersion = driftSessionVersionRef.current;
     const id = clientId("drift");
     const { run } = driftSession;
@@ -833,6 +912,8 @@ export default function NordlyV2App() {
         : item));
       return;
     }
+    const controller = new AbortController();
+    driftRequestRef.current = controller;
     try {
       const response = await runIncidentLabFollowUp({
         run_reference: driftSession.runReference,
@@ -841,7 +922,7 @@ export default function NordlyV2App() {
         suggestion_id: suggestionId,
         locale,
         confirm_live_ai: driftSession.mode === "live_ai",
-      });
+      }, controller.signal);
       if (driftSessionVersionRef.current !== sessionVersion) return;
       setDriftTurns((current) => current.map((item) => item.id === id
         ? { ...item, response, pending: false }
@@ -851,6 +932,8 @@ export default function NordlyV2App() {
       setDriftTurns((current) => current.map((item) => item.id === id
         ? { ...item, pending: false, error: apiErrorText(error, locale) }
         : item));
+    } finally {
+      if (driftRequestRef.current === controller) driftRequestRef.current = null;
     }
   }, [copy, driftSession, locale]);
 
@@ -882,15 +965,12 @@ export default function NordlyV2App() {
           />
 
           <main className="nordly-main">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={mode}
-                className="nordly-scene"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.2 }}
-              >
+            <AnimatePresence mode="sync" initial={false}>
+              {!liveAiStatusResolved && mode !== "documents" ? (
+                <SceneTransition key="system-startup">
+                  <SystemStartup locale={locale} />
+                </SceneTransition>
+              ) : <SceneTransition key={mode}>
                 {mode === "support" ? (
                   <SupportAgentView
                     locale={locale}
@@ -911,8 +991,10 @@ export default function NordlyV2App() {
                   <DriftAgentView
                     locale={locale}
                     liveAiStatus={liveAiStatus}
+                    liveAiStatusResolved={liveAiStatusResolved}
                     session={driftSession}
                     sessionState={driftState}
+                    requestPhase={driftRequestPhase}
                     failureMode={driftFailureMode}
                     error={driftError}
                     playbackStage={playbackStage}
@@ -943,7 +1025,7 @@ export default function NordlyV2App() {
                     }}
                   />
                 )}
-              </motion.div>
+              </SceneTransition>}
             </AnimatePresence>
           </main>
 
@@ -961,6 +1043,7 @@ export default function NordlyV2App() {
                 locale={locale}
                 close={closeEvidence}
                 openDocument={openDocument}
+                documents={documents}
               />
             ) : null}
           </AnimatePresence>
@@ -1130,16 +1213,23 @@ function SupportAgentView({
 }) {
   const copy = COPY[locale];
   const bottomRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true);
   const [slow, setSlow] = useState(false);
   const [offlineReplay, setOfflineReplay] = useState<SupportReplayBundle | null>(null);
   const [offlineReplayState, setOfflineReplayState] = useState<"idle" | "requesting" | "playing" | "ready" | "error">("idle");
   const [offlineReplayStage, setOfflineReplayStage] = useState(0);
   const offlineReplayRequestRef = useRef(0);
+  const offlineReplayAbortRef = useRef<AbortController | null>(null);
   const liveAvailable = liveAiStatusResolved && liveAiStatus?.live_state === "available";
-  const offline = liveAiStatusResolved && !liveAvailable;
-  const replayAvailable = liveAiStatus?.replay_available === true;
+  const statusUnknown = liveAiStatusResolved && liveAiStatus === null;
+  const fallbackMode = liveAiStatusResolved && !liveAvailable;
+  const replayAvailable = liveAiStatus?.replay_available !== false;
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (!autoScrollRef.current) return;
+    bottomRef.current?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "nearest",
+    });
   }, [turns.length, pendingId, offlineReplayStage, offlineReplayState]);
 
   useEffect(() => {
@@ -1162,18 +1252,22 @@ function SupportAgentView({
     return () => window.clearTimeout(timer);
   }, [offlineReplayStage, offlineReplayState]);
 
+  useEffect(() => () => offlineReplayAbortRef.current?.abort(), []);
+
   const startOfflineReplay = useCallback(async () => {
-    if (offlineReplayState === "requesting") return;
+    if (offlineReplayState === "requesting" || offlineReplayAbortRef.current) return;
     const requestVersion = offlineReplayRequestRef.current + 1;
     offlineReplayRequestRef.current = requestVersion;
     setOfflineReplay(null);
     setOfflineReplayStage(0);
     setOfflineReplayState("requesting");
+    const controller = new AbortController();
+    offlineReplayAbortRef.current = controller;
     try {
       const [policy, boundary, orderLookup] = await Promise.all([
-        runKnowledgeReplay("refund-timing"),
-        runKnowledgeReplay("refund-customer-action"),
-        getDemoOrder("NORD-2051"),
+        runKnowledgeReplay("refund-timing", controller.signal),
+        runKnowledgeReplay("refund-customer-action", controller.signal),
+        getDemoOrder("NORD-2051", controller.signal),
       ]);
       if (offlineReplayRequestRef.current !== requestVersion) return;
       setOfflineReplay({ policy, boundary, order: orderLookup.order });
@@ -1182,11 +1276,15 @@ function SupportAgentView({
     } catch {
       if (offlineReplayRequestRef.current !== requestVersion) return;
       setOfflineReplayState("error");
+    } finally {
+      if (offlineReplayAbortRef.current === controller) offlineReplayAbortRef.current = null;
     }
   }, [offlineReplayState]);
 
   const endConversation = useCallback(() => {
     offlineReplayRequestRef.current += 1;
+    offlineReplayAbortRef.current?.abort();
+    offlineReplayAbortRef.current = null;
     setOfflineReplay(null);
     setOfflineReplayStage(0);
     setOfflineReplayState("idle");
@@ -1221,13 +1319,13 @@ function SupportAgentView({
 
   const replayActive = ["playing", "ready"].includes(offlineReplayState);
   const conversationActive = (liveAvailable && turns.length > 0) || replayActive;
-  const showOfflineStart = offline && ["idle", "error"].includes(offlineReplayState);
-  const showConversation = liveAvailable || (offline && ["playing", "ready"].includes(offlineReplayState));
+  const showOfflineStart = fallbackMode && ["idle", "error"].includes(offlineReplayState);
+  const showConversation = !liveAiStatusResolved || liveAvailable || (fallbackMode && ["playing", "ready"].includes(offlineReplayState));
   const replayExplicitlyUnavailable = liveAiStatus?.replay_available === false;
   const supportReplayLabel = replayExplicitlyUnavailable
     ? copy.replayNotAvailable
     : offlineReplayState === "error"
-      ? localized(locale, "Försök med replay igen", "Try replay again")
+      ? localized(locale, "Försök hämta exemplet igen", "Try loading the example again")
       : copy.startReplay;
 
   return (
@@ -1239,16 +1337,35 @@ function SupportAgentView({
             <EndConversationButton label={copy.endConversation} onClick={endConversation} />
           ) : null}
         </div>
-        <div className={`chat-thread${!showConversation ? " chat-thread--offline" : ""}`} role="log" aria-live="polite" aria-relevant="additions text" aria-busy={Boolean(pendingId) || !liveAiStatusResolved || offlineReplayState === "requesting" || offlineReplayState === "playing"}>
-          {liveAvailable ? <MessageBubble side="assistant">
+        <div
+          className={`chat-thread${!showConversation ? " chat-thread--offline" : ""}`}
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions text"
+          aria-busy={Boolean(pendingId) || !liveAiStatusResolved || offlineReplayState === "requesting" || offlineReplayState === "playing"}
+          onScroll={(event) => {
+            const thread = event.currentTarget;
+            autoScrollRef.current = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 96;
+          }}
+        >
+          {!liveAiStatusResolved || liveAvailable ? <MessageBubble side="assistant">
             <p>{copy.greeting}</p>
           </MessageBubble> : null}
+
+          {!liveAiStatusResolved || (liveAvailable && turns.length === 0) ? (
+            <div className="suggestion-row suggestion-row--welcome" aria-label={localized(locale, "Exempelfrågor", "Example questions")}>
+              {copy.supportSuggestions.map((suggestion) => (
+                <button key={suggestion} type="button" onClick={() => void submit(suggestion)} disabled={!liveAvailable || Boolean(pendingId)}>{suggestion}</button>
+              ))}
+            </div>
+          ) : null}
 
           {liveAvailable ? turns.map((turn) => (
             <SupportTurn
               key={turn.clientId}
               turn={turn}
               locale={locale}
+              pending={pendingId === turn.clientId}
               slow={slow && pendingId === turn.clientId}
               onConfirm={() => void submit(turn.question, true, turn.clientId)}
               onCancel={() => cancel(turn.clientId)}
@@ -1258,48 +1375,56 @@ function SupportAgentView({
           )) : null}
 
           {!liveAiStatusResolved ? (
-            <div className="offline-replay-loading" role="status">
-              <TypingIndicator label={localized(locale, "Kontrollerar Live-AI…", "Checking Live AI…")} />
+            <div className="connection-status" role="status">
+              <TypingIndicator label={copy.connecting} />
             </div>
           ) : null}
 
           {showOfflineStart ? (
             <AgentIdleState
-              title={localized(locale, "AI:n är offline just nu.", "AI is offline right now.")}
+              title={statusUnknown
+                ? localized(locale, "Det tar längre tid att ansluta.", "Connecting is taking longer than expected.")
+                : localized(locale, "AI:n är offline just nu.", "AI is offline right now.")}
               body={localized(
                 locale,
-                replayExplicitlyUnavailable
-                  ? "Varken Live-AI eller replay är tillgänglig just nu. Kontrollera igen om en stund."
+                statusUnknown
+                  ? "Du kan prova ett sparat exempel under tiden eller försöka igen."
+                  : replayExplicitlyUnavailable
+                  ? "Varken chatten eller det sparade exemplet är tillgängligt just nu. Försök igen om en stund."
                   : offlineReplayState === "error"
-                  ? "Replayen kunde inte hämtas. Du kan försöka igen eller kontrollera om AI:n är tillbaka."
-                  : "Ett verifierat syntetiskt supportfall från backend. Replayen gör inga nya AI-anrop.",
-                replayExplicitlyUnavailable
-                  ? "Neither Live AI nor replay is available right now. Check again shortly."
+                  ? "Det sparade exemplet kunde inte hämtas. Du kan försöka igen eller kontrollera om chatten är tillbaka."
+                  : "Du kan ändå prova ett sparat supportexempel med syntetisk data.",
+                statusUnknown
+                  ? "You can try a saved example in the meantime or try again."
+                  : replayExplicitlyUnavailable
+                  ? "Neither the chat nor the saved example is available right now. Try again shortly."
                   : offlineReplayState === "error"
-                  ? "The replay could not be loaded. Try again or check whether AI is back."
-                  : "A verified synthetic support case from the backend. The replay makes no new AI calls.",
+                  ? "The saved example could not be loaded. Try again or check whether the chat is back."
+                  : "You can still try a saved support example with synthetic data.",
               )}
               actions={<>
                 <button type="button" className="button-primary" onClick={() => void startOfflineReplay()} disabled={!replayAvailable}>
                   <NordlySignal />{supportReplayLabel}
                 </button>
                 <button type="button" className="button-secondary" onClick={() => void refreshLiveAiStatus()}>
-                  <RefreshIcon />{localized(locale, "Kontrollera AI igen", "Check AI again")}
+                  <RefreshIcon />{localized(locale, "Försök ansluta igen", "Try connecting again")}
                 </button>
               </>}
-              footnote={replayExplicitlyUnavailable
-                ? localized(locale, "Backend rapporterar att replay saknas", "Backend reports that replay is unavailable")
-                : localized(locale, "Verifierad syntetisk supportreplay · inga nya AI-anrop", "Verified synthetic support replay · no new AI calls")}
+              footnote={statusUnknown
+                ? localized(locale, "Det sparade exemplet kräver en anslutning.", "The saved example requires a connection.")
+                : replayExplicitlyUnavailable
+                ? localized(locale, "Det finns inget sparat exempel att visa just nu.", "There is no saved example to show right now.")
+                : localized(locale, "Sparat exempel · syntetisk data", "Saved example · synthetic data")}
             />
           ) : null}
 
-          {offline && offlineReplayState === "requesting" ? (
+          {fallbackMode && offlineReplayState === "requesting" ? (
             <div className="offline-replay-loading" role="status">
-              <TypingIndicator label={localized(locale, "Hämtar verifierad replay från backend…", "Loading verified replay from the backend…")} />
+              <TypingIndicator label={localized(locale, "Hämtar ett sparat supportexempel…", "Loading a saved support example…")} />
             </div>
           ) : null}
 
-          {offline && offlineReplay ? (
+          {fallbackMode && offlineReplay ? (
             <AnimatePresence initial={false}>
               {offlineReplayStage >= 1 ? (
                 <MessageBubble key="offline-policy-question" side="user">
@@ -1314,7 +1439,7 @@ function SupportAgentView({
                   <p>{locale === "sv" ? offlineReplay.policy.answer.summary_sv : offlineReplay.policy.answer.summary_en}</p>
                   <ReplayOrderStrip order={offlineReplay.order} locale={locale} />
                   <SourceChips sources={replaySources} locale={locale} onOpen={openDocument} />
-                  <div className="verified-row"><CheckIcon />{localized(locale, "Verifierad inspelning · inga nya AI-anrop", "Verified recording · no new AI calls")}</div>
+                  <div className="verified-row"><CheckIcon />{localized(locale, "Sparat exempel · syntetisk data", "Saved example · synthetic data")}</div>
                 </MessageBubble>
               ) : null}
               {offlineReplayStage >= 4 ? (
@@ -1328,7 +1453,7 @@ function SupportAgentView({
               {offlineReplayStage >= 6 ? (
                 <MessageBubble key="offline-boundary-answer" side="assistant">
                   <p>{locale === "sv" ? offlineReplay.boundary.answer.summary_sv : offlineReplay.boundary.answer.summary_en}</p>
-                  <div className="protected-inline"><ShieldIcon /><span>{localized(locale, "Read-only · agenten gjorde ingen ändring", "Read only · the agent made no change")}</span></div>
+                  <div className="protected-inline"><ShieldIcon /><span>{localized(locale, "Jag gjorde inga ändringar.", "I didn’t make any changes.")}</span></div>
                   <div className="offline-replay-actions">
                     <button type="button" className="button-secondary" onClick={() => void startOfflineReplay()}><RefreshIcon />{localized(locale, "Spela igen", "Play again")}</button>
                   </div>
@@ -1339,14 +1464,7 @@ function SupportAgentView({
           <div ref={bottomRef} />
         </div>
 
-        {liveAvailable ? <div className="chat-composer-wrap">
-          {turns.length === 0 ? (
-            <div className="suggestion-row" aria-label={localized(locale, "Exempelfrågor", "Example questions")}>
-              {copy.supportSuggestions.map((suggestion) => (
-                <button key={suggestion} type="button" onClick={() => void submit(suggestion)} disabled={Boolean(pendingId)}>{suggestion}</button>
-              ))}
-            </div>
-          ) : null}
+        {!liveAiStatusResolved || liveAvailable ? <div className="chat-composer-wrap">
           <form className="chat-composer" onSubmit={onSubmit}>
             <label className="sr-only" htmlFor="support-message">{copy.supportPlaceholder}</label>
               <input
@@ -1355,11 +1473,11 @@ function SupportAgentView({
                 autoComplete="off"
                 value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder={copy.supportPlaceholder}
+              placeholder={liveAvailable ? copy.supportPlaceholder : copy.connecting}
               maxLength={500}
-              disabled={Boolean(pendingId)}
+              disabled={!liveAvailable || Boolean(pendingId)}
             />
-            <button type="submit" disabled={!draft.trim() || Boolean(pendingId)} aria-label={copy.send}><SendIcon /></button>
+            <button type="submit" disabled={!liveAvailable || !draft.trim() || Boolean(pendingId)} aria-label={copy.send}><SendIcon /></button>
           </form>
         </div> : null}
       </div>
@@ -1370,6 +1488,7 @@ function SupportAgentView({
 function SupportTurn({
   turn,
   locale,
+  pending,
   slow,
   onConfirm,
   onCancel,
@@ -1378,6 +1497,7 @@ function SupportTurn({
 }: {
   turn: CustomerChatTurn;
   locale: Locale;
+  pending: boolean;
   slow: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -1386,11 +1506,12 @@ function SupportTurn({
 }) {
   const copy = COPY[locale];
   const response = turn.response;
+  const documentSources = response?.sources.filter((source) => Boolean(source.document_id)) ?? [];
   const text = response
     ? locale === "sv" ? response.assistant_message.text_sv : response.assistant_message.text_en
     : null;
   return (
-    <motion.div className="chat-turn" layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+    <div className="chat-turn">
       <MessageBubble side="user"><p>{turn.question}</p></MessageBubble>
       {turn.errorCode ? (
         <MessageBubble side="assistant" tone="error">
@@ -1411,7 +1532,7 @@ function SupportTurn({
             <div className="confirmation-card__safe"><CheckIcon />{copy.noProviderYet}</div>
             <div className="confirmation-card__actions">
               <button type="button" className="button-secondary" onClick={onCancel}>{copy.cancel}</button>
-              <button type="button" className="button-primary" onClick={onConfirm}>{copy.searchDocuments}</button>
+              <button type="button" className="button-primary" onClick={onConfirm} disabled={pending}>{pending ? copy.checking : copy.searchDocuments}</button>
             </div>
           </div>
         </MessageBubble>
@@ -1419,19 +1540,18 @@ function SupportTurn({
         <MessageBubble side="assistant">
           <p>{text}</p>
           {response.order ? <OrderStrip response={response} locale={locale} /> : null}
-          {response.sources.length > 0 ? (
-            <SourceChips sources={response.sources} locale={locale} onOpen={openDocument} />
+          {documentSources.length > 0 ? (
+            <SourceChips sources={documentSources} locale={locale} onOpen={openDocument} />
           ) : null}
           {response.outcome === "refused" ? (
-            <div className="protected-inline"><LockIcon /><span>{localized(locale, "Privat innehåll öppnades inte", "Private content was not opened")}</span></div>
+            <div className="protected-inline"><LockIcon /><span>{localized(locale, "Jag öppnade inga privata uppgifter.", "I did not open any private information.")}</span></div>
           ) : null}
           <button type="button" className="disclosure-row" onClick={() => openEvidence(response)}>
             <span>{copy.behindAnswer}</span><ChevronRightIcon />
           </button>
-          <div className="verified-row"><CheckIcon />{supportOutcomeLabel(response, locale)}</div>
         </MessageBubble>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -1480,17 +1600,17 @@ function SourceChips({
 }) {
   return (
     <div className="source-chips">
-      {sources.map((source) => (
-        <button
-          key={source.evidence_id}
-          type="button"
-          onClick={() => onOpen(source, returnMode)}
-          disabled={!source.document_id}
-        >
-          <DocumentIcon />
-          <span>{source.title}</span>
-          {source.document_id ? <ChevronRightIcon /> : null}
+      {sources.map((source) => source.document_id ? (
+        <button key={source.evidence_id} type="button" onClick={() => onOpen(source, returnMode)}>
+          {sourceIcon(source)}
+          <span>{sourceLabel(source, locale)}</span>
+          <ChevronRightIcon />
         </button>
+      ) : (
+        <span key={source.evidence_id} className="source-chip--evidence" title={source.title}>
+          {sourceIcon(source)}
+          <span>{sourceLabel(source, locale)}</span>
+        </span>
       ))}
     </div>
   );
@@ -1499,8 +1619,10 @@ function SourceChips({
 function DriftAgentView({
   locale,
   liveAiStatus,
+  liveAiStatusResolved,
   session,
   sessionState,
+  requestPhase,
   failureMode,
   error,
   playbackStage,
@@ -1517,8 +1639,10 @@ function DriftAgentView({
 }: {
   locale: Locale;
   liveAiStatus: LiveAiStatusResponse | null;
+  liveAiStatusResolved: boolean;
   session: DriftSession | null;
   sessionState: "idle" | "requesting" | "playing" | "ready" | "error";
+  requestPhase: DriftRequestPhase;
   failureMode: DriftSession["mode"] | null;
   error: string | null;
   playbackStage: number;
@@ -1535,6 +1659,7 @@ function DriftAgentView({
 }) {
   const copy = COPY[locale];
   const bottomRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true);
   const [draft, setDraft] = useState("");
   const [slow, setSlow] = useState(false);
   const [selectedFamily, setSelectedFamily] = useState<IncidentFamilyCapability | null>(null);
@@ -1568,11 +1693,16 @@ function DriftAgentView({
     },
     [documents, locale, runbooks],
   );
-  const liveAvailable = liveAiStatus?.live_state === "available";
-  const replayAvailable = liveAiStatus?.replay_available === true;
+  const liveAvailable = liveAiStatusResolved && liveAiStatus?.live_state === "available";
+  const statusUnknown = liveAiStatusResolved && liveAiStatus === null;
+  const replayAvailable = liveAiStatusResolved && liveAiStatus?.replay_available !== false;
   const replayExplicitlyUnavailable = liveAiStatus?.replay_available === false;
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (!autoScrollRef.current) return;
+    bottomRef.current?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "nearest",
+    });
   }, [playbackStage, sessionState, turns.length]);
   useEffect(() => {
     if (!pending) {
@@ -1623,7 +1753,17 @@ function DriftAgentView({
           <AgentIdentity kind="drift" locale={locale} />
           {reportActive ? <EndConversationButton label={copy.endConversation} onClick={endConversation} /> : null}
         </div>
-        <div className="chat-thread chat-thread--drift" role="log" aria-live="polite" aria-relevant="additions text" aria-busy={sessionState === "requesting" || sessionState === "playing" || pending}>
+        <div
+          className="chat-thread chat-thread--drift"
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions text"
+          aria-busy={sessionState === "requesting" || sessionState === "playing" || pending}
+          onScroll={(event) => {
+            const thread = event.currentTarget;
+            autoScrollRef.current = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 96;
+          }}
+        >
           {sessionState === "idle" ? (
             liveAvailable ? (
               <motion.div className="drift-case-start" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -1681,16 +1821,20 @@ function DriftAgentView({
             ) : (
               <AgentIdleState
                 title={copy.driftIdleTitle}
-                body={copy.driftIdleBody}
+                body={!liveAiStatusResolved
+                  ? copy.connecting
+                  : statusUnknown
+                    ? localized(locale, "Live-statusen svarade inte i tid. Du kan fortfarande prova säkerhetsreplayen.", "The live status did not answer in time. You can still try the safety replay.")
+                    : copy.driftIdleBody}
                 actions={<>
                   <button type="button" className="button-primary" onClick={() => void startReplay()} disabled={!replayAvailable}>
-                    {replayExplicitlyUnavailable ? localized(locale, "Replay är inte tillgänglig", "Replay unavailable") : copy.startReplay}
+                    {replayExplicitlyUnavailable ? copy.replayNotAvailable : copy.startReplay}
                   </button>
                   <button type="button" className="button-secondary" onClick={() => void refreshLiveAiStatus()}>
-                    <RefreshIcon />{localized(locale, "Kontrollera AI igen", "Check AI again")}
+                    <RefreshIcon />{localized(locale, "Försök ansluta igen", "Try connecting again")}
                   </button>
                 </>}
-                footnote={copy.replayTruth}
+                footnote={statusUnknown ? copy.liveUnknown : copy.replayTruth}
               />
             )
           ) : sessionState === "requesting" ? (
@@ -1699,7 +1843,11 @@ function DriftAgentView({
                 <p>{selectedFamily ? copy.driftCasePrompt(selectedFamily.customer_impact[locale]) : copy.driftGenericPrompt}</p>
               </MessageBubble>
               <MessageBubble side="assistant" tone="pending">
-                <TypingIndicator label={copy.receiptWaiting} />
+                <TypingIndicator label={failureMode === "recorded_replay"
+                  ? localized(locale, "Hämtar verifierad replay från backend…", "Loading verified replay from the backend…")
+                  : requestPhase === "planning"
+                    ? copy.planning
+                    : copy.investigating} />
               </MessageBubble>
             </div>
           ) : sessionState === "error" ? (
@@ -1715,7 +1863,7 @@ function DriftAgentView({
                 {replayAvailable ? (
                   <button type="button" className="button-secondary" onClick={() => void startReplay()}>{copy.startReplay}</button>
                 ) : (
-                  <button type="button" className="button-secondary" onClick={() => void refreshLiveAiStatus()}><RefreshIcon />{localized(locale, "Kontrollera AI igen", "Check AI again")}</button>
+                  <button type="button" className="button-secondary" onClick={() => void refreshLiveAiStatus()}><RefreshIcon />{localized(locale, "Försök ansluta igen", "Try connecting again")}</button>
                 )}
               </>}
               footnote={localized(locale, "Inget svar ersattes automatiskt med replay.", "No answer was automatically replaced with a replay.")}
@@ -1797,7 +1945,7 @@ function DriftAgentView({
               </AnimatePresence>
 
               {turns.map((turn) => (
-                <motion.div key={turn.id} className="chat-turn" layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                <div key={turn.id} className="chat-turn">
                   <MessageBubble side="user"><p>{turn.question}</p></MessageBubble>
                   <MessageBubble side="assistant" tone={turn.error ? "error" : "default"}>
                     {turn.pending ? <TypingIndicator label={slow ? copy.slow : copy.waiting} /> : null}
@@ -1822,7 +1970,7 @@ function DriftAgentView({
                     ) : null}
                     {turn.error ? <p>{turn.error}</p> : null}
                   </MessageBubble>
-                </motion.div>
+                </div>
               ))}
               <div ref={bottomRef} />
             </>
@@ -2064,11 +2212,13 @@ function EvidenceSheet({
   locale,
   close,
   openDocument,
+  documents,
 }: {
   state: NonNullable<EvidenceState>;
   locale: Locale;
   close: () => void;
   openDocument: (source: DemoCustomerChatSource, returnMode?: Mode) => void;
+  documents: KnowledgeDocumentLibraryResponse | null;
 }) {
   const copy = COPY[locale];
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -2132,10 +2282,40 @@ function EvidenceSheet({
             session={state.session}
             locale={locale}
             focus={state.focus}
+            documents={documents}
+            openDocument={openDocument}
           />
         )}
       </motion.aside>
     </>
+  );
+}
+
+function EvidenceSourceRow({
+  source,
+  locale,
+  openDocument,
+}: {
+  source: DemoCustomerChatSource;
+  locale: Locale;
+  openDocument: (source: DemoCustomerChatSource, returnMode?: Mode) => void;
+}) {
+  const content = <>
+    {sourceIcon(source)}
+    <span>
+      <strong>{sourceLabel(source, locale)}</strong>
+      <small>{source.section_heading ?? (locale === "sv" ? source.display_summary_sv : source.display_summary_en)}</small>
+    </span>
+    {source.document_id ? <ChevronRightIcon /> : <ShieldIcon />}
+  </>;
+  return source.document_id ? (
+    <button type="button" className="evidence-source" onClick={() => openDocument(source, "support")}>
+      {content}
+    </button>
+  ) : (
+    <div className="evidence-source evidence-source--static">
+      {content}
+    </div>
   );
 }
 
@@ -2180,9 +2360,7 @@ function SupportEvidence({ response, locale, openDocument }: { response: DemoCus
         <section className="evidence-section">
           <h3>{copy.sourcesAndEvidence}</h3>
           {response.sources.map((source) => (
-            <button key={source.evidence_id} type="button" className="evidence-source" onClick={() => openDocument(source, "support")} disabled={!source.document_id}>
-              <DocumentIcon /><span><strong>{source.title}</strong><small>{source.section_heading ?? (locale === "sv" ? source.display_summary_sv : source.display_summary_en)}</small></span>{source.document_id ? <ChevronRightIcon /> : null}
-            </button>
+            <EvidenceSourceRow key={source.evidence_id} source={source} locale={locale} openDocument={openDocument} />
           ))}
         </section>
       ) : null}
@@ -2204,10 +2382,14 @@ function DriftEvidence({
   session,
   locale,
   focus,
+  documents,
+  openDocument,
 }: {
   session: DriftSession;
   locale: Locale;
   focus?: Pick<IncidentLabFollowUpCitation, "target_scene" | "target_id">;
+  documents: KnowledgeDocumentLibraryResponse | null;
+  openDocument: (source: DemoCustomerChatSource, returnMode?: Mode) => void;
 }) {
   const copy = COPY[locale];
   const run = session.run;
@@ -2313,17 +2495,17 @@ function DriftEvidence({
       <details className="evidence-details" open={focus?.target_scene === "agent_rag"}>
         <summary>{localized(locale, "Hämtade runbookpassager", "Retrieved runbook passages")}<ChevronRightIcon /></summary>
         <div className="evidence-runbook-list">
-          {runbooks.map(({ evidence: runbook, match }) => (
-            <article
-              key={runbook.evidence_id}
-              className={`evidence-runbook${focus?.target_scene === "agent_rag" && focus.target_id === runbook.evidence_id ? " is-focused" : ""}`}
-            >
+          {runbooks.map(({ evidence: runbook, match }) => {
+            const documentSource = runbookDocumentSource(runbook, documents, locale);
+            const className = `evidence-runbook${documentSource ? " evidence-runbook--link" : ""}${focus?.target_scene === "agent_rag" && focus.target_id === runbook.evidence_id ? " is-focused" : ""}`;
+            const content = <>
               <div className="evidence-runbook__meta">
                 <DocumentIcon />
                 <span>
-                  <strong>{runbook.content.document_id}</strong>
+                  <strong>{documentSource?.title ?? runbook.content.document_id}</strong>
                   <small>{runbook.content.chunk_id} · v{runbook.content.document_version}</small>
                 </span>
+                {documentSource ? <ChevronRightIcon /> : null}
               </div>
               <p>{runbook.content.text}</p>
               {match ? (
@@ -2332,8 +2514,15 @@ function DriftEvidence({
                   {match.cosine_similarity === null ? "" : ` · ${match.cosine_similarity.toFixed(3)}`}
                 </small>
               ) : null}
-            </article>
-          ))}
+            </>;
+            return documentSource ? (
+              <button key={runbook.evidence_id} type="button" className={className} onClick={() => openDocument(documentSource, "drift")}>
+                {content}
+              </button>
+            ) : (
+              <article key={runbook.evidence_id} className={className}>{content}</article>
+            );
+          })}
         </div>
       </details>
       <details className="evidence-details" open={focus?.target_scene === "java"}>
